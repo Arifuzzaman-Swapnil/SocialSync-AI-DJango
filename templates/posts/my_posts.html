@@ -1,0 +1,468 @@
+{% extends 'base.html' %}
+
+{% block title %}My Posts - SocialSync{% endblock %}
+
+{% block extra_css %}
+<style>
+    .posts-container {
+        max-width: 1400px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    
+    .posts-header {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .posts-header h1 {
+        font-size: 2rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-box {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #6366f1;
+    }
+    
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-top: 0.5rem;
+    }
+    
+    .filters {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .filter-btn {
+        padding: 0.75rem 1.5rem;
+        border: 2px solid #e5e7eb;
+        background: white;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+        text-decoration: none;
+        color: #374151;
+    }
+    
+    .filter-btn:hover {
+        border-color: #6366f1;
+        color: #6366f1;
+    }
+    
+    .filter-btn.active {
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        border-color: transparent;
+    }
+    
+    .posts-list {
+        display: grid;
+        gap: 1.5rem;
+    }
+    
+    .post-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        transition: transform 0.3s;
+    }
+    
+    .post-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+    
+    .post-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        margin-bottom: 1rem;
+    }
+    
+    .post-status {
+        display: inline-block;
+        padding: 0.5rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .status-scheduled {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .status-posted {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-failed {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .status-cancelled {
+        background: #f3f4f6;
+        color: #6b7280;
+    }
+    
+    .status-posting {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .post-time {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.5rem;
+    }
+    
+    .post-caption {
+        color: #1f2937;
+        margin-bottom: 1rem;
+        line-height: 1.6;
+    }
+    
+    .post-platforms {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .platform-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+    }
+    
+    .badge-facebook { background: #1877f2; }
+    .badge-twitter { background: #1da1f2; }
+    .badge-instagram { background: #e4405f; }
+    .badge-linkedin { background: #0a66c2; }
+    
+    .post-actions {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 2px solid #f3f4f6;
+    }
+    
+    .btn-action {
+        padding: 0.5rem 1rem;
+        border: 2px solid #e5e7eb;
+        background: white;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+        text-decoration: none;
+        color: #374151;
+    }
+    
+    .btn-action:hover {
+        border-color: #6366f1;
+        color: #6366f1;
+    }
+    
+    .btn-delete {
+        border-color: #ef4444;
+        color: #ef4444;
+    }
+    
+    .btn-delete:hover {
+        background: #ef4444;
+        color: white;
+    }
+    
+    .empty-state {
+        background: white;
+        padding: 4rem 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .post-results {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #f9fafb;
+        border-radius: 0.5rem;
+    }
+    
+    .result-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        font-size: 0.875rem;
+    }
+    
+    .result-success {
+        color: #10b981;
+    }
+    
+    .result-error {
+        color: #ef4444;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="posts-container">
+    <!-- Header -->
+    <div class="posts-header">
+        <h1>📋 My Posts</h1>
+        <p style="color: #6b7280;">Manage and track your scheduled posts</p>
+    </div>
+    
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-box">
+            <div class="stat-value">{{ total_posts }}</div>
+            <div class="stat-label">Total Posts</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ scheduled_posts }}</div>
+            <div class="stat-label">Scheduled</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ posted_posts }}</div>
+            <div class="stat-label">Posted</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-value">{{ failed_posts }}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="filters">
+        <a href="?status=all" class="filter-btn {% if status_filter == 'all' %}active{% endif %}">
+            📊 All Posts
+        </a>
+        <a href="?status=scheduled" class="filter-btn {% if status_filter == 'scheduled' %}active{% endif %}">
+            ⏰ Scheduled
+        </a>
+        <a href="?status=posted" class="filter-btn {% if status_filter == 'posted' %}active{% endif %}">
+            ✅ Posted
+        </a>
+        <a href="?status=failed" class="filter-btn {% if status_filter == 'failed' %}active{% endif %}">
+            ❌ Failed
+        </a>
+        <a href="{% url 'create_post' %}" class="filter-btn" style="margin-left: auto; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none;">
+            ➕ New Post
+        </a>
+    </div>
+    
+    <!-- Posts List -->
+    <div class="posts-list">
+        {% if posts %}
+            {% for post in posts %}
+            <div class="post-card">
+                <div class="post-header">
+                    <div>
+                        <span class="post-status status-{{ post.status }}">
+                            {% if post.status == 'scheduled' %}⏰ Scheduled
+                            {% elif post.status == 'posted' %}✅ Posted
+                            {% elif post.status == 'failed' %}❌ Failed
+                            {% elif post.status == 'cancelled' %}🚫 Cancelled
+                            {% elif post.status == 'posting' %}📤 Posting...
+                            {% endif %}
+                        </span>
+                        <div class="post-time">
+                            {% if post.status == 'scheduled' %}
+                                📅 Scheduled for {{ post.scheduled_time|date:"F d, Y" }} at {{ post.scheduled_time|date:"h:i A" }}
+                            {% elif post.status == 'posted' %}
+                                ✓ Posted on {{ post.posted_at|date:"F d, Y" }} at {{ post.posted_at|date:"h:i A" }}
+                            {% else %}
+                                📅 {{ post.scheduled_time|date:"F d, Y" }} at {{ post.scheduled_time|date:"h:i A" }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if post.ai_generated %}
+                    <span style="background: #eff6ff; color: #1e40af; padding: 0.25rem 0.75rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 600;">
+                        🤖 AI Generated
+                    </span>
+                    {% endif %}
+                </div>
+                
+                <div class="post-caption">
+                    {{ post.caption|truncatewords:50 }}
+                </div>
+                
+                <div class="post-platforms">
+                    {% for platform in post.platforms_list %}
+                    <span class="platform-badge badge-{{ platform }}">
+                        {% if platform == 'facebook' %}📘 Facebook
+                        {% elif platform == 'twitter' %}🐦 Twitter
+                        {% elif platform == 'instagram' %}📷 Instagram
+                        {% elif platform == 'linkedin' %}💼 LinkedIn
+                        {% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+                
+                <!-- Post Results (for posted/failed) -->
+                {% if post.status == 'posted' or post.status == 'failed' %}
+                <div class="post-results">
+                    <strong>📊 Results:</strong>
+                    {% for platform in post.platforms_list %}
+                    <div class="result-item">
+                        <span>
+                            {% if platform == 'facebook' %}📘 Facebook
+                            {% elif platform == 'twitter' %}🐦 Twitter
+                            {% elif platform == 'instagram' %}📷 Instagram
+                            {% elif platform == 'linkedin' %}💼 LinkedIn
+                            {% endif %}
+                        </span>
+                        <span>
+                            {% if platform == 'facebook' %}
+                                {% if post.facebook_post_id %}
+                                    <span class="result-success">✓ Posted</span>
+                                {% elif post.facebook_error %}
+                                    <span class="result-error">✗ {{ post.facebook_error|truncatewords:5 }}</span>
+                                {% endif %}
+                            {% elif platform == 'twitter' %}
+                                {% if post.twitter_post_id %}
+                                    <span class="result-success">✓ Posted</span>
+                                {% elif post.twitter_error %}
+                                    <span class="result-error">✗ {{ post.twitter_error|truncatewords:5 }}</span>
+                                {% endif %}
+                            {% elif platform == 'instagram' %}
+                                {% if post.instagram_post_id %}
+                                    <span class="result-success">✓ Posted</span>
+                                {% elif post.instagram_error %}
+                                    <span class="result-error">✗ {{ post.instagram_error|truncatewords:5 }}</span>
+                                {% endif %}
+                            {% elif platform == 'linkedin' %}
+                                {% if post.linkedin_post_id %}
+                                    <span class="result-success">✓ Posted</span>
+                                {% elif post.linkedin_error %}
+                                    <span class="result-error">✗ {{ post.linkedin_error|truncatewords:5 }}</span>
+                                {% endif %}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Actions -->
+                <div class="post-actions">
+                    {% if post.can_be_edited %}
+                    <a href="{% url 'edit_post' post.id %}" class="btn-action">
+                        ✏️ Edit
+                    </a>
+                    {% endif %}
+                    
+                    {% if post.can_be_cancelled %}
+                    <form method="POST" action="{% url 'cancel_post' post.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-action" onclick="return confirm('Cancel this post?')">
+                            🚫 Cancel
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    <form method="POST" action="{% url 'delete_post' post.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-action btn-delete" onclick="return confirm('Delete this post permanently?')">
+                            🗑️ Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📭</div>
+                <h3>No Posts Yet</h3>
+                <p style="color: #6b7280; margin-bottom: 2rem;">
+                    {% if status_filter != 'all' %}
+                        No {{ status_filter }} posts found.
+                    {% else %}
+                        You haven't created any posts yet. Get started now!
+                    {% endif %}
+                </p>
+                <a href="{% url 'create_post' %}" style="padding: 1rem 2rem; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: 0.5rem; text-decoration: none; font-weight: 600; display: inline-block;">
+                    ➕ Create Your First Post
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Auto-refresh every 10 seconds
+setInterval(function() {
+    location.reload();
+}, 10000);
+
+// Also refresh when tab becomes visible
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        location.reload();
+    }
+});
+
+// Show refresh indicator
+window.addEventListener('load', function() {
+    let indicator = document.createElement('div');
+    indicator.id = 'refresh-indicator';
+    indicator.style.cssText = 'position: fixed; bottom: 20px; right: 20px; background: rgba(99, 102, 241, 0.9); color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; z-index: 9999; box-shadow: 0 4px 12px rgba(0,0,0,0.15);';
+    indicator.innerHTML = '🔄 Auto-refresh ON';
+    document.body.appendChild(indicator);
+    
+    // Blink before refresh
+    setInterval(function() {
+        indicator.style.opacity = '0.5';
+        setTimeout(function() {
+            indicator.style.opacity = '1';
+        }, 500);
+    }, 9000);
+});
+</script>
+
+{% endblock %}

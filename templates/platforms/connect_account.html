@@ -1,0 +1,665 @@
+{% extends 'base.html' %}
+
+{% block title %}Connect Accounts - SocialSync{% endblock %}
+
+{% block extra_css %}
+<style>
+    .connect-container {
+        max-width: 1200px;
+        margin: 2rem auto;
+    }
+    
+    .page-header {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .page-header h1 {
+        font-size: 2rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    
+    .platforms-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+    
+    .platform-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        transition: transform 0.3s, box-shadow 0.3s;
+        cursor: pointer;
+        border: 3px solid transparent;
+    }
+    
+    .platform-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+    }
+    
+    .platform-card.active {
+        border-color: #6366f1;
+    }
+    
+    .platform-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .platform-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+    }
+    
+    .platform-icon.facebook { background: #1877f2; }
+    .platform-icon.twitter { background: #1da1f2; }
+    .platform-icon.instagram { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
+    .platform-icon.linkedin { background: #0a66c2; }
+    .platform-icon.tiktok { background: #000000; }
+    .platform-icon.youtube { background: #ff0000; }
+    .platform-icon.pinterest { background: #e60023; }
+    .platform-icon.telegram { background: #0088cc; }
+    
+    .platform-info h3 {
+        margin: 0;
+        color: #1f2937;
+        font-size: 1.25rem;
+    }
+    
+    .platform-status {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .platform-status.connected {
+        color: #10b981;
+        font-weight: 600;
+    }
+    
+    .connect-form {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+        display: none;
+    }
+    
+    .connect-form.active {
+        display: block;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .form-label .required {
+        color: #ef4444;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        transition: all 0.3s;
+        font-family: monospace;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    
+    .form-help {
+        font-size: 0.875rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+    
+    .btn-connect {
+        width: 100%;
+        padding: 1rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .btn-connect:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    }
+    
+    .connected-accounts {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .connected-accounts h2 {
+        margin-bottom: 1.5rem;
+        color: #1f2937;
+    }
+    
+    .account-list {
+        display: grid;
+        gap: 1rem;
+    }
+    
+    .account-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.5rem;
+        background: #f9fafb;
+        border-radius: 0.75rem;
+        border: 2px solid #e5e7eb;
+    }
+    
+    .account-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .account-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+    
+    .account-details h4 {
+        margin: 0;
+        color: #1f2937;
+    }
+    
+    .account-platform {
+        font-size: 0.875rem;
+        color: #6b7280;
+    }
+    
+    .btn-disconnect {
+        padding: 0.5rem 1rem;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .btn-disconnect:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6b7280;
+    }
+    
+    .empty-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+    
+    .info-box {
+        background: #eff6ff;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .info-box strong {
+        color: #1e40af;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="connect-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <h1>🔗 Connect Social Media Accounts</h1>
+        <p style="color: #6b7280;">
+            Connect your social media accounts to start scheduling posts
+            {% if not can_add_account %}
+                <span style="color: #ef4444; font-weight: 600;">
+                    (Limit reached: {{ connected_accounts.count }}/{{ user.profile.max_social_accounts }})
+                </span>
+            {% endif %}
+        </p>
+    </div>
+    
+    <!-- Platform Selection Grid -->
+    <div class="platforms-grid">
+        <!-- Facebook -->
+        <div class="platform-card" onclick="showForm('facebook')" id="card-facebook">
+            <div class="platform-header">
+                <div class="platform-icon facebook">📘</div>
+                <div class="platform-info">
+                    <h3>Facebook</h3>
+                    <div class="platform-status">Click to connect</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Twitter -->
+        <div class="platform-card" onclick="showForm('twitter')" id="card-twitter">
+            <div class="platform-header">
+                <div class="platform-icon twitter">🐦</div>
+                <div class="platform-info">
+                    <h3>X (Twitter)</h3>
+                    <div class="platform-status">Click to connect</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Instagram -->
+        <div class="platform-card" onclick="showForm('instagram')" id="card-instagram">
+            <div class="platform-header">
+                <div class="platform-icon instagram">📷</div>
+                <div class="platform-info">
+                    <h3>Instagram</h3>
+                    <div class="platform-status">Click to connect</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- LinkedIn -->
+        <div class="platform-card" onclick="showForm('linkedin')" id="card-linkedin">
+            <div class="platform-header">
+                <div class="platform-icon linkedin">💼</div>
+                <div class="platform-info">
+                    <h3>LinkedIn</h3>
+                    <div class="platform-status">Click to connect</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- TikTok -->
+        <div class="platform-card" style="opacity: 0.5;">
+            <div class="platform-header">
+                <div class="platform-icon tiktok">🎵</div>
+                <div class="platform-info">
+                    <h3>TikTok</h3>
+                    <div class="platform-status">Coming Soon</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- YouTube -->
+        <div class="platform-card" style="opacity: 0.5;">
+            <div class="platform-header">
+                <div class="platform-icon youtube">🎥</div>
+                <div class="platform-info">
+                    <h3>YouTube</h3>
+                    <div class="platform-status">Coming Soon</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pinterest -->
+        <div class="platform-card" style="opacity: 0.5;">
+            <div class="platform-header">
+                <div class="platform-icon pinterest">📌</div>
+                <div class="platform-info">
+                    <h3>Pinterest</h3>
+                    <div class="platform-status">Coming Soon</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Telegram -->
+        <div class="platform-card" style="opacity: 0.5;">
+            <div class="platform-header">
+                <div class="platform-icon telegram">✈️</div>
+                <div class="platform-info">
+                    <h3>Telegram</h3>
+                    <div class="platform-status">Coming Soon</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Facebook Form -->
+    <div class="connect-form" id="form-facebook">
+        <h2>📘 Connect Facebook Page</h2>
+        
+        <div class="info-box">
+            <strong>ℹ️ How to get credentials:</strong><br>
+            1. Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank">Graph API Explorer</a><br>
+            2. Select your app → Generate Access Token<br>
+            3. Add permissions: <code>pages_manage_posts</code>, <code>pages_read_engagement</code><br>
+            4. Query: <code>/me/accounts</code> to get Page ID and Page Access Token
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="platform" value="facebook">
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Facebook Page ID <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="facebook_page_id"
+                    class="form-control" 
+                    placeholder="123456789012345"
+                    required
+                >
+                <div class="form-help">Your Facebook Page ID (numeric)</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Page Access Token <span class="required">*</span>
+                </label>
+                <textarea 
+                    name="facebook_access_token"
+                    class="form-control" 
+                    rows="4"
+                    placeholder="EAAxxxxxxxxxx..."
+                    required
+                ></textarea>
+                <div class="form-help">Long-lived Page Access Token from Graph API Explorer</div>
+            </div>
+            
+            <button type="submit" class="btn-connect">
+                🔗 Connect Facebook Page
+            </button>
+        </form>
+    </div>
+    
+    <!-- Twitter Form -->
+    <div class="connect-form" id="form-twitter">
+        <h2>🐦 Connect Twitter/X Account</h2>
+        
+        <div class="info-box">
+            <strong>ℹ️ How to get credentials:</strong><br>
+            1. Go to <a href="https://developer.twitter.com/en/portal/dashboard" target="_blank">Twitter Developer Portal</a><br>
+            2. Create or select your app<br>
+            3. Go to "Keys and Tokens" tab<br>
+            4. Copy all 4 credentials below
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="platform" value="twitter">
+            
+            <div class="form-group">
+                <label class="form-label">
+                    API Key (Consumer Key) <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="twitter_api_key"
+                    class="form-control" 
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxx"
+                    required
+                >
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    API Secret (Consumer Secret) <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="twitter_api_secret"
+                    class="form-control" 
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    required
+                >
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Access Token <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="twitter_access_token"
+                    class="form-control" 
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    required
+                >
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Access Token Secret <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="twitter_access_token_secret"
+                    class="form-control" 
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    required
+                >
+            </div>
+            
+            <button type="submit" class="btn-connect">
+                🔗 Connect Twitter Account
+            </button>
+        </form>
+    </div>
+    
+    <!-- Instagram Form -->
+    <div class="connect-form" id="form-instagram">
+        <h2>📷 Connect Instagram Business Account</h2>
+        
+        <div class="info-box">
+            <strong>ℹ️ How to get credentials:</strong><br>
+            1. Instagram account must be a Business account<br>
+            2. Must be connected to a Facebook Page<br>
+            3. Use same Facebook Page Access Token as above<br>
+            4. Get Business Account ID from Graph API: <code>/me?fields=instagram_business_account</code>
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="platform" value="instagram">
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Instagram Business Account ID <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="instagram_business_account_id"
+                    class="form-control" 
+                    placeholder="17841400000000000"
+                    required
+                >
+                <div class="form-help">Your Instagram Business Account ID (numeric)</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Access Token <span class="required">*</span>
+                </label>
+                <textarea 
+                    name="instagram_access_token"
+                    class="form-control" 
+                    rows="4"
+                    placeholder="EAAxxxxxxxxxx... (same as Facebook Page token)"
+                    required
+                ></textarea>
+                <div class="form-help">Facebook Page Access Token (same as above)</div>
+            </div>
+            
+            <button type="submit" class="btn-connect">
+                🔗 Connect Instagram Account
+            </button>
+        </form>
+    </div>
+    
+    <!-- LinkedIn Form -->
+    <div class="connect-form" id="form-linkedin">
+        <h2>💼 Connect LinkedIn Account</h2>
+        
+        <div class="info-box">
+            <strong>ℹ️ How to get credentials:</strong><br>
+            1. Complete OAuth 2.0 flow to get Access Token<br>
+            2. Get Person URN from <code>/v2/userinfo</code> API (the 'sub' field)<br>
+            3. Token expires in 60 days - needs refresh
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            <input type="hidden" name="platform" value="linkedin">
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Access Token <span class="required">*</span>
+                </label>
+                <textarea 
+                    name="linkedin_access_token"
+                    class="form-control" 
+                    rows="4"
+                    placeholder="AQxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    required
+                ></textarea>
+                <div class="form-help">LinkedIn OAuth 2.0 Access Token</div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    Person URN <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    name="linkedin_person_urn"
+                    class="form-control" 
+                    placeholder="xxxxxxxxxxxxxxxx"
+                    required
+                >
+                <div class="form-help">Your LinkedIn Person URN (from /v2/userinfo API 'sub' field)</div>
+            </div>
+            
+            <button type="submit" class="btn-connect">
+                🔗 Connect LinkedIn Account
+            </button>
+        </form>
+    </div>
+    
+    <!-- Connected Accounts -->
+    <div class="connected-accounts">
+        <h2>✅ Connected Accounts ({{ connected_accounts.count }})</h2>
+        
+        {% if connected_accounts %}
+            <div class="account-list">
+                {% for account in connected_accounts %}
+                <div class="account-item">
+                    <div class="account-info">
+                        <div class="account-icon {{ account.platform }}">
+                            {% if account.platform == 'facebook' %}📘
+                            {% elif account.platform == 'twitter' %}🐦
+                            {% elif account.platform == 'instagram' %}📷
+                            {% elif account.platform == 'linkedin' %}💼
+                            {% endif %}
+                        </div>
+                        <div class="account-details">
+                            <h4>{{ account.account_name }}</h4>
+                            <div class="account-platform">
+                                {{ account.get_platform_display }} • 
+                                Connected {{ account.connected_at|date:"M d, Y" }}
+                            </div>
+                        </div>
+                    </div>
+                    <form method="POST" action="{% url 'disconnect_account' account.id %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn-disconnect" onclick="return confirm('Disconnect {{ account.account_name }}?')">
+                            🗑️ Disconnect
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">🔌</div>
+                <p><strong>No accounts connected yet</strong></p>
+                <p>Click on a platform above to get started!</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+    function showForm(platform) {
+        // Hide all forms
+        document.querySelectorAll('.connect-form').forEach(form => {
+            form.classList.remove('active');
+        });
+        
+        // Remove active class from all cards
+        document.querySelectorAll('.platform-card').forEach(card => {
+            card.classList.remove('active');
+        });
+        
+        // Show selected form
+        const form = document.getElementById('form-' + platform);
+        if (form) {
+            form.classList.add('active');
+            form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            // Add active class to selected card
+            document.getElementById('card-' + platform).classList.add('active');
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,261 @@
+{% extends 'base.html' %}
+
+{% block title %}Profile - SocialSync{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-container {
+        max-width: 800px;
+        margin: 2rem auto;
+    }
+    
+    .profile-card {
+        background: white;
+        border-radius: 1rem;
+        padding: 3rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .profile-header {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 3rem;
+        padding-bottom: 2rem;
+        border-bottom: 2px solid #f3f4f6;
+    }
+    
+    .avatar-section {
+        text-align: center;
+    }
+    
+    .avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+    
+    .avatar img {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+    }
+    
+    .upload-btn {
+        padding: 0.5rem 1rem;
+        background: #f3f4f6;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-size: 0.875rem;
+    }
+    
+    .profile-info h1 {
+        font-size: 2rem;
+        color: #1f2937;
+        margin-bottom: 0.5rem;
+    }
+    
+    .profile-meta {
+        color: #6b7280;
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+    
+    .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: #374151;
+    }
+    
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        transition: all 0.3s;
+    }
+    
+    .form-control:focus {
+        outline: none;
+        border-color: #6366f1;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+    
+    .form-control:disabled {
+        background: #f3f4f6;
+        cursor: not-allowed;
+    }
+    
+    .btn-save {
+        padding: 1rem 2rem;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .btn-save:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+    }
+    
+    .info-box {
+        background: #f0f9ff;
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <div class="profile-card">
+        <!-- Profile Header -->
+        <div class="profile-header">
+            <div class="avatar-section">
+                <div class="avatar">
+                    {% if profile.avatar %}
+                        <img src="{{ profile.avatar.url }}" alt="{{ user.username }}">
+                    {% else %}
+                        {{ user.username.0|upper }}
+                    {% endif %}
+                </div>
+                <label for="avatar-upload" class="upload-btn">
+                    📷 Change Photo
+                </label>
+                <input type="file" id="avatar-upload" style="display: none;" accept="image/*">
+            </div>
+            
+            <div class="profile-info">
+                <h1>{{ user.username }}</h1>
+                <div class="profile-meta">
+                    <div class="meta-item">
+                        <span>📧</span>
+                        <span>{{ user.email }}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>📅</span>
+                        <span>Joined {{ user.date_joined|date:"F Y" }}</span>
+                    </div>
+                    <div class="meta-item">
+                        {% if profile.is_approved %}
+                            <span style="color: #10b981;">✓ Approved</span>
+                        {% else %}
+                            <span style="color: #f59e0b;">⏳ Pending</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-box">
+            <strong>ℹ️ Pro Tip:</strong> Keep your profile updated to get personalized AI caption suggestions!
+        </div>
+        
+        <!-- Profile Form -->
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label class="form-label" for="username">Username</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    class="form-control" 
+                    value="{{ user.username }}"
+                    disabled
+                >
+                <small style="color: #6b7280;">Username cannot be changed</small>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="email">Email</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email"
+                    class="form-control" 
+                    value="{{ user.email }}"
+                >
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="phone">Phone</label>
+                <input 
+                    type="tel" 
+                    id="phone" 
+                    name="phone"
+                    class="form-control" 
+                    value="{{ profile.phone|default:'' }}"
+                    placeholder="+880 123 456 7890"
+                >
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="company">Company</label>
+                <input 
+                    type="text" 
+                    id="company" 
+                    name="company"
+                    class="form-control" 
+                    value="{{ profile.company|default:'' }}"
+                    placeholder="Your company name"
+                >
+            </div>
+            
+            <input type="file" name="avatar" style="display: none;" id="avatar-input">
+            
+            <button type="submit" class="btn-save">
+                💾 Save Changes
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Avatar upload handling
+    document.getElementById('avatar-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            document.getElementById('avatar-input').files = e.target.files;
+            
+            // Preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.querySelector('.avatar').innerHTML = '<img src="' + e.target.result + '" alt="Avatar">';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+{% endblock %}
+{% block extra_js %}{% endblock %}

@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Post - SocialSync{% endblock %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 2rem auto; padding: 0 1rem;">
+    <div style="background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 2rem;">
+        <h1 style="font-size: 2rem; color: #6366f1; margin-bottom: 0.5rem;">✏️ Edit Post</h1>
+        <p style="color: #6b7280;">Update your scheduled post</p>
+    </div>
+    
+    <form method="POST" style="background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+        {% csrf_token %}
+        
+        <!-- Caption -->
+        <div style="margin-bottom: 2rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Caption</label>
+            <textarea name="caption" required style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 0.5rem; min-height: 150px; font-family: inherit;">{{ post.caption }}</textarea>
+        </div>
+        
+        <!-- Platforms -->
+        <div style="margin-bottom: 2rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Platforms</label>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem;">
+                {% for account in connected_accounts %}
+                <label style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #f9fafb; border: 2px solid #e5e7eb; border-radius: 0.75rem; cursor: pointer;">
+                    <input type="checkbox" name="platforms" value="{{ account.platform }}" {% if account.platform in selected_platforms %}checked{% endif %}>
+                    <span style="font-weight: 600;">
+                        {% if account.platform == 'facebook' %}📘 Facebook
+                        {% elif account.platform == 'twitter' %}🐦 Twitter
+                        {% elif account.platform == 'instagram' %}📷 Instagram
+                        {% elif account.platform == 'linkedin' %}💼 LinkedIn
+                        {% endif %}
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Schedule Time -->
+        <div style="margin-bottom: 2rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #374151;">Scheduled Time</label>
+            <input type="datetime-local" name="scheduled_time" required value="{{ post.scheduled_time|date:'Y-m-d\TH:i' }}" style="width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 0.5rem;">
+        </div>
+        
+        <!-- Actions -->
+        <div style="display: flex; gap: 1rem;">
+            <button type="submit" style="flex: 1; padding: 1rem; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border: none; border-radius: 0.5rem; font-size: 1.125rem; font-weight: 600; cursor: pointer;">
+                💾 Save Changes
+            </button>
+            <a href="{% url 'my_posts' %}" style="flex: 1; padding: 1rem; background: white; color: #6b7280; border: 2px solid #e5e7eb; border-radius: 0.5rem; font-size: 1.125rem; font-weight: 600; text-align: center; text-decoration: none; display: block;">
+                ❌ Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

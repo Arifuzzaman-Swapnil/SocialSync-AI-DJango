@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard - SocialSync{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+    
+    .admin-header {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+    
+    .admin-header h1 {
+        font-size: 2rem;
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .stat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+    
+    .stat-icon {
+        font-size: 2.5rem;
+    }
+    
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1f2937;
+    }
+    
+    .stat-label {
+        color: #6b7280;
+        font-size: 0.875rem;
+    }
+    
+    .stat-change {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #10b981;
+    }
+    
+    .pending-users {
+        background: white;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .pending-users h2 {
+        margin-bottom: 1.5rem;
+        color: #1f2937;
+    }
+    
+    .user-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .user-table th {
+        text-align: left;
+        padding: 1rem;
+        background: #f9fafb;
+        color: #6b7280;
+        font-weight: 600;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .user-table td {
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .user-table tr:hover {
+        background: #f9fafb;
+    }
+    
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .badge-pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+    
+    .badge-approved {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .btn-approve {
+        padding: 0.5rem 1rem;
+        background: #10b981;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+    
+    .btn-approve:hover {
+        background: #059669;
+        transform: translateY(-2px);
+    }
+    
+    .btn-reject {
+        padding: 0.5rem 1rem;
+        background: #ef4444;
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s;
+        margin-left: 0.5rem;
+    }
+    
+    .btn-reject:hover {
+        background: #dc2626;
+        transform: translateY(-2px);
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6b7280;
+    }
+    
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Admin Header -->
+    <div class="admin-header">
+        <h1>👑 Admin Dashboard</h1>
+        <p style="color: #6b7280;">Manage users and monitor system activity</p>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon">👥</div>
+            </div>
+            <div class="stat-value">{{ total_users }}</div>
+            <div class="stat-label">Total Users</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon">⏳</div>
+            </div>
+            <div class="stat-value">{{ pending_users }}</div>
+            <div class="stat-label">Pending Approval</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon">✅</div>
+            </div>
+            <div class="stat-value">{{ approved_users }}</div>
+            <div class="stat-label">Approved Users</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon">🔗</div>
+            </div>
+            <div class="stat-value">0</div>
+            <div class="stat-label">Active Accounts</div>
+        </div>
+    </div>
+    
+    <!-- Pending Users Table -->
+    <div class="pending-users">
+        <h2>⏳ Pending User Approvals</h2>
+        
+        {% if recent_users %}
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Company</th>
+                    <th>Registered</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for profile in recent_users %}
+                <tr>
+                    <td>
+                        <strong>{{ profile.user.username }}</strong>
+                    </td>
+                    <td>{{ profile.user.email }}</td>
+                    <td>{{ profile.company|default:"—" }}</td>
+                    <td>{{ profile.created_at|date:"M d, Y" }}</td>
+                    <td>
+                        {% if profile.is_approved %}
+                            <span class="badge badge-approved">✓ Approved</span>
+                        {% else %}
+                            <span class="badge badge-pending">⏳ Pending</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if not profile.is_approved %}
+                            <a href="/admin/accounts/userprofile/{{ profile.id }}/change/" target="_blank">
+                                <button class="btn-approve">✓ Approve</button>
+                            </a>
+                            <button class="btn-reject">✗ Reject</button>
+                        {% else %}
+                            <span style="color: #10b981;">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">🎉</div>
+            <p><strong>All caught up!</strong></p>
+            <p>No pending user approvals</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
