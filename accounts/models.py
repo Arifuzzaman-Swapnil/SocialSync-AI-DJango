@@ -3,6 +3,43 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+class SiteConfiguration(models.Model):
+    """Store site-wide configuration in database"""
+    
+    key = models.CharField(max_length=100, unique=True, help_text='Configuration key')
+    value = models.TextField(blank=True, help_text='Configuration value')
+    description = models.CharField(max_length=255, blank=True, help_text='What this setting does')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'site_configuration'
+        verbose_name = 'Site Configuration'
+        verbose_name_plural = 'Site Configurations'
+        ordering = ['key']
+    
+    def __str__(self):
+        return f"{self.key}: {self.value[:50]}"
+    
+    @staticmethod
+    def get(key, default=''):
+        """Get configuration value"""
+        try:
+            config = SiteConfiguration.objects.get(key=key, is_active=True)
+            return config.value
+        except SiteConfiguration.DoesNotExist:
+            return default
+    
+    @staticmethod
+    def set(key, value, description=''):
+        """Set configuration value"""
+        config, created = SiteConfiguration.objects.update_or_create(
+            key=key,
+            defaults={'value': value, 'description': description, 'is_active': True}
+        )
+        return config
+
 class UserProfile(models.Model):
     """Extended user profile with approval system"""
     

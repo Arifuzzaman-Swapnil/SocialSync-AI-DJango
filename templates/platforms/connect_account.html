@@ -3,110 +3,371 @@
 {% block title %}Connect Accounts - SocialSync{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        background: #0d0d0d;
+        color: #e5e7eb;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        line-height: 1.6;
+    }
+
     .connect-container {
-        max-width: 1200px;
-        margin: 2rem auto;
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 3rem 2.5rem;
     }
-    
+
     .page-header {
-        background: white;
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        margin-bottom: 2rem;
-    }
-    
-    .page-header h1 {
-        font-size: 2rem;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.5rem;
-    }
-    
-    .platforms-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 1.5rem;
+        background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+        padding: 3rem 2.5rem;
+        border-radius: 2rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         margin-bottom: 3rem;
+        position: relative;
+        overflow: hidden;
     }
-    
-    .platform-card {
-        background: white;
-        border-radius: 1rem;
-        padding: 2rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        transition: transform 0.3s, box-shadow 0.3s;
-        cursor: pointer;
-        border: 3px solid transparent;
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 200%;
+        height: 100%;
+        background: linear-gradient(90deg, 
+            transparent, 
+            rgba(239, 68, 68, 0.03), 
+            transparent
+        );
+        animation: shimmer 8s infinite;
     }
-    
-    .platform-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+
+    @keyframes shimmer {
+        0% { left: -100%; }
+        100% { left: 100%; }
     }
-    
-    .platform-card.active {
-        border-color: #6366f1;
+
+    .page-header::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, 
+            transparent,
+            #ff6b6b,
+            #ee5a6f,
+            #f06595,
+            transparent
+        );
+        background-size: 200% 100%;
+        animation: gradient-shift 3s linear infinite;
     }
-    
-    .platform-header {
+
+    @keyframes gradient-shift {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 200% 0%; }
+    }
+
+    .page-header-content {
+        position: relative;
+        z-index: 1;
         display: flex;
         align-items: center;
-        gap: 1rem;
-        margin-bottom: 1rem;
+        gap: 1.5rem;
     }
-    
-    .platform-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 12px;
+
+    .header-icon {
+        width: 70px;
+        height: 70px;
+        background: linear-gradient(135deg, #ff6b6b, #f06595);
+        border-radius: 1.5rem;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 2rem;
+        color: white;
+        box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
     }
-    
-    .platform-icon.facebook { background: #1877f2; }
-    .platform-icon.twitter { background: #1da1f2; }
-    .platform-icon.instagram { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-    .platform-icon.linkedin { background: #0a66c2; }
-    .platform-icon.tiktok { background: #000000; }
-    .platform-icon.youtube { background: #ff0000; }
-    .platform-icon.pinterest { background: #e60023; }
-    .platform-icon.telegram { background: #0088cc; }
-    
+
+    .page-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 50%, #f06595 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+        letter-spacing: -0.03em;
+    }
+
+    .page-header p {
+        color: #94a3b8;
+        font-size: 1.05rem;
+        font-weight: 500;
+    }
+
+    .limit-warning {
+        color: #ef4444;
+        font-weight: 700;
+    }
+
+    .section-header {
+        background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+        padding: 2rem 2.5rem;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        margin-bottom: 2rem;
+        margin-top: 4rem;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .section-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, 
+            transparent,
+            #f59e0b,
+            #ef4444,
+            #f59e0b,
+            transparent
+        );
+        background-size: 200% 100%;
+        animation: gradient-shift 3s linear infinite;
+    }
+
+    .section-header-content {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .section-icon {
+        font-size: 2rem;
+        color: #f59e0b;
+    }
+
+    .section-header h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 0.5rem;
+    }
+
+    .section-header p {
+        color: #94a3b8;
+        margin: 0;
+        font-size: 0.95rem;
+    }
+
+    .platforms-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 2rem;
+        margin-bottom: 3rem;
+    }
+
+    .platform-card {
+        background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+        border-radius: 1.5rem;
+        padding: 2rem;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .platform-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: radial-gradient(circle at 20% 20%, rgba(239, 68, 68, 0.1), transparent 70%);
+        opacity: 0;
+        transition: opacity 0.5s;
+    }
+
+    .platform-card:hover:not(.disabled) {
+        transform: translateY(-8px);
+        box-shadow: 0 20px 50px rgba(239, 68, 68, 0.3);
+        border-color: rgba(239, 68, 68, 0.3);
+    }
+
+    .platform-card:hover:not(.disabled)::before {
+        opacity: 1;
+    }
+
+    .platform-card.active {
+        border-color: rgba(239, 68, 68, 0.5);
+        box-shadow: 0 20px 50px rgba(239, 68, 68, 0.4);
+    }
+
+    .platform-card.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .coming-soon-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    }
+
+    .platform-header {
+        display: flex;
+        align-items: center;
+        gap: 1.25rem;
+        margin-bottom: 1.25rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .platform-icon {
+        width: 65px;
+        height: 65px;
+        border-radius: 1.25rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        color: white;
+        transition: all 0.3s;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .platform-card:hover .platform-icon {
+        transform: scale(1.1) rotate(-5deg);
+    }
+
+    .platform-icon.facebook {
+        background: #1877f2;
+    }
+
+    .platform-icon.twitter {
+        background: #1da1f2;
+    }
+
+    .platform-icon.instagram {
+        background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    }
+
+    .platform-icon.linkedin {
+        background: #0a66c2;
+    }
+
+    .platform-icon.messenger {
+        background: linear-gradient(135deg, #00b2ff, #0084ff);
+    }
+
+    .platform-icon.whatsapp {
+        background: #25d366;
+    }
+
+    .platform-icon.telegram {
+        background: #0088cc;
+    }
+
+    .platform-icon.email {
+        background: #ea4335;
+    }
+
     .platform-info h3 {
         margin: 0;
-        color: #1f2937;
+        color: #ffffff;
         font-size: 1.25rem;
+        font-weight: 700;
     }
-    
+
     .platform-status {
         font-size: 0.875rem;
-        color: #6b7280;
+        color: #94a3b8;
+        font-weight: 500;
     }
-    
+
     .platform-status.connected {
-        color: #10b981;
+        color: #34d399;
         font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
-    
+
+    .platform-description {
+        margin-top: 1rem;
+        color: #94a3b8;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        position: relative;
+        z-index: 1;
+    }
+
     .connect-form {
-        background: white;
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+        padding: 2.5rem;
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.06);
         margin-bottom: 2rem;
         display: none;
+        position: relative;
+        overflow: hidden;
     }
-    
+
+    .connect-form::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, 
+            transparent,
+            #6366f1,
+            #8b5cf6,
+            #6366f1,
+            transparent
+        );
+        background-size: 200% 100%;
+        animation: gradient-shift 3s linear infinite;
+    }
+
     .connect-form.active {
         display: block;
-        animation: slideIn 0.3s ease-out;
+        animation: slideIn 0.4s ease-out;
     }
-    
+
     @keyframes slideIn {
         from {
             opacity: 0;
@@ -117,152 +378,391 @@
             transform: translateY(0);
         }
     }
-    
+
+    .connect-form h2 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        position: relative;
+        z-index: 1;
+    }
+
     .form-group {
         margin-bottom: 1.5rem;
+        position: relative;
+        z-index: 1;
     }
-    
+
     .form-label {
         display: block;
-        margin-bottom: 0.5rem;
-        font-weight: 600;
-        color: #374151;
+        margin-bottom: 0.75rem;
+        font-weight: 700;
+        color: #e5e7eb;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
-    
+
+    .form-label i {
+        color: #f59e0b;
+        font-size: 0.85rem;
+    }
+
     .form-label .required {
         color: #ef4444;
     }
-    
+
     .form-control {
         width: 100%;
-        padding: 0.75rem 1rem;
-        border: 2px solid #e5e7eb;
-        border-radius: 0.5rem;
+        padding: 1rem 1.25rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 0.75rem;
         font-size: 1rem;
+        color: #e5e7eb;
+        font-family: 'Courier New', monospace;
         transition: all 0.3s;
-        font-family: monospace;
     }
-    
+
+    textarea.form-control {
+        resize: vertical;
+    }
+
+    .form-control::placeholder {
+        color: #64748b;
+    }
+
     .form-control:focus {
         outline: none;
-        border-color: #6366f1;
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(99, 102, 241, 0.5);
         box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
     }
-    
+
     .form-help {
-        font-size: 0.875rem;
-        color: #6b7280;
-        margin-top: 0.25rem;
+        font-size: 0.85rem;
+        color: #64748b;
+        margin-top: 0.5rem;
+        font-style: italic;
     }
-    
+
     .btn-connect {
         width: 100%;
-        padding: 1rem;
+        padding: 1.125rem 1.5rem;
         background: linear-gradient(135deg, #6366f1, #8b5cf6);
         color: white;
         border: none;
-        border-radius: 0.5rem;
-        font-size: 1rem;
-        font-weight: 600;
+        border-radius: 0.875rem;
+        font-size: 1.05rem;
+        font-weight: 700;
         cursor: pointer;
-        transition: all 0.3s;
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+        box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
     }
-    
+
     .btn-connect:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        transform: translateY(-3px);
+        box-shadow: 0 15px 40px rgba(99, 102, 241, 0.5);
     }
-    
+
     .connected-accounts {
-        background: white;
-        padding: 2rem;
-        border-radius: 1rem;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+        padding: 2.5rem;
+        border-radius: 1.5rem;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        position: relative;
+        overflow: hidden;
     }
-    
+
+    .connected-accounts::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, 
+            transparent,
+            #10b981,
+            #06b6d4,
+            #10b981,
+            transparent
+        );
+        background-size: 200% 100%;
+        animation: gradient-shift 3s linear infinite;
+    }
+
     .connected-accounts h2 {
-        margin-bottom: 1.5rem;
-        color: #1f2937;
+        margin-bottom: 2rem;
+        color: #fff;
+        font-weight: 700;
+        font-size: 1.75rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        position: relative;
+        z-index: 1;
     }
-    
+
+    .connected-accounts h2 i {
+        color: #10b981;
+    }
+
     .account-list {
         display: grid;
-        gap: 1rem;
+        gap: 1.5rem;
+        position: relative;
+        z-index: 1;
     }
-    
+
     .account-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 1.5rem;
-        background: #f9fafb;
-        border-radius: 0.75rem;
-        border: 2px solid #e5e7eb;
+        padding: 1.75rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.3s;
     }
-    
+
+    .account-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(16, 185, 129, 0.2);
+        transform: translateX(5px);
+    }
+
     .account-info {
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: 1.25rem;
     }
-    
+
     .account-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 10px;
+        width: 55px;
+        height: 55px;
+        border-radius: 1rem;
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 1.5rem;
+        color: white;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
     }
-    
+
     .account-details h4 {
         margin: 0;
-        color: #1f2937;
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 1.1rem;
     }
-    
+
     .account-platform {
         font-size: 0.875rem;
-        color: #6b7280;
+        color: #94a3b8;
+        margin-top: 0.25rem;
     }
-    
+
     .btn-disconnect {
-        padding: 0.5rem 1rem;
-        background: #ef4444;
+        padding: 0.75rem 1.5rem;
+        background: linear-gradient(135deg, #ef4444, #dc2626);
         color: white;
         border: none;
-        border-radius: 0.5rem;
+        border-radius: 0.75rem;
         cursor: pointer;
-        font-weight: 600;
+        font-weight: 700;
+        font-size: 0.9rem;
         transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
     }
-    
+
     .btn-disconnect:hover {
-        background: #dc2626;
+        background: linear-gradient(135deg, #dc2626, #b91c1c);
         transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
     }
-    
+
     .empty-state {
         text-align: center;
-        padding: 3rem;
-        color: #6b7280;
+        padding: 4rem 2rem;
+        color: #94a3b8;
+        position: relative;
+        z-index: 1;
     }
-    
+
     .empty-icon {
         font-size: 4rem;
+        margin-bottom: 1.5rem;
+        opacity: 0.5;
+    }
+
+    .empty-state p {
+        font-size: 1.05rem;
+    }
+
+    .empty-state strong {
+        color: #fff;
+    }
+
+    .info-box {
+        background: rgba(59, 130, 246, 0.1);
+        border-left: 4px solid #3b82f6;
+        padding: 1.25rem;
+        border-radius: 0.75rem;
+        margin-bottom: 2rem;
+        position: relative;
+        z-index: 1;
+    }
+
+    .info-box strong {
+        color: #60a5fa;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .info-box a {
+        color: #60a5fa;
+        text-decoration: underline;
+    }
+
+    .info-box code {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.25rem;
+        font-family: 'Courier New', monospace;
+        color: #fbbf24;
+    }
+
+    .coming-soon-section {
+        background: linear-gradient(145deg, #1a1a1a 0%, #2d2d2d 100%);
+        border-radius: 1.5rem;
+        padding: 4rem 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .coming-soon-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 15px,
+            rgba(255, 255, 255, 0.02) 15px,
+            rgba(255, 255, 255, 0.02) 30px
+        );
+        pointer-events: none;
+    }
+
+    .coming-soon-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .coming-soon-icon {
+        font-size: 4.5rem;
+        margin-bottom: 1.5rem;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    .coming-soon-title {
+        font-size: 2rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #f59e0b, #ef4444);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         margin-bottom: 1rem;
     }
-    
-    .info-box {
-        background: #eff6ff;
-        border-left: 4px solid #3b82f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1.5rem;
+
+    .coming-soon-text {
+        color: #94a3b8;
+        font-size: 1.1rem;
+        line-height: 1.8;
     }
-    
-    .info-box strong {
-        color: #1e40af;
+
+    .coming-soon-text strong {
+        color: #fff;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+        width: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #0d0d0d;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #ef4444, #f59e0b);
+        border-radius: 10px;
+        border: 2px solid #0d0d0d;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #dc2626, #d97706);
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+        .platforms-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .connect-container {
+            padding: 1.5rem;
+        }
+
+        .page-header,
+        .section-header,
+        .connect-form,
+        .connected-accounts {
+            padding: 2rem 1.5rem;
+        }
+
+        .page-header h1 {
+            font-size: 1.75rem;
+        }
+
+        .platforms-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .page-header-content {
+            flex-direction: column;
+            text-align: center;
+        }
     }
 </style>
 {% endblock %}
@@ -271,370 +771,447 @@
 <div class="connect-container">
     <!-- Page Header -->
     <div class="page-header">
-        <h1>🔗 Connect Social Media Accounts</h1>
-        <p style="color: #6b7280;">
-            Connect your social media accounts to start scheduling posts
-            {% if not can_add_account %}
-                <span style="color: #ef4444; font-weight: 600;">
-                    (Limit reached: {{ connected_accounts.count }}/{{ user.profile.max_social_accounts }})
-                </span>
-            {% endif %}
-        </p>
+        <div class="page-header-content">
+            <div class="header-icon">
+                <i class="fas fa-plug"></i>
+            </div>
+            <div>
+                <h1>Connect Social Media Accounts</h1>
+                <p>
+                    Connect your social media accounts to start scheduling posts
+                    {% if not can_add_account %}
+                    <span class="limit-warning">
+                        (Limit reached: {{ connected_accounts.count }}/{{ user.profile.max_social_accounts }})
+                    </span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
     </div>
-    
-    <!-- Platform Selection Grid -->
+
+    <!-- SECTION 1: Social Media Posting Platforms -->
+    <div class="section-header">
+        <div class="section-header-content">
+            <div class="section-icon">
+                <i class="fas fa-share-alt"></i>
+            </div>
+            <div>
+                <h2>Social Media Posting Platforms</h2>
+                <p>Schedule and publish posts across multiple social media platforms</p>
+            </div>
+        </div>
+    </div>
+
     <div class="platforms-grid">
         <!-- Facebook -->
         <div class="platform-card" onclick="showForm('facebook')" id="card-facebook">
             <div class="platform-header">
-                <div class="platform-icon facebook">📘</div>
+                <div class="platform-icon facebook">
+                    <i class="fab fa-facebook-f"></i>
+                </div>
                 <div class="platform-info">
                     <h3>Facebook</h3>
                     <div class="platform-status">Click to connect</div>
                 </div>
             </div>
+            <div class="platform-description">
+                Post to your Facebook Pages automatically with scheduled content and media.
+            </div>
         </div>
-        
+
         <!-- Twitter -->
         <div class="platform-card" onclick="showForm('twitter')" id="card-twitter">
             <div class="platform-header">
-                <div class="platform-icon twitter">🐦</div>
+                <div class="platform-icon twitter">
+                    <i class="fab fa-twitter"></i>
+                </div>
                 <div class="platform-info">
                     <h3>X (Twitter)</h3>
                     <div class="platform-status">Click to connect</div>
                 </div>
             </div>
+            <div class="platform-description">
+                Schedule tweets with images and videos to your X/Twitter account.
+            </div>
         </div>
-        
+
         <!-- Instagram -->
         <div class="platform-card" onclick="showForm('instagram')" id="card-instagram">
             <div class="platform-header">
-                <div class="platform-icon instagram">📷</div>
+                <div class="platform-icon instagram">
+                    <i class="fab fa-instagram"></i>
+                </div>
                 <div class="platform-info">
                     <h3>Instagram</h3>
                     <div class="platform-status">Click to connect</div>
                 </div>
             </div>
+            <div class="platform-description">
+                Post photos and videos to your Instagram Business account automatically.
+            </div>
         </div>
-        
+
         <!-- LinkedIn -->
         <div class="platform-card" onclick="showForm('linkedin')" id="card-linkedin">
             <div class="platform-header">
-                <div class="platform-icon linkedin">💼</div>
+                <div class="platform-icon linkedin">
+                    <i class="fab fa-linkedin-in"></i>
+                </div>
                 <div class="platform-info">
                     <h3>LinkedIn</h3>
                     <div class="platform-status">Click to connect</div>
                 </div>
             </div>
-        </div>
-        
-        <!-- TikTok -->
-        <div class="platform-card" style="opacity: 0.5;">
-            <div class="platform-header">
-                <div class="platform-icon tiktok">🎵</div>
-                <div class="platform-info">
-                    <h3>TikTok</h3>
-                    <div class="platform-status">Coming Soon</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- YouTube -->
-        <div class="platform-card" style="opacity: 0.5;">
-            <div class="platform-header">
-                <div class="platform-icon youtube">🎥</div>
-                <div class="platform-info">
-                    <h3>YouTube</h3>
-                    <div class="platform-status">Coming Soon</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Pinterest -->
-        <div class="platform-card" style="opacity: 0.5;">
-            <div class="platform-header">
-                <div class="platform-icon pinterest">📌</div>
-                <div class="platform-info">
-                    <h3>Pinterest</h3>
-                    <div class="platform-status">Coming Soon</div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Telegram -->
-        <div class="platform-card" style="opacity: 0.5;">
-            <div class="platform-header">
-                <div class="platform-icon telegram">✈️</div>
-                <div class="platform-info">
-                    <h3>Telegram</h3>
-                    <div class="platform-status">Coming Soon</div>
-                </div>
+            <div class="platform-description">
+                Share professional content to your LinkedIn profile or company page.
             </div>
         </div>
     </div>
-    
+
     <!-- Facebook Form -->
     <div class="connect-form" id="form-facebook">
-        <h2>📘 Connect Facebook Page</h2>
-        
+        <h2><i class="fab fa-facebook-f"></i> Connect Facebook Page</h2>
+
         <div class="info-box">
-            <strong>ℹ️ How to get credentials:</strong><br>
+            <strong><i class="fas fa-info-circle"></i> How to get credentials:</strong><br>
             1. Go to <a href="https://developers.facebook.com/tools/explorer/" target="_blank">Graph API Explorer</a><br>
             2. Select your app → Generate Access Token<br>
             3. Add permissions: <code>pages_manage_posts</code>, <code>pages_read_engagement</code><br>
             4. Query: <code>/me/accounts</code> to get Page ID and Page Access Token
         </div>
-        
+
         <form method="POST">
             {% csrf_token %}
             <input type="hidden" name="platform" value="facebook">
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-id-card"></i>
                     Facebook Page ID <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="facebook_page_id"
-                    class="form-control" 
-                    placeholder="123456789012345"
-                    required
-                >
+                <input type="text" name="facebook_page_id" class="form-control" placeholder="123456789012345" required>
                 <div class="form-help">Your Facebook Page ID (numeric)</div>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     Page Access Token <span class="required">*</span>
                 </label>
-                <textarea 
-                    name="facebook_access_token"
-                    class="form-control" 
-                    rows="4"
-                    placeholder="EAAxxxxxxxxxx..."
-                    required
-                ></textarea>
+                <textarea name="facebook_access_token" class="form-control" rows="4" placeholder="EAAxxxxxxxxxx..." required></textarea>
                 <div class="form-help">Long-lived Page Access Token from Graph API Explorer</div>
             </div>
-            
+
             <button type="submit" class="btn-connect">
-                🔗 Connect Facebook Page
+                <i class="fas fa-link"></i>
+                Connect Facebook Page
             </button>
         </form>
     </div>
-    
+
     <!-- Twitter Form -->
     <div class="connect-form" id="form-twitter">
-        <h2>🐦 Connect Twitter/X Account</h2>
-        
+        <h2><i class="fab fa-twitter"></i> Connect Twitter/X Account</h2>
+
         <div class="info-box">
-            <strong>ℹ️ How to get credentials:</strong><br>
+            <strong><i class="fas fa-info-circle"></i> How to get credentials:</strong><br>
             1. Go to <a href="https://developer.twitter.com/en/portal/dashboard" target="_blank">Twitter Developer Portal</a><br>
             2. Create or select your app<br>
             3. Go to "Keys and Tokens" tab<br>
             4. Copy all 4 credentials below
         </div>
-        
+
         <form method="POST">
             {% csrf_token %}
             <input type="hidden" name="platform" value="twitter">
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     API Key (Consumer Key) <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="twitter_api_key"
-                    class="form-control" 
-                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxx"
-                    required
-                >
+                <input type="text" name="twitter_api_key" class="form-control" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxx" required>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     API Secret (Consumer Secret) <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="twitter_api_secret"
-                    class="form-control" 
-                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    required
-                >
+                <input type="text" name="twitter_api_secret" class="form-control" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     Access Token <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="twitter_access_token"
-                    class="form-control" 
-                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    required
-                >
+                <input type="text" name="twitter_access_token" class="form-control" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     Access Token Secret <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="twitter_access_token_secret"
-                    class="form-control" 
-                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    required
-                >
+                <input type="text" name="twitter_access_token_secret" class="form-control" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required>
             </div>
-            
+
             <button type="submit" class="btn-connect">
-                🔗 Connect Twitter Account
+                <i class="fas fa-link"></i>
+                Connect Twitter Account
             </button>
         </form>
     </div>
-    
+
     <!-- Instagram Form -->
     <div class="connect-form" id="form-instagram">
-        <h2>📷 Connect Instagram Business Account</h2>
-        
+        <h2><i class="fab fa-instagram"></i> Connect Instagram Business Account</h2>
+
         <div class="info-box">
-            <strong>ℹ️ How to get credentials:</strong><br>
+            <strong><i class="fas fa-info-circle"></i> How to get credentials:</strong><br>
             1. Instagram account must be a Business account<br>
             2. Must be connected to a Facebook Page<br>
             3. Use same Facebook Page Access Token as above<br>
             4. Get Business Account ID from Graph API: <code>/me?fields=instagram_business_account</code>
         </div>
-        
+
         <form method="POST">
             {% csrf_token %}
             <input type="hidden" name="platform" value="instagram">
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-id-card"></i>
                     Instagram Business Account ID <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="instagram_business_account_id"
-                    class="form-control" 
-                    placeholder="17841400000000000"
-                    required
-                >
+                <input type="text" name="instagram_business_account_id" class="form-control" placeholder="17841400000000000" required>
                 <div class="form-help">Your Instagram Business Account ID (numeric)</div>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     Access Token <span class="required">*</span>
                 </label>
-                <textarea 
-                    name="instagram_access_token"
-                    class="form-control" 
-                    rows="4"
-                    placeholder="EAAxxxxxxxxxx... (same as Facebook Page token)"
-                    required
-                ></textarea>
+                <textarea name="instagram_access_token" class="form-control" rows="4" placeholder="EAAxxxxxxxxxx... (same as Facebook Page token)" required></textarea>
                 <div class="form-help">Facebook Page Access Token (same as above)</div>
             </div>
-            
+
             <button type="submit" class="btn-connect">
-                🔗 Connect Instagram Account
+                <i class="fas fa-link"></i>
+                Connect Instagram Account
             </button>
         </form>
     </div>
-    
+
     <!-- LinkedIn Form -->
     <div class="connect-form" id="form-linkedin">
-        <h2>💼 Connect LinkedIn Account</h2>
-        
+        <h2><i class="fab fa-linkedin-in"></i> Connect LinkedIn Account</h2>
+
         <div class="info-box">
-            <strong>ℹ️ How to get credentials:</strong><br>
+            <strong><i class="fas fa-info-circle"></i> How to get credentials:</strong><br>
             1. Complete OAuth 2.0 flow to get Access Token<br>
             2. Get Person URN from <code>/v2/userinfo</code> API (the 'sub' field)<br>
             3. Token expires in 60 days - needs refresh
         </div>
-        
+
         <form method="POST">
             {% csrf_token %}
             <input type="hidden" name="platform" value="linkedin">
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-key"></i>
                     Access Token <span class="required">*</span>
                 </label>
-                <textarea 
-                    name="linkedin_access_token"
-                    class="form-control" 
-                    rows="4"
-                    placeholder="AQxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    required
-                ></textarea>
+                <textarea name="linkedin_access_token" class="form-control" rows="4" placeholder="AQxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" required></textarea>
                 <div class="form-help">LinkedIn OAuth 2.0 Access Token</div>
             </div>
-            
+
             <div class="form-group">
                 <label class="form-label">
+                    <i class="fas fa-id-card"></i>
                     Person URN <span class="required">*</span>
                 </label>
-                <input 
-                    type="text" 
-                    name="linkedin_person_urn"
-                    class="form-control" 
-                    placeholder="xxxxxxxxxxxxxxxx"
-                    required
-                >
+                <input type="text" name="linkedin_person_urn" class="form-control" placeholder="xxxxxxxxxxxxxxxx" required>
                 <div class="form-help">Your LinkedIn Person URN (from /v2/userinfo API 'sub' field)</div>
             </div>
-            
+
             <button type="submit" class="btn-connect">
-                🔗 Connect LinkedIn Account
+                <i class="fas fa-link"></i>
+                Connect LinkedIn Account
             </button>
         </form>
     </div>
-    
+
+    <!-- SECTION 2: AI Automation Chatbot -->
+    <div class="section-header">
+        <div class="section-header-content">
+            <div class="section-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div>
+                <h2>AI Automation Chatbot</h2>
+                <p>Connect messaging platforms to enable AI-powered automated responses</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="platforms-grid">
+        <!-- Messenger (WORKING) -->
+        <div class="platform-card" onclick="window.location.href='{% url 'messenger_connect' %}'" id="card-messenger">
+            <div class="platform-header">
+                <div class="platform-icon messenger">
+                    <i class="fab fa-facebook-messenger"></i>
+                </div>
+                <div class="platform-info">
+                    <h3>Facebook Messenger</h3>
+                    <div class="platform-status">Click to connect</div>
+                </div>
+            </div>
+            <div class="platform-description">
+                AI-powered chatbot for Facebook Messenger with RAG and custom knowledge base.
+            </div>
+        </div>
+
+        <!-- Instagram DM (Coming Soon) -->
+        <div class="platform-card disabled">
+            <span class="coming-soon-badge"><i class="fas fa-rocket"></i> Coming Soon</span>
+            <div class="platform-header">
+                <div class="platform-icon instagram">
+                    <i class="fab fa-instagram"></i>
+                </div>
+                <div class="platform-info">
+                    <h3>Instagram DM</h3>
+                    <div class="platform-status">Coming soon</div>
+                </div>
+            </div>
+            <div class="platform-description">
+                Automated responses for Instagram Direct Messages with AI intelligence.
+            </div>
+        </div>
+
+        <!-- WhatsApp (Coming Soon) -->
+        <div class="platform-card disabled">
+            <span class="coming-soon-badge"><i class="fas fa-rocket"></i> Coming Soon</span>
+            <div class="platform-header">
+                <div class="platform-icon whatsapp">
+                    <i class="fab fa-whatsapp"></i>
+                </div>
+                <div class="platform-info">
+                    <h3>WhatsApp Business</h3>
+                    <div class="platform-status">Coming soon</div>
+                </div>
+            </div>
+            <div class="platform-description">
+                Connect WhatsApp Business API for intelligent customer support automation.
+            </div>
+        </div>
+
+        <!-- Telegram (Coming Soon) -->
+        <div class="platform-card disabled">
+            <span class="coming-soon-badge"><i class="fas fa-rocket"></i> Coming Soon</span>
+            <div class="platform-header">
+                <div class="platform-icon telegram">
+                    <i class="fab fa-telegram-plane"></i>
+                </div>
+                <div class="platform-info">
+                    <h3>Telegram</h3>
+                    <div class="platform-status">Coming soon</div>
+                </div>
+            </div>
+            <div class="platform-description">
+                Deploy AI chatbot on Telegram for instant automated messaging.
+            </div>
+        </div>
+
+        <!-- Email (Coming Soon) -->
+        <div class="platform-card disabled">
+            <span class="coming-soon-badge"><i class="fas fa-rocket"></i> Coming Soon</span>
+            <div class="platform-header">
+                <div class="platform-icon email">
+                    <i class="fas fa-envelope"></i>
+                </div>
+                <div class="platform-info">
+                    <h3>Email Automation</h3>
+                    <div class="platform-status">Coming soon</div>
+                </div>
+            </div>
+            <div class="platform-description">
+                AI-powered email responses and customer support automation.
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 3: Comment Automation (Coming Soon) -->
+    <div class="section-header">
+        <div class="section-header-content">
+            <div class="section-icon">
+                <i class="fas fa-comments"></i>
+            </div>
+            <div>
+                <h2>Social Media Comment AI Automation</h2>
+                <p>Automatically respond to comments on your social media posts</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="coming-soon-section">
+        <div class="coming-soon-content">
+            <div class="coming-soon-icon"><i class="fas fa-hard-hat"></i></div>
+            <h3 class="coming-soon-title">Coming Soon!</h3>
+            <p class="coming-soon-text">
+                AI-powered automated comment responses for Facebook, Instagram, Twitter, and LinkedIn.<br>
+                <strong>Stay tuned for updates!</strong>
+            </p>
+        </div>
+    </div>
+
     <!-- Connected Accounts -->
     <div class="connected-accounts">
-        <h2>✅ Connected Accounts ({{ connected_accounts.count }})</h2>
-        
+        <h2><i class="fas fa-check-circle"></i> Connected Posting Accounts ({{ connected_accounts.count }})</h2>
+
         {% if connected_accounts %}
-            <div class="account-list">
-                {% for account in connected_accounts %}
-                <div class="account-item">
-                    <div class="account-info">
-                        <div class="account-icon {{ account.platform }}">
-                            {% if account.platform == 'facebook' %}📘
-                            {% elif account.platform == 'twitter' %}🐦
-                            {% elif account.platform == 'instagram' %}📷
-                            {% elif account.platform == 'linkedin' %}💼
-                            {% endif %}
-                        </div>
-                        <div class="account-details">
-                            <h4>{{ account.account_name }}</h4>
-                            <div class="account-platform">
-                                {{ account.get_platform_display }} • 
-                                Connected {{ account.connected_at|date:"M d, Y" }}
-                            </div>
+        <div class="account-list">
+            {% for account in connected_accounts %}
+            <div class="account-item">
+                <div class="account-info">
+                    <div class="account-icon {{ account.platform }}">
+                        {% if account.platform == 'facebook' %}
+                            <i class="fab fa-facebook-f"></i>
+                        {% elif account.platform == 'twitter' %}
+                            <i class="fab fa-twitter"></i>
+                        {% elif account.platform == 'instagram' %}
+                            <i class="fab fa-instagram"></i>
+                        {% elif account.platform == 'linkedin' %}
+                            <i class="fab fa-linkedin-in"></i>
+                        {% endif %}
+                    </div>
+                    <div class="account-details">
+                        <h4>{{ account.account_name }}</h4>
+                        <div class="account-platform">
+                            {{ account.get_platform_display }} •
+                            Connected {{ account.connected_at|date:"M d, Y" }}
                         </div>
                     </div>
-                    <form method="POST" action="{% url 'disconnect_account' account.id %}" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn-disconnect" onclick="return confirm('Disconnect {{ account.account_name }}?')">
-                            🗑️ Disconnect
-                        </button>
-                    </form>
                 </div>
-                {% endfor %}
+                <form method="POST" action="{% url 'disconnect_account' account.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-disconnect" onclick="return confirm('Disconnect {{ account.account_name }}?')">
+                        <i class="fas fa-trash"></i>
+                        Disconnect
+                    </button>
+                </form>
             </div>
+            {% endfor %}
+        </div>
         {% else %}
-            <div class="empty-state">
-                <div class="empty-icon">🔌</div>
-                <p><strong>No accounts connected yet</strong></p>
-                <p>Click on a platform above to get started!</p>
-            </div>
+        <div class="empty-state">
+            <div class="empty-icon"><i class="fas fa-plug"></i></div>
+            <p><strong>No accounts connected yet</strong></p>
+            <p>Click on a platform above to get started!</p>
+        </div>
         {% endif %}
     </div>
 </div>
@@ -645,18 +1222,18 @@
         document.querySelectorAll('.connect-form').forEach(form => {
             form.classList.remove('active');
         });
-        
+
         // Remove active class from all cards
         document.querySelectorAll('.platform-card').forEach(card => {
             card.classList.remove('active');
         });
-        
+
         // Show selected form
         const form = document.getElementById('form-' + platform);
         if (form) {
             form.classList.add('active');
             form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            
+
             // Add active class to selected card
             document.getElementById('card-' + platform).classList.add('active');
         }

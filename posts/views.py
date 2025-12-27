@@ -2,15 +2,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
-from django.http import JsonResponse
+from datetime import datetime
+import os  # ADD THIS
+import time  # ADD THIS
+from django.conf import settings  # ADD THIS
+
 from .models import Post
 from platforms.models import SocialAccount
-import json
-from datetime import datetime
+from accounts.models import UserProfile
 
 @login_required
 def create_post(request):
-    """Create new post"""
+    """Create new post with multiple media support"""
     
     # Get user's connected accounts
     connected_accounts = SocialAccount.objects.filter(
@@ -26,95 +29,76 @@ def create_post(request):
         platforms[account.platform].append(account)
     
     if request.method == 'POST':
-        # DEBUG: Print all POST data
-        print("=" * 50)
-        print("POST DATA RECEIVED:")
-        for key, value in request.POST.items():
-            print(f"{key}: {value}")
-        print("=" * 50)
-        
-        caption = request.POST.get('caption', '').strip()
-        scheduled_time = request.POST.get('scheduled_time', '').strip()
-        selected_platforms = request.POST.getlist('platforms')
-        ai_generated = request.POST.get('ai_generated') == 'true'
-        
-        # DEBUG: Print extracted values
-        print(f"Caption: {caption}")
-        print(f"Scheduled Time: {scheduled_time}")
-        print(f"Platforms: {selected_platforms}")
-        print(f"AI Generated: {ai_generated}")
-        
-        # Validation
-        if not caption:
-            print("ERROR: Caption is empty")
-            messages.error(request, '❌ Caption is required')
-            return redirect('create_post')
-        
-        if not selected_platforms:
-            print("ERROR: No platforms selected")
-            messages.error(request, '❌ Please select at least one platform')
-            return redirect('create_post')
-        
-        if not scheduled_time:
-            print("ERROR: No scheduled time")
-            messages.error(request, '❌ Scheduled time is required')
-            return redirect('create_post')
-        
-# Parse scheduled time
         try:
-            import pytz
+            # DEBUG: Print all POST data
+            print("=" * 50)
+            print("POST DATA RECEIVED:")
+            for key, value in request.POST.items():
+                print(f"{key}: {value}")
+            print("=" * 50)
             
-            # Handle both formats
-            if 'T' in scheduled_time:
-                scheduled_dt = datetime.strptime(scheduled_time, '%Y-%m-%dT%H:%M')
-            else:
-                scheduled_dt = datetime.strptime(scheduled_time, '%Y-%m-%d %H:%M')
+            caption = request.POST.get('caption', '').strip()
+            scheduled_time = request.POST.get('scheduled_time', '').strip()
+            selected_platforms = request.POST.getlist('platforms')
+            ai_generated = request.POST.get('ai_generated') == 'true'
             
-            # User's timezone (Bangladesh)
-            bd_tz = pytz.timezone('Asia/Dhaka')
+            # DEBUG: Print extracted values
+            print(f"Caption: {caption}")
+            print(f"Scheduled Time: {scheduled_time}")
+            print(f"Platforms: {selected_platforms}")
+            print(f"AI Generated: {ai_generated}")
             
-            # Make aware in Bangladesh timezone
-            scheduled_dt = bd_tz.localize(scheduled_dt)
+            # Validation
+            if not caption:
+                print("ERROR: Caption is empty")
+                messages.error(request, '❌ Caption is required')
+                return redirect('create_post')
             
-            # Convert to UTC (this is what gets saved to database)
-            scheduled_dt = scheduled_dt.astimezone(pytz.UTC)
+            if not selected_platforms:
+                print("ERROR: No platforms selected")
+                messages.error(request, '❌ Please select at least one platform')
+                return redirect('create_post')
             
-            print(f"User input: {scheduled_time}")
-            print(f"Saved as UTC: {scheduled_dt}")
+            if not scheduled_time:
+                print("ERROR: No scheduled time")
+                messages.error(request, '❌ Scheduled time is required')
+                return redirect('create_post')
+            
+            # Parse scheduled time
+            try:
+                import pytz
                 
-        except ValueError as e:
-            print(f"ERROR: Date parsing failed: {e}")
-            messages.error(request, f'❌ Invalid date/time format: {str(e)}')
-            return redirect('create_post')
-        
-        # Check monthly limit
-        profile = request.user.profile
-        if profile.posts_this_month >= profile.max_posts_per_month:
-            print("ERROR: Monthly limit reached")
-            messages.error(request, f'❌ Monthly limit reached ({profile.max_posts_per_month} posts)')
-            return redirect('create_post')
-        
-        # Handle media upload
-        uploaded_files = request.FILES.getlist('media')  # Changed to getlist
-        media_files = []
-        if 'media' in request.FILES:
-            media_file = request.FILES['media']
-            # Save media file
-            from django.core.files.storage import default_storage
-            from django.core.files.base import ContentFile
-            import os
+                # Handle both formats
+                if 'T' in scheduled_time:
+                    scheduled_dt = datetime.strptime(scheduled_time, '%Y-%m-%dT%H:%M')
+                else:
+                    scheduled_dt = datetime.strptime(scheduled_time, '%Y-%m-%d %H:%M')
+                
+                # User's timezone (Bangladesh)
+                bd_tz = pytz.timezone('Asia/Dhaka')
+                
+                # Make aware in Bangladesh timezone
+                scheduled_dt = bd_tz.localize(scheduled_dt)
+                
+                # Convert to UTC (this is what gets saved to database)
+                scheduled_dt = scheduled_dt.astimezone(pytz.UTC)
+                
+                print(f"User input: {scheduled_time}")
+                print(f"Saved as UTC: {scheduled_dt}")
+                    
+            except ValueError as e:
+                print(f"ERROR: Date parsing failed: {e}")
+                messages.error(request, f'❌ Invalid date/time format: {str(e)}')
+                return redirect('create_post')
             
-            # Create unique filename
-            ext = os.path.splitext(media_file.name)[1]
-            filename = f"posts/{request.user.id}/{timezone.now().timestamp()}{ext}"
+            # Check monthly limit
+            profile = request.user.profile
+            if profile.posts_this_month >= profile.max_posts_per_month:
+                print("ERROR: Monthly limit reached")
+                messages.error(request, f'❌ Monthly limit reached ({profile.max_posts_per_month} posts)')
+                return redirect('create_post')
             
-            # Save file
-            path = default_storage.save(filename, ContentFile(media_file.read()))
-            media_files.append(path)
-            print(f"Media saved: {path}")
-        
-        # Create post
-        try:
+            # Create post first
             print("Creating post...")
             post = Post.objects.create(
                 user=request.user,
@@ -130,10 +114,59 @@ def create_post(request):
             post.set_platforms(selected_platforms)
             print(f"Platforms set: {selected_platforms}")
             
-            # Set media files
-            if media_files:
-                post.set_media_files(media_files)
-                print(f"Media files set: {media_files}")
+            # ========================================
+            # MULTIPLE MEDIA HANDLING - NEW CODE
+            # ========================================
+            media_files_list = request.FILES.getlist('media')
+            saved_paths = []
+            
+            print(f"Received {len(media_files_list)} media files")
+            
+            if len(media_files_list) > 0:
+                for idx, uploaded_file in enumerate(media_files_list):
+                    # Validate size (50MB max per file)
+                    max_size = 50 * 1024 * 1024
+                    if uploaded_file.size > max_size:
+                        print(f"File {idx+1} too large: {uploaded_file.size / (1024*1024):.2f}MB, skipping")
+                        continue
+                    
+                    # Get extension
+                    ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    
+                    # Validate file type
+                    allowed_types = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']
+                    if ext not in allowed_types:
+                        print(f"File {idx+1} invalid type: {ext}, skipping")
+                        continue
+                    
+                    # Create unique filename
+                    timestamp = time.time()
+                    filename = f"{int(timestamp)}_{idx}{ext}"
+                    
+                    # Create user-specific directory
+                    user_dir = os.path.join('posts', str(request.user.id))
+                    full_dir = os.path.join(settings.MEDIA_ROOT, user_dir)
+                    os.makedirs(full_dir, exist_ok=True)
+                    
+                    # Save file
+                    file_path = os.path.join(user_dir, filename)
+                    full_path = os.path.join(settings.MEDIA_ROOT, file_path)
+                    
+                    # Write file
+                    with open(full_path, 'wb+') as destination:
+                        for chunk in uploaded_file.chunks():
+                            destination.write(chunk)
+                    
+                    saved_paths.append(file_path)
+                    print(f"Media {idx+1} saved: {file_path}")
+                
+                # Save media paths to post
+                if saved_paths:
+                    post.set_media_files(saved_paths)
+                    print(f"Total media files saved: {len(saved_paths)}")
+            # ========================================
+            # END MULTIPLE MEDIA HANDLING
+            # ========================================
             
             post.save()
             print("Post saved successfully!")
@@ -154,6 +187,7 @@ def create_post(request):
             messages.error(request, f'❌ Failed to create post: {str(e)}')
             return redirect('create_post')
     
+    # GET request
     context = {
         'connected_accounts': connected_accounts,
         'platforms': platforms,

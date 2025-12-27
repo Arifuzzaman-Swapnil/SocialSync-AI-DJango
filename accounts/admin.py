@@ -1,5 +1,29 @@
 from django.contrib import admin
 from .models import UserProfile
+from .models import SiteConfiguration
+
+@admin.register(SiteConfiguration)
+class SiteConfigurationAdmin(admin.ModelAdmin):
+    list_display = ['key', 'value_preview', 'description', 'is_active', 'updated_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['key', 'description']
+    list_editable = ['is_active']
+    
+    fieldsets = (
+        ('Configuration', {
+            'fields': ('key', 'value', 'description')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+    )
+    
+    def value_preview(self, obj):
+        """Show preview of value"""
+        if len(obj.value) > 50:
+            return obj.value[:50] + '...'
+        return obj.value
+    value_preview.short_description = 'Value'
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):

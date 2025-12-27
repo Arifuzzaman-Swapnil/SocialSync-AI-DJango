@@ -19,6 +19,11 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
+from django.shortcuts import render  # ← এটা add করুন
+
+# Placeholder function
+def messenger_connect_placeholder(request):
+    return render(request, 'messenger_placeholder.html')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -28,6 +33,9 @@ urlpatterns = [
     path('', include('accounts.urls')),
     path('', lambda request: redirect('login')),
     path('features/', include('upcoming_features.urls')),
+
+    path('messenger/connect/', messenger_connect_placeholder, name='messenger_connect'),
+    path('messenger/', include('messenger_bot.urls')),  # ← ADD THIS
 
 ]
 

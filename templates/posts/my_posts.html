@@ -246,6 +246,123 @@
     .result-error {
         color: #ef4444;
     }
+     .modal {
+        display: none;
+        position: fixed;
+        z-index: 9999;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        overflow: auto;
+    }
+    
+    .modal.active {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        max-width: 800px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .modal-close {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.1);
+        border: none;
+        border-radius: 50%;
+        font-size: 24px;
+        cursor: pointer;
+        z-index: 10;
+        transition: all 0.3s;
+    }
+    
+    .modal-close:hover {
+        background: rgba(0, 0, 0, 0.2);
+        transform: rotate(90deg);
+    }
+    
+    .modal-header {
+        padding: 2rem;
+        border-bottom: 2px solid #f3f4f6;
+    }
+    
+    .modal-body {
+        padding: 2rem;
+    }
+    
+    .modal-media {
+        width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+        border-radius: 12px;
+        margin-bottom: 1.5rem;
+        background: #f9fafb;
+    }
+    
+    .modal-caption {
+        font-size: 1.125rem;
+        line-height: 1.75;
+        color: #1f2937;
+        margin-bottom: 1.5rem;
+        white-space: pre-wrap;
+    }
+    
+    .modal-info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-top: 1.5rem;
+        padding-top: 1.5rem;
+        border-top: 2px solid #f3f4f6;
+    }
+    
+    .modal-info-item {
+        background: #f9fafb;
+        padding: 1rem;
+        border-radius: 8px;
+    }
+    
+    .modal-info-label {
+        font-size: 0.75rem;
+        color: #6b7280;
+        text-transform: uppercase;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+    
+    .modal-info-value {
+        font-size: 1rem;
+        color: #1f2937;
+        font-weight: 600;
+    }
+    
+    /* Media Grid - Make clickable */
+    .post-card img,
+    .post-card video,
+    .preview-item {
+        cursor: pointer;
+        transition: transform 0.2s;
+    }
+    
+    .post-card img:hover,
+    .post-card video:hover,
+    .preview-item:hover {
+        transform: scale(1.05);
+    }
 </style>
 {% endblock %}
 
@@ -332,6 +449,50 @@
                     {{ post.caption|truncatewords:50 }}
                 </div>
                 
+                <!-- ADD THIS AFTER post-caption div -->
+<!-- Media Display - FIND AND REPLACE -->
+{% if post.media_files and post.media_files|length > 0 %}
+<div style="margin: 1rem 0;">
+    {% if post.media_files|length == 1 %}
+        <!-- Single Media - Make clickable -->
+        {% with media=post.media_files.0 %}
+            {% if '.mp4' in media or '.mov' in media or '.avi' in media %}
+                <video controls onclick="openPostModal('{{ post.id }}')" style="width: 100%; max-height: 300px; border-radius: 8px; object-fit: cover; cursor: pointer;">
+                    <source src="{{ MEDIA_URL }}{{ media }}" type="video/mp4">
+                </video>
+            {% else %}
+                <img src="{{ MEDIA_URL }}{{ media }}" onclick="openPostModal('{{ post.id }}')" style="width: 100%; max-height: 300px; border-radius: 8px; object-fit: cover; cursor: pointer;">
+            {% endif %}
+        {% endwith %}
+    {% else %}
+        <!-- Multiple Media Grid - Make clickable -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem;">
+            {% for media in post.media_files|slice:":4" %}
+                <div onclick="openPostModal('{{ post.id }}')" style="position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 2px solid #e5e7eb; cursor: pointer;">
+                    {% if '.mp4' in media or '.mov' in media or '.avi' in media %}
+                        <video style="width: 100%; height: 100%; object-fit: cover; pointer-events: none;">
+                            <source src="{{ MEDIA_URL }}{{ media }}" type="video/mp4">
+                        </video>
+                        <div style="position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px;">🎥</div>
+                    {% else %}
+                        <img src="{{ MEDIA_URL }}{{ media }}" style="width: 100%; height: 100%; object-fit: cover; pointer-events: none;">
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+        {% if post.media_files|length > 4 %}
+            <p style="margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
+                +{{ post.media_files|length|add:"-4" }} more • <a href="#" onclick="openPostModal('{{ post.id }}'); return false;" style="color: #6366f1;">View all</a>
+            </p>
+        {% endif %}
+    {% endif %}
+    
+    <p style="margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
+        📎 {{ post.media_files|length }} file{{ post.media_files|length|pluralize }} • <a href="#" onclick="openPostModal('{{ post.id }}'); return false;" style="color: #6366f1;">View details</a>
+    </p>
+</div>
+{% endif %}
+
                 <div class="post-platforms">
                     {% for platform in post.platforms_list %}
                     <span class="platform-badge badge-{{ platform }}">
@@ -464,5 +625,182 @@ window.addEventListener('load', function() {
     }, 9000);
 });
 </script>
+<!-- Post Details Modal -->
+<div id="postModal" class="modal">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal()">×</button>
+        
+        <div class="modal-header">
+            <h2 id="modalTitle" style="margin: 0; font-size: 1.5rem;">Post Details</h2>
+        </div>
+        
+        <div class="modal-body">
+            <!-- Media Display -->
+            <div id="modalMediaContainer"></div>
+            
+            <!-- Caption -->
+            <div class="modal-caption" id="modalCaption"></div>
+            
+            <!-- Post Info Grid -->
+            <div class="modal-info-grid">
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Status</div>
+                    <div class="modal-info-value" id="modalStatus"></div>
+                </div>
+                
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Scheduled Time</div>
+                    <div class="modal-info-value" id="modalTime"></div>
+                </div>
+                
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Platforms</div>
+                    <div class="modal-info-value" id="modalPlatforms"></div>
+                </div>
+                
+                <div class="modal-info-item">
+                    <div class="modal-info-label">Media Files</div>
+                    <div class="modal-info-value" id="modalMediaCount"></div>
+                </div>
+            </div>
+            
+            <!-- Results (if posted) -->
+            <div id="modalResults" style="margin-top: 1.5rem; display: none;">
+                <div style="font-weight: 600; margin-bottom: 0.5rem; color: #374151;">
+                    📊 Posting Results:
+                </div>
+                <div id="modalResultsContent"></div>
+            </div>
+        </div>
+    </div>
+</div>
 
+<script>
+// Post data storage
+const postsData = {
+    {% for post in posts %}
+    '{{ post.id }}': {
+        id: '{{ post.id }}',
+        caption: `{{ post.caption|escapejs }}`,
+        status: '{{ post.status }}',
+        scheduledTime: '{{ post.scheduled_time|date:"F d, Y" }} at {{ post.scheduled_time|date:"h:i A" }}',
+        postedAt: '{% if post.posted_at %}{{ post.posted_at|date:"F d, Y" }} at {{ post.posted_at|date:"h:i A" }}{% endif %}',
+        platforms: [{% for platform in post.platforms_list %}'{{ platform }}',{% endfor %}],
+        mediaFiles: [{% for media in post.media_files %}'{{ MEDIA_URL }}{{ media }}',{% endfor %}],
+        aiGenerated: {{ post.ai_generated|lower }},
+        results: {
+            facebook: { success: {{ post.facebook_post_id|yesno:"true,false" }}, error: '{{ post.facebook_error|escapejs }}' },
+            twitter: { success: {{ post.twitter_post_id|yesno:"true,false" }}, error: '{{ post.twitter_error|escapejs }}' },
+            instagram: { success: {{ post.instagram_post_id|yesno:"true,false" }}, error: '{{ post.instagram_error|escapejs }}' },
+            linkedin: { success: {{ post.linkedin_post_id|yesno:"true,false" }}, error: '{{ post.linkedin_error|escapejs }}' }
+        }
+    },
+    {% endfor %}
+};
+
+// Open modal function
+function openPostModal(postId) {
+    const post = postsData[postId];
+    if (!post) return;
+    
+    // Set title
+    document.getElementById('modalTitle').textContent = 'Post #' + post.id;
+    
+    // Set caption
+    document.getElementById('modalCaption').textContent = post.caption;
+    
+    // Set status with styling
+    const statusEl = document.getElementById('modalStatus');
+    statusEl.textContent = post.status.toUpperCase();
+    statusEl.style.color = post.status === 'posted' ? '#10b981' : post.status === 'failed' ? '#ef4444' : '#6366f1';
+    
+    // Set time
+    document.getElementById('modalTime').textContent = post.status === 'posted' && post.postedAt ? post.postedAt : post.scheduledTime;
+    
+    // Set platforms
+    const platformIcons = {
+        facebook: '📘',
+        twitter: '🐦',
+        instagram: '📷',
+        linkedin: '💼'
+    };
+    const platformsText = post.platforms.map(p => platformIcons[p] + ' ' + p.charAt(0).toUpperCase() + p.slice(1)).join(', ');
+    document.getElementById('modalPlatforms').innerHTML = platformsText;
+    
+    // Set media count
+    document.getElementById('modalMediaCount').textContent = post.mediaFiles.length + ' file' + (post.mediaFiles.length > 1 ? 's' : '');
+    
+    // Display media
+    const mediaContainer = document.getElementById('modalMediaContainer');
+    mediaContainer.innerHTML = '';
+    
+    post.mediaFiles.forEach(mediaUrl => {
+        const isVideo = mediaUrl.match(/\.(mp4|mov|avi)$/i);
+        
+        if (isVideo) {
+            const video = document.createElement('video');
+            video.src = mediaUrl;
+            video.controls = true;
+            video.className = 'modal-media';
+            mediaContainer.appendChild(video);
+        } else {
+            const img = document.createElement('img');
+            img.src = mediaUrl;
+            img.className = 'modal-media';
+            mediaContainer.appendChild(img);
+        }
+    });
+    
+    // Show results if posted/failed
+    if (post.status === 'posted' || post.status === 'failed') {
+        const resultsDiv = document.getElementById('modalResults');
+        const resultsContent = document.getElementById('modalResultsContent');
+        resultsDiv.style.display = 'block';
+        
+        let resultsHTML = '';
+        post.platforms.forEach(platform => {
+            const result = post.results[platform];
+            const icon = platformIcons[platform];
+            const statusIcon = result.success ? '✅' : '❌';
+            const statusText = result.success ? 'Posted' : (result.error || 'Failed');
+            const color = result.success ? '#10b981' : '#ef4444';
+            
+            resultsHTML += `
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem; margin-bottom: 0.5rem; background: #f9fafb; border-radius: 6px;">
+                    <span>${icon} ${platform.charAt(0).toUpperCase() + platform.slice(1)}</span>
+                    <span style="color: ${color};">${statusIcon} ${statusText}</span>
+                </div>
+            `;
+        });
+        
+        resultsContent.innerHTML = resultsHTML;
+    } else {
+        document.getElementById('modalResults').style.display = 'none';
+    }
+    
+    // Show modal
+    document.getElementById('postModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+// Close modal function
+function closeModal() {
+    document.getElementById('postModal').classList.remove('active');
+    document.body.style.overflow = 'auto';
+}
+
+// Close on outside click
+document.getElementById('postModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+
+// Close on ESC key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeModal();
+    }
+});
+</script>
 {% endblock %}
