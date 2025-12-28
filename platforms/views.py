@@ -1,3 +1,6 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\platforms\views.py
+
+
 from django.shortcuts import render
 
 # Create your views here.

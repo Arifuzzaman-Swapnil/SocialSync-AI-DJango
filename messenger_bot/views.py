@@ -1,8 +1,10 @@
+# messenger_bot/views.py
+
 """
 Messenger Bot Views
 Handles Facebook Messenger connection, PDF uploads, and configuration
 """
-
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -38,7 +40,7 @@ def connect_messenger(request):
     try:
         connection = MessengerConnection.objects.get(user=request.user)
         # Redirect to dashboard if already connected
-        return redirect('messenger_dashboard')
+        return redirect('messenger_bot:dashboard')
     except MessengerConnection.DoesNotExist:
         connection = None
     
@@ -81,7 +83,7 @@ def connect_messenger(request):
                     request, 
                     f'🎉 Successfully connected {connection.page_name}! Your chatbot is ready.'
                 )
-                return redirect('messenger_success')
+                return redirect('messenger_bot:success')
                 
             except Exception as e:
                 logger.error(f"Error creating messenger connection: {e}")
@@ -184,8 +186,7 @@ def messenger_settings(request):
         return redirect('connect_messenger')
     except AIConfiguration.DoesNotExist:
         messages.error(request, 'AI configuration not found.')
-        return redirect('messenger_dashboard')
-    
+        return redirect('messenger_bot:dashboard')    
     if request.method == 'POST':
         form_type = request.POST.get('form_type')
         
@@ -194,14 +195,14 @@ def messenger_settings(request):
             if form.is_valid():
                 form.save()
                 messages.success(request, '✅ Connection settings updated!')
-                return redirect('messenger_settings')
+                return redirect('messenger_bot:settings')
         
         elif form_type == 'ai_config':
             form = AIConfigurationForm(request.POST, instance=ai_config)
             if form.is_valid():
                 form.save()
                 messages.success(request, '✅ AI configuration updated!')
-                return redirect('messenger_settings')
+                return redirect('messenger_bot:settings')
         
         elif form_type == 'new_prompt':
             form = CustomPromptForm(request.POST)
@@ -210,7 +211,7 @@ def messenger_settings(request):
                 prompt.connection = connection
                 prompt.save()
                 messages.success(request, '✅ Custom prompt created!')
-                return redirect('messenger_settings')
+                return redirect('messenger_bot:settings')
     
     # Get forms
     connection_form = MessengerConnectionForm(instance=connection)
@@ -259,7 +260,7 @@ def webhook(request, page_id):
                     connection.save()
                     
                     logger.info(f"Webhook verified for page {page_id}")
-                    return JsonResponse({'challenge': int(challenge)}, safe=False)
+                    return HttpResponse(challenge, content_type='text/plain')
                 else:
                     logger.warning(f"Invalid verify token for page {page_id}")
                     return JsonResponse({'error': 'Invalid verify token'}, status=403)
@@ -278,16 +279,84 @@ def webhook(request, page_id):
             # Log incoming webhook data
             logger.info(f"Received webhook data: {data}")
             
-            # Process webhook data here
-            # This will be implemented in next steps with RAG
+            # Get connection
+            try:
+                connection = MessengerConnection.objects.get(page_id=page_id)
+            except MessengerConnection.DoesNotExist:
+                logger.error(f"Connection not found for page {page_id}")
+                return JsonResponse({'error': 'Connection not found'}, status=404)
+            
+            # Process each entry
+            if 'entry' in data:
+                from .services.message_handler import MessageHandler
+                message_handler = MessageHandler(connection)
+                
+                for entry in data['entry']:
+                    # Check for messaging events
+                    if 'messaging' in entry:
+                        for messaging_event in entry['messaging']:
+                            
+                            # Get sender ID
+                            sender_id = messaging_event.get('sender', {}).get('id')
+                            
+                            # Handle message
+                            if 'message' in messaging_event:
+                                message = messaging_event['message']
+                                
+                                # Skip if it's an echo (message sent by the page)
+                                if message.get('is_echo'):
+                                    continue
+                                
+                                # Get message text
+                                message_text = message.get('text')
+                                message_id = message.get('mid')
+                                
+                                if message_text and sender_id:
+                                    # Process the message
+                                    logger.info(f"Processing message from {sender_id}: {message_text}")
+                                    message_handler.process_message(
+                                        sender_id=sender_id,
+                                        message_text=message_text,
+                                        message_id=message_id
+                                    )
+                                
+                                # Handle attachments (images, files)
+                                if 'attachments' in message:
+                                    for attachment in message['attachments']:
+                                        attachment_type = attachment.get('type')
+                                        logger.info(f"Received {attachment_type} from {sender_id}")
+                                        
+                                        # Handle images
+                                        if attachment_type == 'image':
+                                            image_url = attachment.get('payload', {}).get('url')
+                                            if image_url and sender_id:
+                                                # Save image message
+                                                conversation = message_handler._get_or_create_conversation(sender_id)
+                                                Message.objects.create(
+                                                    conversation=conversation,
+                                                    sender='user',
+                                                    message_type='image',
+                                                    image_url=image_url,
+                                                    timestamp=timezone.now()
+                                                )
+                                                
+                                                # Send acknowledgment
+                                                message_handler._send_facebook_message(
+                                                    sender_id,
+                                                    "I received your image! However, I currently focus on text messages."
+                                                )
+                            
+                            # Handle postback (button clicks)
+                            elif 'postback' in messaging_event:
+                                postback_payload = messaging_event['postback'].get('payload')
+                                logger.info(f"Received postback from {sender_id}: {postback_payload}")
             
             return JsonResponse({'status': 'received'}, status=200)
         
         except Exception as e:
-            logger.error(f"Error processing webhook: {e}")
+            logger.error(f"Error processing webhook: {e}", exc_info=True)
             return JsonResponse({'error': str(e)}, status=500)
-
-
+        
 @login_required
 def disconnect_messenger(request):
     """Disconnect Messenger page"""

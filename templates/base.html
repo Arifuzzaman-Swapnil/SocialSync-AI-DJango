@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}SocialSync - AI Social Media Manager{% endblock %}</title>
     
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
         * {
             margin: 0;
             padding: 0;
@@ -13,125 +16,190 @@
         }
         
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary: #8b5cf6;
+            --primary: #ff6b6b;
+            --primary-dark: #ee5a6f;
+            --secondary: #f06595;
+            --accent: #f59e0b;
             --success: #10b981;
             --danger: #ef4444;
             --warning: #f59e0b;
-            --info: #3b82f6;
-            --dark: #1f2937;
-            --light: #f9fafb;
-            --border: #e5e7eb;
+            --info: #6366f1;
+            --dark: #0d0d0d;
+            --card-dark: #111111;
+            --card-darker: #1a1a1a;
+            --border: rgba(255, 255, 255, 0.06);
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0d0d0d;
             min-height: 100vh;
-            color: #333;
+            color: #e5e7eb;
+            line-height: 1.6;
         }
         
         /* Navbar */
         .navbar {
-            background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
             padding: 0;
             position: sticky;
             top: 0;
             z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .navbar::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                transparent,
+                #ff6b6b,
+                #ee5a6f,
+                #f06595,
+                transparent
+            );
+            background-size: 200% 100%;
+            animation: gradient-shift 3s linear infinite;
+        }
+
+        @keyframes gradient-shift {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
         }
         
         .navbar-container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 2rem;
+            padding: 1.25rem 2.5rem;
         }
         
         .navbar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 50%, #f06595 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            letter-spacing: -0.03em;
+            text-decoration: none;
+        }
+
+        .navbar-brand i {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #ff6b6b, #f06595);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.25rem;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
         }
         
         .navbar-menu {
             display: flex;
-            gap: 2rem;
+            gap: 0.5rem;
             list-style: none;
             align-items: center;
         }
         
         .navbar-menu a {
             text-decoration: none;
-            color: #4b5563;
-            font-weight: 500;
-            transition: color 0.3s;
+            color: #94a3b8;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            padding: 0.75rem 1.25rem;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar-menu a i {
+            font-size: 0.9rem;
         }
         
         .navbar-menu a:hover {
-            color: var(--primary);
+            color: #fff;
+            background: rgba(239, 68, 68, 0.1);
         }
         
         .btn {
             padding: 0.75rem 1.5rem;
             border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
+            border-radius: 0.75rem;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
             text-decoration: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
             text-align: center;
+            font-size: 0.95rem;
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            background: linear-gradient(135deg, #ef4444, #f59e0b);
             color: white;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.5);
         }
         
         .btn-outline {
             background: transparent;
-            color: var(--primary);
-            border: 2px solid var(--primary);
+            color: #ff6b6b;
+            border: 2px solid rgba(239, 68, 68, 0.3);
         }
         
         .btn-outline:hover {
-            background: var(--primary);
-            color: white;
+            background: rgba(239, 68, 68, 0.1);
+            border-color: #ff6b6b;
+            color: #fff;
         }
         
         /* Container */
         .container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 2.5rem;
         }
         
         /* Messages */
         .messages {
             max-width: 600px;
-            margin: 1rem auto;
+            margin: 2rem auto;
+            padding: 0 1rem;
         }
         
         .alert {
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
+            padding: 1.25rem 1.5rem;
+            border-radius: 1rem;
             margin-bottom: 1rem;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease-out;
+            gap: 1rem;
+            animation: slideIn 0.4s ease-out;
+            border: 1px solid;
+            font-weight: 500;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
         }
         
         @keyframes slideIn {
@@ -144,38 +212,249 @@
                 opacity: 1;
             }
         }
+
+        .alert i {
+            font-size: 1.25rem;
+        }
         
         .alert-success {
-            background: #d1fae5;
-            border-left: 4px solid var(--success);
-            color: #065f46;
+            background: rgba(16, 185, 129, 0.1);
+            border-color: rgba(16, 185, 129, 0.3);
+            color: #34d399;
+        }
+
+        .alert-success i {
+            color: #10b981;
         }
         
         .alert-error {
-            background: #fee2e2;
-            border-left: 4px solid var(--danger);
-            color: #991b1b;
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .alert-error i {
+            color: #ef4444;
         }
         
         .alert-warning {
-            background: #fef3c7;
-            border-left: 4px solid var(--warning);
-            color: #92400e;
+            background: rgba(245, 158, 11, 0.1);
+            border-color: rgba(245, 158, 11, 0.3);
+            color: #fbbf24;
+        }
+
+        .alert-warning i {
+            color: #f59e0b;
         }
         
         .alert-info {
-            background: #dbeafe;
-            border-left: 4px solid var(--info);
-            color: #1e40af;
+            background: rgba(99, 102, 241, 0.1);
+            border-color: rgba(99, 102, 241, 0.3);
+            color: #a5b4fc;
+        }
+
+        .alert-info i {
+            color: #6366f1;
         }
         
         /* Footer */
         .footer {
-            background: white;
-            padding: 2rem;
-            margin-top: 4rem;
+            background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+            padding: 3rem 2.5rem;
+            margin-top: 5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                transparent,
+                #ff6b6b,
+                #ee5a6f,
+                #f06595,
+                transparent
+            );
+            background-size: 200% 100%;
+            animation: gradient-shift 3s linear infinite;
+        }
+
+        .footer-content {
+            max-width: 1600px;
+            margin: 0 auto;
             text-align: center;
-            color: #6b7280;
+        }
+
+        .footer-brand {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 50%, #f06595 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .footer-brand i {
+            width: 35px;
+            height: 35px;
+            background: linear-gradient(135deg, #ff6b6b, #f06595);
+            border-radius: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1rem;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+        }
+
+        .footer-text {
+            color: #64748b;
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-links a {
+            color: #94a3b8;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .footer-links a:hover {
+            color: #ff6b6b;
+        }
+
+        .footer-social {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .footer-social a {
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94a3b8;
+            transition: all 0.3s;
+        }
+
+        .footer-social a:hover {
+            background: linear-gradient(135deg, #ef4444, #f59e0b);
+            color: white;
+            border-color: transparent;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .footer-copyright {
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .footer-copyright i {
+            color: #ef4444;
+            font-size: 0.9rem;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0d0d0d;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #ef4444, #f59e0b);
+            border-radius: 10px;
+            border: 2px solid #0d0d0d;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #dc2626, #d97706);
+        }
+
+        /* Mobile Menu Toggle */
+        .navbar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .navbar-container {
+                padding: 1rem 1.5rem;
+            }
+
+            .navbar-toggle {
+                display: block;
+            }
+
+            .navbar-menu {
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+                flex-direction: column;
+                padding: 1rem;
+                gap: 0.5rem;
+                display: none;
+                border-top: 1px solid rgba(255, 255, 255, 0.06);
+            }
+
+            .navbar-menu.active {
+                display: flex;
+            }
+
+            .container {
+                padding: 0 1.5rem;
+            }
+
+            .footer {
+                padding: 2rem 1.5rem;
+            }
+
+            .footer-links {
+                flex-direction: column;
+                gap: 1rem;
+            }
         }
         
         {% block extra_css %}{% endblock %}
@@ -185,21 +464,26 @@
     <!-- Navbar -->
     <nav class="navbar">
         <div class="navbar-container">
-            <div class="navbar-brand">
-                🚀 SocialSync
-            </div>
+            <a href="{% if user.is_authenticated %}{% url 'dashboard' %}{% else %}{% url 'login' %}{% endif %}" class="navbar-brand">
+                <i class="fas fa-rocket"></i>
+                <span>SocialSync</span>
+            </a>
             
-            <ul class="navbar-menu">
+            <button class="navbar-toggle" onclick="toggleMenu()">
+                <i class="fas fa-bars"></i>
+            </button>
+            
+            <ul class="navbar-menu" id="navbarMenu">
                 {% if user.is_authenticated %}
-                    <li><a href="{% url 'dashboard' %}">Dashboard</a></li>
-                    <li><a href="{% url 'profile' %}">Profile</a></li>
+                    <li><a href="{% url 'dashboard' %}"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="{% url 'profile' %}"><i class="fas fa-user"></i> Profile</a></li>
                     {% if user.is_staff %}
-                        <li><a href="{% url 'admin_dashboard' %}">Admin</a></li>
+                        <li><a href="{% url 'admin_dashboard' %}"><i class="fas fa-crown"></i> Admin</a></li>
                     {% endif %}
-                    <li><a href="{% url 'logout' %}" class="btn btn-outline">Logout</a></li>
+                    <li><a href="{% url 'logout' %}" class="btn btn-outline"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
                 {% else %}
-                    <li><a href="{% url 'login' %}">Login</a></li>
-                    <li><a href="{% url 'register' %}" class="btn btn-primary">Get Started</a></li>
+                    <li><a href="{% url 'login' %}"><i class="fas fa-sign-in-alt"></i> Login</a></li>
+                    <li><a href="{% url 'register' %}" class="btn btn-primary"><i class="fas fa-rocket"></i> Get Started</a></li>
                 {% endif %}
             </ul>
         </div>
@@ -210,13 +494,8 @@
         <div class="messages">
             {% for message in messages %}
                 <div class="alert alert-{{ message.tags }}">
-                    <span>
-                        {% if message.tags == 'success' %}✓{% endif %}
-                        {% if message.tags == 'error' %}✗{% endif %}
-                        {% if message.tags == 'warning' %}⚠{% endif %}
-                        {% if message.tags == 'info' %}ℹ{% endif %}
-                    </span>
-                    {{ message }}
+                    <i class="fas {% if message.tags == 'success' %}fa-check-circle{% elif message.tags == 'error' %}fa-exclamation-circle{% elif message.tags == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %}"></i>
+                    <span>{{ message }}</span>
                 </div>
             {% endfor %}
         </div>
@@ -229,8 +508,50 @@
     
     <!-- Footer -->
     <div class="footer">
-        <p>&copy; 2025 SocialSync. All rights reserved. | Built with ❤️ in Django</p>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <i class="fas fa-rocket"></i>
+                <span>SocialSync</span>
+            </div>
+            <p class="footer-text">AI-Powered Social Media Management Platform</p>
+            
+            <div class="footer-links">
+                <a href="#"><i class="fas fa-info-circle"></i> About</a>
+                <a href="#"><i class="fas fa-shield-alt"></i> Privacy</a>
+                <a href="#"><i class="fas fa-file-contract"></i> Terms</a>
+                <a href="#"><i class="fas fa-envelope"></i> Contact</a>
+            </div>
+
+            <div class="footer-social">
+                <a href="#" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                <a href="#" title="Twitter"><i class="fab fa-twitter"></i></a>
+                <a href="#" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+                <a href="#" title="Instagram"><i class="fab fa-instagram"></i></a>
+            </div>
+
+            <p class="footer-copyright">
+                &copy; 2025 SocialSync. All rights reserved. | Built with <i class="fas fa-heart"></i> using Django
+            </p>
+        </div>
     </div>
+
+    <script>
+        function toggleMenu() {
+            const menu = document.getElementById('navbarMenu');
+            menu.classList.toggle('active');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const navbar = document.querySelector('.navbar');
+            const menu = document.getElementById('navbarMenu');
+            const toggle = document.querySelector('.navbar-toggle');
+            
+            if (!navbar.contains(event.target) && menu.classList.contains('active')) {
+                menu.classList.remove('active');
+            }
+        });
+    </script>
     
     {% block extra_js %}{% endblock %}
 </body>

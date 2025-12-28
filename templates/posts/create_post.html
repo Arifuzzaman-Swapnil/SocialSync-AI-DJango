@@ -19,13 +19,13 @@
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         line-height: 1.6;
     }
-    
+
     .create-container {
         max-width: 1200px;
         margin: 0 auto;
         padding: 3rem 2.5rem;
     }
-    
+
     .create-header {
         background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
         padding: 3rem 2.5rem;
@@ -44,17 +44,21 @@
         left: -100%;
         width: 200%;
         height: 100%;
-        background: linear-gradient(90deg, 
-            transparent, 
-            rgba(239, 68, 68, 0.03), 
-            transparent
-        );
+        background: linear-gradient(90deg,
+                transparent,
+                rgba(239, 68, 68, 0.03),
+                transparent);
         animation: shimmer 8s infinite;
     }
 
     @keyframes shimmer {
-        0% { left: -100%; }
-        100% { left: 100%; }
+        0% {
+            left: -100%;
+        }
+
+        100% {
+            left: 100%;
+        }
     }
 
     .create-header::after {
@@ -64,20 +68,24 @@
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, 
-            transparent,
-            #ff6b6b,
-            #ee5a6f,
-            #f06595,
-            transparent
-        );
+        background: linear-gradient(90deg,
+                transparent,
+                #ff6b6b,
+                #ee5a6f,
+                #f06595,
+                transparent);
         background-size: 200% 100%;
         animation: gradient-shift 3s linear infinite;
     }
 
     @keyframes gradient-shift {
-        0% { background-position: 0% 0%; }
-        100% { background-position: 200% 0%; }
+        0% {
+            background-position: 0% 0%;
+        }
+
+        100% {
+            background-position: 200% 0%;
+        }
     }
 
     .header-content {
@@ -100,7 +108,7 @@
         color: white;
         box-shadow: 0 10px 30px rgba(239, 68, 68, 0.4);
     }
-    
+
     .create-header h1 {
         font-size: 2.5rem;
         font-weight: 800;
@@ -116,7 +124,7 @@
         font-size: 1.05rem;
         font-weight: 500;
     }
-    
+
     .create-form {
         background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
         padding: 3rem 2.5rem;
@@ -134,17 +142,16 @@
         left: 0;
         right: 0;
         height: 4px;
-        background: linear-gradient(90deg, 
-            transparent,
-            #10b981,
-            #06b6d4,
-            #10b981,
-            transparent
-        );
+        background: linear-gradient(90deg,
+                transparent,
+                #10b981,
+                #06b6d4,
+                #10b981,
+                transparent);
         background-size: 200% 100%;
         animation: gradient-shift 3s linear infinite;
     }
-    
+
     .form-section {
         margin-bottom: 3rem;
         padding-bottom: 2.5rem;
@@ -152,13 +159,13 @@
         position: relative;
         z-index: 1;
     }
-    
+
     .form-section:last-child {
         border-bottom: none;
         margin-bottom: 0;
         padding-bottom: 0;
     }
-    
+
     .form-section h3 {
         margin-bottom: 1.5rem;
         color: #fff;
@@ -173,11 +180,11 @@
         color: #f59e0b;
         font-size: 1.25rem;
     }
-    
+
     .form-group {
         margin-bottom: 1.5rem;
     }
-    
+
     .form-label {
         display: block;
         margin-bottom: 0.75rem;
@@ -195,7 +202,7 @@
         color: #f59e0b;
         font-size: 0.85rem;
     }
-    
+
     .form-control {
         width: 100%;
         padding: 1rem 1.25rem;
@@ -215,19 +222,19 @@
     .form-control::placeholder {
         color: #64748b;
     }
-    
+
     .form-control:focus {
         outline: none;
         background: rgba(255, 255, 255, 0.08);
         border-color: rgba(239, 68, 68, 0.5);
         box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
     }
-    
+
     textarea.form-control {
         resize: vertical;
         min-height: 180px;
     }
-    
+
     .ai-caption-box {
         background: rgba(99, 102, 241, 0.1);
         padding: 1.5rem;
@@ -247,7 +254,7 @@
     .ai-caption-box strong i {
         color: #a5b4fc;
     }
-    
+
     .ai-controls {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -255,7 +262,7 @@
         margin-top: 1rem;
         margin-bottom: 1rem;
     }
-    
+
     .btn-ai {
         width: 100%;
         padding: 1rem 1.5rem;
@@ -273,27 +280,27 @@
         gap: 0.75rem;
         box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
     }
-    
+
     .btn-ai:hover:not(:disabled) {
         transform: translateY(-3px);
         box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
     }
-    
+
     .btn-ai:disabled {
         opacity: 0.5;
         cursor: not-allowed;
     }
-    
+
     .platforms-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
         gap: 1.5rem;
     }
-    
+
     .platform-checkbox {
         display: none;
     }
-    
+
     .platform-label {
         display: flex;
         align-items: center;
@@ -311,13 +318,13 @@
         border-color: rgba(239, 68, 68, 0.3);
         transform: translateY(-3px);
     }
-    
-    .platform-checkbox:checked + .platform-label {
+
+    .platform-checkbox:checked+.platform-label {
         background: rgba(239, 68, 68, 0.1);
         border-color: rgba(239, 68, 68, 0.5);
         box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
     }
-    
+
     .platform-icon {
         width: 50px;
         height: 50px;
@@ -330,12 +337,23 @@
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
         flex-shrink: 0;
     }
-    
-    .platform-icon.facebook { background: #1877f2; }
-    .platform-icon.twitter { background: #1da1f2; }
-    .platform-icon.instagram { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-    .platform-icon.linkedin { background: #0a66c2; }
-    
+
+    .platform-icon.facebook {
+        background: #1877f2;
+    }
+
+    .platform-icon.twitter {
+        background: #1da1f2;
+    }
+
+    .platform-icon.instagram {
+        background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    }
+
+    .platform-icon.linkedin {
+        background: #0a66c2;
+    }
+
     .platform-name {
         font-weight: 700;
         color: #ffffff;
@@ -347,7 +365,7 @@
         color: #94a3b8;
         margin-top: 0.25rem;
     }
-    
+
     .btn-submit {
         width: 100%;
         padding: 1.25rem 2rem;
@@ -365,7 +383,7 @@
         gap: 0.75rem;
         box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
     }
-    
+
     .btn-submit:hover:not(:disabled) {
         transform: translateY(-3px);
         box-shadow: 0 15px 40px rgba(16, 185, 129, 0.5);
@@ -375,7 +393,7 @@
         opacity: 0.5;
         cursor: not-allowed;
     }
-    
+
     .no-accounts {
         background: rgba(245, 158, 11, 0.1);
         border-left: 4px solid #f59e0b;
@@ -397,26 +415,28 @@
         font-weight: 700;
         text-decoration: underline;
     }
-    
+
     .char-counter {
         text-align: right;
         font-size: 0.875rem;
         color: #94a3b8;
         margin-top: 0.5rem;
     }
-    
+
     .loading {
         display: inline-block;
         width: 18px;
         height: 18px;
-        border: 3px solid rgba(255,255,255,.3);
+        border: 3px solid rgba(255, 255, 255, .3);
         border-radius: 50%;
         border-top-color: #fff;
         animation: spin 1s ease-in-out infinite;
     }
-    
+
     @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     /* Upload Button */
@@ -603,7 +623,7 @@
             </div>
         </div>
     </div>
-    
+
     {% if not has_accounts %}
     <div class="no-accounts">
         <strong><i class="fas fa-exclamation-triangle"></i> No Connected Accounts</strong><br>
@@ -611,59 +631,48 @@
         <a href="{% url 'connect_account' %}">Connect Account <i class="fas fa-arrow-right"></i></a>
     </div>
     {% endif %}
-    
+
     <!-- Create Form -->
     <form method="POST" enctype="multipart/form-data" class="create-form" id="createPostForm">
         {% csrf_token %}
-        
+
         <!-- Caption Section -->
         <div class="form-section">
             <h3><i class="fas fa-edit"></i> Post Caption</h3>
-            
+
             <div class="form-group">
                 <label class="form-label">
                     <i class="fas fa-comment-alt"></i>
                     Caption
                 </label>
-                <textarea 
-                    name="caption" 
-                    class="form-control" 
-                    id="captionInput"
-                    placeholder="Write your post caption here..."
-                    required
-                    maxlength="5000"
-                    oninput="updateCharCount()"
-                ></textarea>
+                <textarea name="caption" class="form-control" id="captionInput"
+                    placeholder="Write your post caption here..." required maxlength="5000"
+                    oninput="updateCharCount()"></textarea>
                 <div class="char-counter">
                     <span id="charCount">0</span> / 5000 characters
                 </div>
             </div>
-            
+
             <!-- AI Caption Generator -->
             <div class="ai-caption-box">
                 <strong><i class="fas fa-magic"></i> AI Caption Generator</strong>
                 <div class="ai-controls">
                     <div class="form-group" style="margin-bottom: 0;">
-                        <input 
-                            type="text" 
-                            class="form-control" 
-                            id="aiTopic"
-                            placeholder="Topic (e.g., Marketing)"
-                        >
+                        <input type="text" class="form-control" id="aiTopic" placeholder="Topic (e.g., Marketing)">
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <select class="form-control" id="aiTone">
-                            <option value="professional">Professional</option>
-                            <option value="casual">Casual</option>
-                            <option value="friendly">Friendly</option>
-                            <option value="enthusiastic">Enthusiastic</option>
+                            <option value="professional" style="background-color: #0d0d0d;">Professional</option>
+                            <option value="casual" style="background-color: #0d0d0d;">Casual</option>
+                            <option value="friendly" style="background-color: #0d0d0d;">Friendly</option>
+                            <option value="enthusiastic" style="background-color: #0d0d0d;">Enthusiastic</option>
                         </select>
                     </div>
                     <div class="form-group" style="margin-bottom: 0;">
                         <select class="form-control" id="aiLength">
-                            <option value="short">Short</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="long">Long</option>
+                            <option value="short" style="background-color: #0d0d0d;">Short</option>
+                            <option value="medium" style="background-color: #0d0d0d;">Medium</option>
+                            <option value="long" style="background-color: #0d0d0d;">Long</option>
                         </select>
                     </div>
                 </div>
@@ -672,7 +681,7 @@
                 </button>
             </div>
         </div>
-        
+
         <!-- Media Section -->
         <div class="form-section">
             <div class="form-group">
@@ -680,17 +689,10 @@
                     <h3><i class="fas fa-image"></i> Upload Media</h3>
                     <span style="color: #94a3b8; font-size: 0.875rem;">(Max 10 files)</span>
                 </label>
-                
+
                 <!-- Hidden File Input -->
-                <input 
-                    type="file" 
-                    id="media" 
-                    name="media" 
-                    accept="image/*,video/*" 
-                    multiple
-                    style="display: none;"
-                >
-                
+                <input type="file" id="media" name="media" accept="image/*,video/*" multiple style="display: none;">
+
                 <!-- Upload Button Area -->
                 <div id="uploadBtn" onclick="document.getElementById('media').click()">
                     <i class="fas fa-cloud-upload-alt"></i>
@@ -701,40 +703,35 @@
                         JPG, PNG, MP4, MOV, AVI
                     </p>
                 </div>
-                
+
                 <!-- Preview Grid -->
                 <div id="previewGrid"></div>
-                
+
                 <!-- File Info -->
                 <div id="fileInfo"></div>
             </div>
         </div>
-        
+
         <!-- Platforms Section -->
         <div class="form-section">
             <h3><i class="fas fa-share-alt"></i> Select Platforms</h3>
-            
+
             {% if has_accounts %}
             <div class="platforms-grid">
                 {% for platform, accounts in platforms.items %}
                 <div>
-                    <input 
-                        type="checkbox" 
-                        class="platform-checkbox" 
-                        name="platforms" 
-                        value="{{ platform }}"
-                        id="platform-{{ platform }}"
-                    >
+                    <input type="checkbox" class="platform-checkbox" name="platforms" value="{{ platform }}"
+                        id="platform-{{ platform }}">
                     <label class="platform-label" for="platform-{{ platform }}">
                         <div class="platform-icon {{ platform }}">
                             {% if platform == 'facebook' %}
-                                <i class="fab fa-facebook-f"></i>
+                            <i class="fab fa-facebook-f"></i>
                             {% elif platform == 'twitter' %}
-                                <i class="fab fa-twitter"></i>
+                            <i class="fab fa-twitter"></i>
                             {% elif platform == 'instagram' %}
-                                <i class="fab fa-instagram"></i>
+                            <i class="fab fa-instagram"></i>
                             {% elif platform == 'linkedin' %}
-                                <i class="fab fa-linkedin-in"></i>
+                            <i class="fab fa-linkedin-in"></i>
                             {% endif %}
                         </div>
                         <div>
@@ -754,33 +751,29 @@
                 {% endfor %}
             </div>
             {% else %}
-            <p style="color: #94a3b8;">No accounts connected. <a href="{% url 'connect_account' %}" style="color: #60a5fa; font-weight: 600;">Connect now <i class="fas fa-arrow-right"></i></a></p>
+            <p style="color: #94a3b8;">No accounts connected. <a href="{% url 'connect_account' %}"
+                    style="color: #60a5fa; font-weight: 600;">Connect now <i class="fas fa-arrow-right"></i></a></p>
             {% endif %}
         </div>
-        
+
         <!-- Schedule Section -->
         <div class="form-section">
             <h3><i class="fas fa-clock"></i> Schedule</h3>
-            
+
             <div class="form-group">
                 <label class="form-label">
                     <i class="fas fa-calendar-alt"></i>
                     Post Date & Time
                 </label>
-                <input 
-                    type="datetime-local" 
-                    name="scheduled_time" 
-                    class="form-control"
-                    required
-                    min="{{ now|date:'Y-m-d' }}T{{ now|date:'H:i' }}"
-                >
+                <input type="datetime-local" name="scheduled_time" class="form-control" required
+                    min="{{ now|date:'Y-m-d' }}T{{ now|date:'H:i' }}">
                 <div class="datetime-info">
                     <i class="fas fa-info-circle"></i>
                     <span>Posts are scheduled in your local timezone</span>
                 </div>
             </div>
         </div>
-        
+
         <!-- Submit Button -->
         <button type="submit" class="btn-submit" {% if not has_accounts %}disabled{% endif %}>
             <i class="fas fa-rocket"></i>
@@ -794,18 +787,18 @@
     let files = [];
     const maxFiles = 10;
 
-    document.getElementById('media').addEventListener('change', function(e) {
+    document.getElementById('media').addEventListener('change', function (e) {
         const newFiles = Array.from(e.target.files);
-        
+
         // Check limit
         if (files.length + newFiles.length > maxFiles) {
             alert('Maximum ' + maxFiles + ' files allowed!');
             return;
         }
-        
+
         // Add files
         files = files.concat(newFiles);
-        
+
         // Update preview
         updatePreview();
     });
@@ -814,29 +807,29 @@
         const grid = document.getElementById('previewGrid');
         const info = document.getElementById('fileInfo');
         const btn = document.getElementById('uploadBtn');
-        
+
         if (files.length === 0) {
             grid.style.display = 'none';
             info.style.display = 'none';
             btn.style.display = 'block';
             return;
         }
-        
+
         grid.style.display = 'grid';
         info.style.display = 'block';
         btn.style.display = 'none';
         grid.innerHTML = '';
-        
+
         files.forEach((file, index) => {
             const box = document.createElement('div');
             box.className = 'preview-box';
-            
+
             // Create preview
             if (file.type.startsWith('image/')) {
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(file);
                 box.appendChild(img);
-                
+
                 const tag = document.createElement('div');
                 tag.className = 'type-tag';
                 tag.innerHTML = '<i class="fas fa-image"></i> Image';
@@ -846,28 +839,28 @@
                 video.src = URL.createObjectURL(file);
                 video.muted = true;
                 box.appendChild(video);
-                
+
                 const tag = document.createElement('div');
                 tag.className = 'type-tag';
                 tag.innerHTML = '<i class="fas fa-video"></i> Video';
                 box.appendChild(tag);
             }
-            
+
             // Close button
             const closeBtn = document.createElement('button');
             closeBtn.className = 'close-btn';
             closeBtn.innerHTML = '×';
             closeBtn.type = 'button';
-            closeBtn.onclick = function() {
+            closeBtn.onclick = function () {
                 files.splice(index, 1);
                 updateFileInput();
                 updatePreview();
             };
             box.appendChild(closeBtn);
-            
+
             grid.appendChild(box);
         });
-        
+
         // Update info
         info.innerHTML = `
             <strong>${files.length}</strong> file${files.length > 1 ? 's' : ''} selected
@@ -885,22 +878,22 @@
         const caption = document.getElementById('captionInput').value;
         document.getElementById('charCount').textContent = caption.length;
     }
-    
+
     async function generateCaption() {
         const topic = document.getElementById('aiTopic').value.trim();
         const tone = document.getElementById('aiTone').value;
         const length = document.getElementById('aiLength').value;
-        
+
         if (!topic) {
             alert('Please enter a topic first');
             return;
         }
-        
+
         // Show loading
         const button = document.querySelector('.btn-ai');
         button.disabled = true;
         document.getElementById('aiButtonText').innerHTML = '<span class="loading"></span> Generating...';
-        
+
         try {
             const response = await fetch('{% url "generate_caption" %}', {
                 method: 'POST',
@@ -910,9 +903,9 @@
                 },
                 body: JSON.stringify({ topic, tone, length })
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 document.getElementById('captionInput').value = data.caption;
                 updateCharCount();
@@ -926,12 +919,12 @@
             document.getElementById('aiButtonText').innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Caption';
         }
     }
-    
+
     // Set minimum datetime to now
-    window.addEventListener('DOMContentLoaded', function() {
+    window.addEventListener('DOMContentLoaded', function () {
         const now = new Date();
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        document.querySelector('input[type="datetime-local"]').min = now.toISOString().slice(0,16);
+        document.querySelector('input[type="datetime-local"]').min = now.toISOString().slice(0, 16);
     });
 </script>
 {% endblock %}

@@ -1,5 +1,9 @@
+# platforms/urls.py
+
 from django.urls import path
 from . import views
+
+app_name = 'platforms' 
 
 urlpatterns = [
     path('connect/', views.connect_account, name='connect_account'),

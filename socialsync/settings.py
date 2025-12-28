@@ -28,8 +28,16 @@ SECRET_KEY = 'django-insecure-rf#m85xc6pefl#85gx(-g)%w)2_*_eg5*26ovyanr!7n%8vhm=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    'idiomatic-davida-subacrid.ngrok-free.dev',
+]
 
+# Add this line
+CSRF_TRUSTED_ORIGINS = [
+    'https://idiomatic-davida-subacrid.ngrok-free.dev',
+]
 
 # Application definition
 

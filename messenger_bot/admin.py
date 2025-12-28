@@ -2,6 +2,7 @@
 Messenger Bot Admin Configuration
 Beautiful and functional admin panel for managing the chatbot
 """
+# messenger_bot\admin.py
 
 from django.contrib import admin
 from django.utils.html import format_html

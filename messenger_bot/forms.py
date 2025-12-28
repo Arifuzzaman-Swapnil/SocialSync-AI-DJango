@@ -1,3 +1,5 @@
+# messenger_bot/forms.py
+ 
 """
 Messenger Bot Forms
 Forms for connecting Facebook Messenger and configuring AI
@@ -70,32 +72,38 @@ class AIConfigurationForm(forms.ModelForm):
                 'class': 'form-control'
             }),
             'rag_enabled': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
+                'class': 'form-check-input',
+                'checked': True  # ← Add this
             }),
             'top_k_results': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': 1,
-                'max': 10
+                'max': 10,
+                'value': 3  # ← Add this
             }),
             'similarity_threshold': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'step': 0.1,
                 'min': 0,
-                'max': 1
+                'max': 1,
+                'value': 0.7  # ← Add this
             }),
             'temperature': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'step': 0.1,
                 'min': 0,
-                'max': 2
+                'max': 2,
+                'value': 0.7  # ← Add this
             }),
             'max_tokens': forms.NumberInput(attrs={
                 'class': 'form-control',
                 'min': 100,
-                'max': 4000
+                'max': 4000,
+                'value': 500  # ← Add this
             }),
             'image_understanding_enabled': forms.CheckboxInput(attrs={
-                'class': 'form-check-input'
+                'class': 'form-check-input',
+                'checked': True  # ← Add this
             }),
         }
 

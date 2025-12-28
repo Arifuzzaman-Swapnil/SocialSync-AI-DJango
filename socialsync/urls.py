@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\socialsync\urls.py
+
 """
 URL configuration for socialsync project.
 
@@ -14,29 +16,26 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+"""
+URL configuration for socialsync project.
+"""
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.shortcuts import redirect
-from django.shortcuts import render  # ← এটা add করুন
-
-# Placeholder function
-def messenger_connect_placeholder(request):
-    return render(request, 'messenger_placeholder.html')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('platforms/', include('platforms.urls')),
-    path('posts/', include('posts.urls')),  # এই line add করুন
+    path('posts/', include('posts.urls')),
     path('', include('accounts.urls')),
     path('', lambda request: redirect('login')),
     path('features/', include('upcoming_features.urls')),
 
-    path('messenger/connect/', messenger_connect_placeholder, name='messenger_connect'),
-    path('messenger/', include('messenger_bot.urls')),  # ← ADD THIS
-
+    # Messenger Bot (KEEP ONLY THIS LINE)
+    path('messenger/', include('messenger_bot.urls')),
 ]
 
 if settings.DEBUG:

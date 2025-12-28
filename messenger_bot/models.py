@@ -1,3 +1,5 @@
+# messenger_bot/models.py
+
 """
 Messenger Bot Models
 Complete database models for AI-powered Facebook Messenger chatbot with RAG
