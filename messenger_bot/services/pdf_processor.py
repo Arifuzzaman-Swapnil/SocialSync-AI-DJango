@@ -1,8 +1,9 @@
+# messenger_bot/services/pdf_processor.py
+
 """
 PDF Processor Service
 Extracts text from PDFs and chunks it for RAG
 """
-# messenger_bot\services\pdf_processor.py
 
 import PyPDF2
 import logging
@@ -28,7 +29,7 @@ class PDFProcessor:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
     
-    def extract_text_from_pdf(self, pdf_path: str) -> Dict[str, any]:
+    def extract_text_from_pdf(self, pdf_path: str) -> str:
         """
         Extract text from PDF file
         
@@ -36,41 +37,26 @@ class PDFProcessor:
             pdf_path: Path to PDF file
             
         Returns:
-            dict: {
-                'text': str,
-                'total_pages': int,
-                'metadata': dict
-            }
+            str: Extracted text
         """
         try:
             text = ""
-            metadata = {}
             
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 total_pages = len(pdf_reader.pages)
                 
-                # Extract metadata
-                if pdf_reader.metadata:
-                    metadata = {
-                        'title': pdf_reader.metadata.get('/Title', ''),
-                        'author': pdf_reader.metadata.get('/Author', ''),
-                        'subject': pdf_reader.metadata.get('/Subject', ''),
-                    }
+                logger.info(f"Processing {total_pages} pages from PDF")
                 
                 # Extract text from all pages
                 for page_num, page in enumerate(pdf_reader.pages):
                     page_text = page.extract_text()
                     if page_text:
-                        text += f"\n--- Page {page_num + 1} ---\n{page_text}"
+                        text += page_text + "\n"
                 
-                logger.info(f"Extracted {len(text)} characters from {total_pages} pages")
-                
-                return {
-                    'text': text,
-                    'total_pages': total_pages,
-                    'metadata': metadata
-                }
+                logger.info(f"Extracted {len(text)} characters from PDF")
+            
+            return text.strip()
         
         except Exception as e:
             logger.error(f"Error extracting text from PDF: {e}")
@@ -92,14 +78,87 @@ class PDFProcessor:
         # Remove special characters but keep basic punctuation
         text = re.sub(r'[^\w\s.,!?;:\-\(\)\[\]\'\"]+', '', text)
         
-        # Remove page markers
-        text = re.sub(r'--- Page \d+ ---', '', text)
-        
         return text.strip()
-    
+        
+    def create_chunks(self, text: str, chunk_size: int = None, overlap: int = None) -> List[str]:
+            """
+            Split text into overlapping chunks (simple version)
+            
+            Args:
+                text: Full text to split
+                chunk_size: Size of each chunk in characters (uses instance default if None)
+                overlap: Number of characters to overlap between chunks (uses instance default if None)
+                
+            Returns:
+                List of text chunks (strings only)
+            """
+            if not text:
+                return []
+            
+            # Use provided values or instance defaults
+            chunk_size = chunk_size or self.chunk_size
+            overlap = overlap or self.chunk_overlap
+            
+            # Clean text first
+            text = self.clean_text(text)
+            
+            chunks = []
+            start = 0
+            text_length = len(text)
+            
+            # Safety counter to prevent infinite loops
+            max_iterations = text_length + 100
+            iteration = 0
+            
+            while start < text_length and iteration < max_iterations:
+                iteration += 1
+                
+                # Calculate end position
+                end = start + chunk_size
+                
+                # If we've gone past the text, take what's left
+                if end > text_length:
+                    end = text_length
+                
+                # If not at the end, try to break at sentence boundary
+                if end < text_length:
+                    # Look for sentence endings (., !, ?)
+                    last_period = text.rfind('.', start, end)
+                    last_question = text.rfind('?', start, end)
+                    last_exclamation = text.rfind('!', start, end)
+                    
+                    # Use the latest sentence ending
+                    sentence_end = max(last_period, last_question, last_exclamation)
+                    
+                    if sentence_end > start:
+                        end = sentence_end + 1
+                
+                # Extract chunk
+                chunk_text = text[start:end].strip()
+                
+                if chunk_text:
+                    chunks.append(chunk_text)
+                
+                # Calculate next start with overlap
+                next_start = end - overlap
+                
+                # CRITICAL: Ensure we're always moving forward
+                if next_start <= start:
+                    # If overlap would keep us in same place, move forward by at least 1 char
+                    next_start = start + max(1, chunk_size // 2)
+                
+                start = next_start
+                
+                # If we've reached or passed the end, stop
+                if start >= text_length:
+                    break
+            
+            logger.info(f"Created {len(chunks)} chunks from text (iterations: {iteration})")
+            return chunks
+
     def chunk_text(self, text: str, page_number: int = None) -> List[Dict[str, any]]:
         """
-        Split text into overlapping chunks
+        Split text into overlapping chunks with metadata
         
         Args:
             text: Text to chunk
@@ -165,15 +224,13 @@ class PDFProcessor:
         """
         try:
             # Extract text
-            extraction_result = self.extract_text_from_pdf(pdf_path)
+            text = self.extract_text_from_pdf(pdf_path)
             
-            # Chunk text
-            chunks = self.chunk_text(extraction_result['text'])
+            if not text:
+                raise ValueError("No text extracted from PDF")
             
-            # Add PDF metadata to each chunk
-            for chunk in chunks:
-                chunk['total_pages'] = extraction_result['total_pages']
-                chunk['pdf_metadata'] = extraction_result['metadata']
+            # Chunk text with metadata
+            chunks = self.chunk_text(text)
             
             logger.info(f"Successfully processed PDF: {len(chunks)} chunks created")
             return chunks
@@ -184,7 +241,7 @@ class PDFProcessor:
 
 
 # Utility function for quick processing
-def process_pdf_file(pdf_path: str, chunk_size: int = 1000) -> List[Dict[str, any]]:
+def process_pdf_file(pdf_path: str, chunk_size: int = 1000) -> List[str]:
     """
     Quick utility to process a PDF file
     
@@ -193,7 +250,8 @@ def process_pdf_file(pdf_path: str, chunk_size: int = 1000) -> List[Dict[str, an
         chunk_size: Size of each chunk
         
     Returns:
-        List of processed chunks
+        List of text chunks (strings)
     """
     processor = PDFProcessor(chunk_size=chunk_size)
-    return processor.process_pdf(pdf_path)
+    text = processor.extract_text_from_pdf(pdf_path)
+    return processor.create_chunks(text)

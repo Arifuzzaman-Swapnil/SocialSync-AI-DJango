@@ -149,22 +149,36 @@ class MessageHandler:
             dict with user info or empty dict
         """
         try:
+            print(f"🔍 Attempting to get user info for: {user_id}")
+            print(f"🔑 Token exists: {bool(self.page_access_token)}")
+            print(f"🔑 Token length: {len(self.page_access_token) if self.page_access_token else 0}")
+            
+            if not self.page_access_token:
+                print("❌ No page access token available!")
+                return {}
+            
             url = f"https://graph.facebook.com/v18.0/{user_id}"
             params = {
                 'fields': 'name,profile_pic',
                 'access_token': self.page_access_token
             }
             
+            print(f"📡 Making API call to: {url}")
             response = requests.get(url, params=params, timeout=10)
+            print(f"📊 Response status: {response.status_code}")
             
             if response.status_code == 200:
-                return response.json()
+                data = response.json()
+                print(f"✅ User info retrieved: {data}")
+                return data
             else:
-                logger.warning(f"Failed to get user info: {response.text}")
+                print(f"❌ Failed to get user info: {response.text}")
                 return {}
         
         except Exception as e:
-            logger.error(f"Error getting user info: {e}")
+            print(f"❌ Error getting user info: {e}")
+            import traceback
+            traceback.print_exc()
             return {}
     
     def _generate_response(self, message_text: str, conversation: Conversation) -> dict:

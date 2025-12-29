@@ -1,8 +1,9 @@
+# messenger_bot/services/openai_client.py
+
 """
 OpenAI Client Service
 Handles OpenAI API interactions for embeddings and chat completions
 """
-# messenger_bot\services\openai_client.py
 
 import openai
 import logging
@@ -196,11 +197,36 @@ class OpenAIClient:
         except Exception as e:
             logger.error(f"Error analyzing image: {e}")
             raise
+    
+    def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        """
+        Calculate cosine similarity between two vectors
+        
+        Args:
+            vec1: First vector
+            vec2: Second vector
+            
+        Returns:
+            float: Similarity score (0-1)
+        """
+        vec1 = np.array(vec1)
+        vec2 = np.array(vec2)
+        
+        dot_product = np.dot(vec1, vec2)
+        norm1 = np.linalg.norm(vec1)
+        norm2 = np.linalg.norm(vec2)
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        similarity = dot_product / (norm1 * norm2)
+        return float(similarity)
 
 
-def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+# Utility functions (outside class)
+def cosine_similarity_standalone(vec1: List[float], vec2: List[float]) -> float:
     """
-    Calculate cosine similarity between two vectors
+    Standalone cosine similarity function
     
     Args:
         vec1: First vector
@@ -242,7 +268,7 @@ def find_most_similar(
     similarities = []
     
     for idx, embedding in enumerate(embeddings):
-        similarity = cosine_similarity(query_embedding, embedding)
+        similarity = cosine_similarity_standalone(query_embedding, embedding)
         similarities.append((idx, similarity))
     
     # Sort by similarity (descending)
