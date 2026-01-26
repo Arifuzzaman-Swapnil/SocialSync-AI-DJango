@@ -1,4 +1,4 @@
-# messenger_bot/apps.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\apps.py
 
 from django.apps import AppConfig
 

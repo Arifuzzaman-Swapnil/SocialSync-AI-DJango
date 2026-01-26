@@ -1,4 +1,4 @@
-# messenger_bot/services/openai_client.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\services\openai_client.py
 
 """
 OpenAI Client Service
@@ -7,7 +7,7 @@ Handles OpenAI API interactions for embeddings and chat completions
 
 import openai
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -197,6 +197,34 @@ class OpenAIClient:
         except Exception as e:
             logger.error(f"Error analyzing image: {e}")
             raise
+    
+    def vision_analysis(
+        self,
+        image_url: str,
+        prompt: str = "Describe this image in detail",
+        model: str = "gpt-4o"
+    ) -> Optional[str]:
+        """
+        Vision API analysis wrapper for images
+        
+        Args:
+            image_url: URL of image
+            prompt: Analysis prompt
+            model: Model to use
+            
+        Returns:
+            str: Analysis or None on error
+        """
+        try:
+            return self.analyze_image(
+                image_url=image_url,
+                prompt=prompt,
+                model=model,
+                max_tokens=500
+            )
+        except Exception as e:
+            logger.error(f"Vision analysis failed: {e}")
+            return None
     
     def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
         """

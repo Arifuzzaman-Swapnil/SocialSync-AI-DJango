@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\analytics\admin.py
+
 from django.contrib import admin
 
 # Register your models here.

@@ -1,4 +1,4 @@
-# messenger_bot/forms.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\forms.py
  
 """
 Messenger Bot Forms
@@ -58,7 +58,10 @@ class AIConfigurationForm(forms.ModelForm):
             'similarity_threshold',
             'temperature',
             'max_tokens',
-            'image_understanding_enabled'
+            'image_understanding_enabled',
+            'voice_transcription_enabled',
+            'voice_reply_enabled',
+            'voice_model'
         ]
         widgets = {
             'openai_api_key': forms.TextInput(attrs={
@@ -99,11 +102,21 @@ class AIConfigurationForm(forms.ModelForm):
                 'class': 'form-control',
                 'min': 100,
                 'max': 4000,
-                'value': 500  # ← Add this
+                'value': 1500  # Increased for complete responses
             }),
             'image_understanding_enabled': forms.CheckboxInput(attrs={
                 'class': 'form-check-input',
                 'checked': True  # ← Add this
+            }),
+            'voice_transcription_enabled': forms.CheckboxInput(attrs={
+                'class': 'form-check-input',
+                'checked': True
+            }),
+            'voice_reply_enabled': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            }),
+            'voice_model': forms.Select(attrs={
+                'class': 'form-control'
             }),
         }
 

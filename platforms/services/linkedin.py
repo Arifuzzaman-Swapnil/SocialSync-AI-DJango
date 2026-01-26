@@ -160,6 +160,8 @@
 #         name = profile.get('name', 'LinkedIn User')
 #         return True, name
 
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\platforms\services\linkedin.py
+
 """
 LinkedIn Service - With Image/Video Support
 """

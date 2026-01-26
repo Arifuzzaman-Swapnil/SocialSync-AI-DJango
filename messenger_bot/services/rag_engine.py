@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\services\rag_engine.py
+
 """
 RAG Engine Service
 Retrieval-Augmented Generation core logic
@@ -221,10 +223,31 @@ class RAGEngine:
             
             # Get active prompt
             active_prompt = connection.prompts.filter(is_active=True).first()
-            system_prompt = active_prompt.system_prompt if active_prompt else (
+            base_system_prompt = active_prompt.system_prompt if active_prompt else (
                 "You are a helpful AI assistant."
             )
             
+            # Enhanced system prompt with language detection and formatting rules
+            system_prompt = f"""{base_system_prompt}
+
+IMPORTANT RULES:
+1. LANGUAGE: Detect the language of the user's message and ALWAYS respond in the SAME language. 
+   - If user writes in Bengali (বাংলা), respond in Bengali
+   - If user writes in English, respond in English
+   - If user writes in any other language, respond in that language
+   - If user mixes languages, respond in the dominant language
+
+2. FORMATTING: 
+   - Do NOT use markdown formatting like **bold**, *italic*, ### headers
+   - Do NOT use bullet points with - or *
+   - Write in natural, conversational paragraphs
+   - Keep responses clean and readable for messaging apps
+
+3. RESPONSE STYLE:
+   - Be helpful and friendly
+   - Give complete answers, don't cut off mid-sentence
+   - Be concise but thorough"""
+
             # Build messages
             messages = [{"role": "system", "content": system_prompt}]
             
@@ -251,8 +274,11 @@ class RAGEngine:
                 max_tokens=self.ai_config.max_tokens
             )
             
+            # Clean any remaining markdown from response
+            clean_response = self._clean_markdown(response['content'])
+            
             return {
-                'response': response['content'],
+                'response': clean_response,
                 'context_used': context_text,
                 'model': response['model'],
                 'tokens': response['tokens'],
@@ -269,6 +295,38 @@ class RAGEngine:
                 'chunks_used': 0,
                 'error': str(e)
             }
+    
+    def _clean_markdown(self, text: str) -> str:
+        """Remove markdown formatting from text"""
+        import re
+        
+        # Remove bold **text** or __text__
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+        text = re.sub(r'__(.+?)__', r'\1', text)
+        
+        # Remove italic *text* or _text_
+        text = re.sub(r'\*(.+?)\*', r'\1', text)
+        text = re.sub(r'(?<!\w)_(.+?)_(?!\w)', r'\1', text)
+        
+        # Remove headers ### text
+        text = re.sub(r'^#{1,6}\s*', '', text, flags=re.MULTILINE)
+        
+        # Remove bullet points - or *
+        text = re.sub(r'^\s*[-*]\s+', '', text, flags=re.MULTILINE)
+        
+        # Remove numbered lists 1. 2. etc
+        text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE)
+        
+        # Remove code blocks ```
+        text = re.sub(r'```[\s\S]*?```', '', text)
+        
+        # Remove inline code `text`
+        text = re.sub(r'`(.+?)`', r'\1', text)
+        
+        # Clean extra whitespace
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        
+        return text.strip()
 
 
 # Import timezone for the vectorized_at field

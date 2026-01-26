@@ -93,7 +93,7 @@
 #         clean_username = username.replace('@', '')
 #         return f"https://twitter.com/{clean_username}/status/{tweet_id}"
 
-
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\platforms\services\twitter.py
 """
 Twitter Service - Text + Media Support
 """

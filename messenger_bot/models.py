@@ -1,4 +1,4 @@
-# messenger_bot/models.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\models.py
 
 """
 Messenger Bot Models
@@ -107,12 +107,34 @@ class AIConfiguration(models.Model):
         help_text="Creativity (0-2). Lower = focused, Higher = creative"
     )
     max_tokens = models.IntegerField(
-        default=500,
-        help_text="Maximum response length"
+        default=1500,
+        help_text="Maximum response length (increased for complete responses)"
     )
     
     # Image understanding
     image_understanding_enabled = models.BooleanField(default=True)
+    
+    # Voice settings
+    voice_transcription_enabled = models.BooleanField(
+        default=True,
+        help_text="Transcribe incoming voice messages using Whisper"
+    )
+    voice_reply_enabled = models.BooleanField(
+        default=False,
+        help_text="Reply with voice messages (uses TTS API)"
+    )
+    voice_model = models.CharField(
+        max_length=50,
+        choices=[
+            ('nova', 'Nova (Female, Friendly)'),
+            ('alloy', 'Alloy (Neutral)'),
+            ('echo', 'Echo (Male, Warm)'),
+            ('fable', 'Fable (British)'),
+            ('onyx', 'Onyx (Deep Male)'),
+            ('shimmer', 'Shimmer (Female, Expressive)'),
+        ],
+        default='nova'
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -306,7 +328,7 @@ class Conversation(models.Model):
     # Facebook user details
     sender_id = models.CharField(max_length=255, db_index=True)
     sender_name = models.CharField(max_length=255, blank=True, null=True)
-    sender_profile_pic = models.URLField(blank=True, null=True)
+    sender_profile_pic = models.TextField(blank=True, null=True)  # Changed from URLField to TextField for long URLs
     
     # Conversation metadata
     started_at = models.DateTimeField(auto_now_add=True)
@@ -315,6 +337,9 @@ class Conversation(models.Model):
     
     # Status
     is_active = models.BooleanField(default=True)
+    
+    # Human takeover mode - when True, AI won't auto-reply
+    human_takeover = models.BooleanField(default=False)
     
     class Meta:
         db_table = 'conversations'
@@ -361,8 +386,8 @@ class Message(models.Model):
     
     # Content
     text = models.TextField(blank=True, null=True)
-    image_url = models.URLField(blank=True, null=True)
-    file_url = models.URLField(blank=True, null=True)
+    image_url = models.TextField(blank=True, null=True)  # Changed from URLField for long Facebook URLs
+    file_url = models.TextField(blank=True, null=True)   # Changed from URLField for long URLs
     
     # AI metadata (for bot messages)
     rag_context_used = models.TextField(
@@ -407,3 +432,107 @@ class Message(models.Model):
     def sender_icon(self):
         """Returns emoji for sender"""
         return "👤" if self.sender == 'user' else "🤖"
+
+
+class Notification(models.Model):
+    """Important message notifications for business owner"""
+    
+    connection = models.ForeignKey(
+        MessengerConnection, 
+        on_delete=models.CASCADE, 
+        related_name='notifications'
+    )
+    
+    conversation = models.ForeignKey(
+        Conversation, 
+        on_delete=models.CASCADE, 
+        related_name='notifications'
+    )
+    
+    message = models.ForeignKey(
+        Message, 
+        on_delete=models.CASCADE, 
+        related_name='notifications'
+    )
+    
+    # Notification type
+    NOTIFICATION_TYPE_CHOICES = [
+        ('product_inquiry', '🛒 Product Inquiry'),
+        ('appointment', '📅 Appointment Request'),
+        ('order', '📦 Order Request'),
+        ('urgent', '🔴 Urgent'),
+        ('complaint', '⚠️ Complaint'),
+        ('pricing', '💰 Pricing Question'),
+        ('availability', '📋 Availability Check'),
+        ('contact', '📞 Contact Request'),
+        ('general', '💬 Important Message'),
+    ]
+    notification_type = models.CharField(
+        max_length=30, 
+        choices=NOTIFICATION_TYPE_CHOICES, 
+        default='general'
+    )
+    
+    # Content
+    title = models.CharField(max_length=255)
+    summary = models.TextField(help_text="AI-generated summary of the important message")
+    
+    # Priority
+    PRIORITY_CHOICES = [
+        ('high', '🔴 High'),
+        ('medium', '🟡 Medium'),
+        ('low', '🟢 Low'),
+    ]
+    priority = models.CharField(
+        max_length=10, 
+        choices=PRIORITY_CHOICES, 
+        default='medium'
+    )
+    
+    # Status
+    is_read = models.BooleanField(default=False)
+    is_resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'notifications'
+        verbose_name = 'Notification'
+        verbose_name_plural = 'Notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['connection', 'is_read']),
+            models.Index(fields=['connection', 'created_at']),
+        ]
+    
+    def __str__(self):
+        status = "✅" if self.is_resolved else ("👁" if self.is_read else "🔔")
+        return f"{status} {self.get_notification_type_display()} - {self.title[:30]}"
+    
+    @property
+    def type_icon(self):
+        """Returns icon for notification type"""
+        icons = {
+            'product_inquiry': '🛒',
+            'appointment': '📅',
+            'order': '📦',
+            'urgent': '🔴',
+            'complaint': '⚠️',
+            'pricing': '💰',
+            'availability': '📋',
+            'contact': '📞',
+            'general': '💬',
+        }
+        return icons.get(self.notification_type, '💬')
+    
+    @property
+    def priority_color(self):
+        """Returns color for priority"""
+        colors = {
+            'high': '#ef4444',
+            'medium': '#f59e0b',
+            'low': '#10b981',
+        }
+        return colors.get(self.priority, '#6b7280')

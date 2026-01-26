@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\admin.py
+
 """
 Messenger Bot Admin Configuration
 Beautiful and functional admin panel for managing the chatbot
@@ -429,6 +431,83 @@ class MessageAdmin(admin.ModelAdmin):
             )
         return '-'
     ai_info.short_description = 'AI Stats'
+
+
+# Import Notification model
+from .models import Notification
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = (
+        'type_badge',
+        'title',
+        'sender_name',
+        'priority_badge',
+        'status_badge',
+        'created_at'
+    )
+    list_filter = ('notification_type', 'priority', 'is_read', 'is_resolved', 'created_at')
+    search_fields = ('title', 'summary', 'conversation__sender_name')
+    readonly_fields = ('created_at', 'resolved_at')
+    
+    fieldsets = (
+        ('Notification Details', {
+            'fields': ('connection', 'conversation', 'message', 'notification_type', 'title', 'summary')
+        }),
+        ('Priority & Status', {
+            'fields': ('priority', 'is_read', 'is_resolved', 'resolved_at')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def type_badge(self, obj):
+        colors = {
+            'product_inquiry': '#8b5cf6',
+            'appointment': '#3b82f6',
+            'order': '#10b981',
+            'urgent': '#ef4444',
+            'complaint': '#f59e0b',
+            'pricing': '#6366f1',
+            'availability': '#14b8a6',
+            'contact': '#ec4899',
+            'general': '#6b7280',
+        }
+        color = colors.get(obj.notification_type, '#6b7280')
+        return format_html(
+            '<span style="background-color: {}20; color: {}; padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 11px;">{} {}</span>',
+            color, color, obj.type_icon, obj.get_notification_type_display()
+        )
+    type_badge.short_description = 'Type'
+    
+    def sender_name(self, obj):
+        name = obj.conversation.sender_name or obj.conversation.sender_id
+        return format_html('<span style="color: #e5e7eb;">{}</span>', name[:20])
+    sender_name.short_description = 'From'
+    
+    def priority_badge(self, obj):
+        colors = {
+            'high': '#ef4444',
+            'medium': '#f59e0b',
+            'low': '#10b981',
+        }
+        color = colors.get(obj.priority, '#6b7280')
+        return format_html(
+            '<span style="background-color: {}20; color: {}; padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 10px;">{}</span>',
+            color, color, obj.priority.upper()
+        )
+    priority_badge.short_description = 'Priority'
+    
+    def status_badge(self, obj):
+        if obj.is_resolved:
+            return format_html('<span style="color: #10b981;">✅ Resolved</span>')
+        elif obj.is_read:
+            return format_html('<span style="color: #f59e0b;">👁 Read</span>')
+        else:
+            return format_html('<span style="color: #ef4444;">🔔 New</span>')
+    status_badge.short_description = 'Status'
 
 
 # Customize admin site header and title

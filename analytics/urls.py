@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\analytics\urls.py
+
 """
 Analytics App URLs
 """

@@ -1,3 +1,5 @@
+<!-- C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\templates\messenger_bot\settings.html -->
+
 {% extends 'base.html' %}
 {% load static %}
 
@@ -740,6 +742,39 @@
                             <label class="form-check-label">
                                 <i class="fas fa-image"></i> Enable Image Understanding
                             </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Voice Settings -->
+                    <div class="voice-settings" style="background: rgba(139, 92, 246, 0.1); padding: 1.25rem; border-radius: 1rem; margin-bottom: 1.5rem; border: 1px solid rgba(139, 92, 246, 0.2);">
+                        <h5 style="color: #a78bfa; margin-bottom: 1rem;">
+                            <i class="fas fa-microphone"></i> Voice Settings
+                        </h5>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ ai_form.voice_transcription_enabled }}
+                                <label class="form-check-label">
+                                    <i class="fas fa-headphones"></i> Transcribe Voice Messages
+                                    <small style="color: #64748b; display: block;">Convert customer voice messages to text using Whisper AI</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                {{ ai_form.voice_reply_enabled }}
+                                <label class="form-check-label">
+                                    <i class="fas fa-volume-up"></i> Reply with Voice
+                                    <small style="color: #64748b; display: block;">Send AI responses as voice messages (uses TTS API)</small>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><i class="fas fa-user-circle"></i> Voice Style</label>
+                            {{ ai_form.voice_model }}
+                            <small style="color: #64748b;">Choose the voice for AI responses</small>
                         </div>
                     </div>
                     

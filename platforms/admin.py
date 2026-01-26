@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\platforms\admin.py
+
 from django.contrib import admin
 from django import forms
 from .models import SocialAccount

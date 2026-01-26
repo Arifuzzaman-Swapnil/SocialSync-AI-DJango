@@ -1,4 +1,4 @@
-# messenger_bot/signals.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\signals.py
 
 """
 Django signals for automatic PDF processing

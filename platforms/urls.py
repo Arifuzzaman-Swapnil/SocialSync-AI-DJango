@@ -1,4 +1,4 @@
-# platforms/urls.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\platforms\urls.py
 
 from django.urls import path
 from . import views

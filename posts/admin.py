@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\posts\admin.py
+
 from django.contrib import admin
 from .models import Post
 

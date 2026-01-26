@@ -36,6 +36,14 @@ urlpatterns = [
 
     # Messenger Bot (KEEP ONLY THIS LINE)
     path('messenger/', include('messenger_bot.urls')),
+
+    path('ai-caption/', include('ai_caption.urls', namespace='ai_caption')),
+
+    path('ai-image/', include('ai_image.urls', namespace='ai_image')),
+
+    path('ai-video/', include('ai_video.urls', namespace='ai_video')),
+
+
 ]
 
 if settings.DEBUG:

@@ -240,10 +240,7 @@
 #         return False
 
 
-"""
-Auto Scheduler - Single Terminal Version with Logging
-"""
-
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\posts\scheduler.py
 """
 Auto Scheduler - YOUR main.py logic automated
 Runs in background with Django server

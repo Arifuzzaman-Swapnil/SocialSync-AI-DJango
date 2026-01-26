@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\posts\management\commands\run_scheduler.py
+
 """
 Django management command to run the post scheduler
 Usage: python manage.py run_scheduler

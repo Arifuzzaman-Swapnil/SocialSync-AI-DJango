@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\accounts\admin.py
+
 from django.contrib import admin
 from .models import UserProfile
 from .models import SiteConfiguration

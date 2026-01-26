@@ -1,3 +1,4 @@
+<!-- # C:\Users\Trust computer\Desktop\Final_version_socialSync\templates\accounts\dashboard.html -->
 {% extends 'base.html' %}
 
 {% block title %}Dashboard - SocialSync{% endblock %}
@@ -437,6 +438,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
         gap: 1.5rem;
+        padding-bottom: 5rem;
     }
 
     .action-btn {
@@ -829,7 +831,7 @@
                 <div class="action-btn-text">Connect Account</div>
             </a>
 
-            <a href="{% url 'create_post' %}" class="action-btn">
+            <a href="{% url 'ai_caption:generator' %}" class="action-btn">
                 <div class="action-btn-icon">
                     <i class="fas fa-robot"></i>
                 </div>
@@ -842,74 +844,87 @@
                 </div>
                 <div class="action-btn-text">My Posts</div>
             </a>
-        </div>
-    </div>
 
-    <!-- Subscription Info -->
-    <div class="quick-actions">
-        <div class="subscription-card">
-            <div class="subscription-header">
-                <h3>
-                    <div class="plan-icon">
-                        <i class="fas fa-crown"></i>
+            <a href="{% url 'ai_image:generator' %}" class="action-btn">
+                <div class="action-btn-icon">
+                    <i class="fas fa-image"></i>
+                </div>
+                <div class="action-btn-text">AI Image</div>
+            </a>
+
+            <a href="{% url 'ai_video:generator' %}" class="action-btn">
+                <div class="action-btn-icon">
+                    <i class="fas fa-video"></i>
+                </div>
+                <div class="action-btn-text">AI Video</div>
+            </a>
+        </div>
+
+        <!-- Subscription Info -->
+        <div class="quick-actions">
+            <div class="subscription-card">
+                <div class="subscription-header">
+                    <h3>
+                        <div class="plan-icon">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        Your Plan
+                    </h3>
+                    <div class="plan-badge">
+                        <i class="fas fa-star"></i>
+                        <span>{{ profile.get_subscription_plan_display }}</span>
                     </div>
-                    Your Plan
-                </h3>
-                <div class="plan-badge">
-                    <i class="fas fa-star"></i>
-                    <span>{{ profile.get_subscription_plan_display }}</span>
                 </div>
-            </div>
-            <div class="subscription-info">
-                <div class="subscription-item">
-                    <i class="fas fa-users"></i>
-                    <div class="subscription-value">{{ profile.max_social_accounts }}</div>
-                    <div class="subscription-label">Social Accounts</div>
-                </div>
-                <div class="subscription-item">
-                    <i class="fas fa-file-invoice"></i>
-                    <div class="subscription-value">{{ profile.max_posts_per_month }}</div>
-                    <div class="subscription-label">Posts Per Month</div>
-                </div>
-                <div class="subscription-item">
-                    <i class="fas fa-check-circle"></i>
-                    <div class="subscription-value">{{ remaining_posts }}</div>
-                    <div class="subscription-label">Remaining Posts</div>
+                <div class="subscription-info">
+                    <div class="subscription-item">
+                        <i class="fas fa-users"></i>
+                        <div class="subscription-value">{{ profile.max_social_accounts }}</div>
+                        <div class="subscription-label">Social Accounts</div>
+                    </div>
+                    <div class="subscription-item">
+                        <i class="fas fa-file-invoice"></i>
+                        <div class="subscription-value">{{ profile.max_posts_per_month }}</div>
+                        <div class="subscription-label">Posts Per Month</div>
+                    </div>
+                    <div class="subscription-item">
+                        <i class="fas fa-check-circle"></i>
+                        <div class="subscription-value">{{ remaining_posts }}</div>
+                        <div class="subscription-label">Remaining Posts</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<script>
-    // Update time and date
-    function updateDateTime() {
-        const now = new Date();
+    <script>
+        // Update time and date
+        function updateDateTime() {
+            const now = new Date();
 
-        // Format time
-        const hours = String(now.getHours()).padStart(2, '0');
-        const minutes = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('currentTime').textContent = `${hours}:${minutes}`;
+            // Format time
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('currentTime').textContent = `${hours}:${minutes}`;
 
-        // Format date
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
-    }
+            // Format date
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+        }
 
-    // Update immediately and then every minute
-    updateDateTime();
-    setInterval(updateDateTime, 60000);
+        // Update immediately and then every minute
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
 
-    // Animate progress bars on load
-    document.addEventListener('DOMContentLoaded', function () {
-        const progressBars = document.querySelectorAll('.stat-progress-bar');
-        progressBars.forEach(bar => {
-            const width = bar.style.width;
-            bar.style.width = '0%';
-            setTimeout(() => {
-                bar.style.width = width;
-            }, 100);
+        // Animate progress bars on load
+        document.addEventListener('DOMContentLoaded', function () {
+            const progressBars = document.querySelectorAll('.stat-progress-bar');
+            progressBars.forEach(bar => {
+                const width = bar.style.width;
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = width;
+                }, 100);
+            });
         });
-    });
-</script>
-{% endblock %}
+    </script>
+    {% endblock %}

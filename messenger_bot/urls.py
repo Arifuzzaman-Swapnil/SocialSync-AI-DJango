@@ -1,8 +1,8 @@
-# messenger_bot/urls.py
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\messenger_bot\urls.py
 
 """
 Messenger Bot URLs
-URL routing for messenger bot functionality
+URL routing for messenger bot functionality with notifications
 """
 
 from django.urls import path
@@ -23,6 +23,20 @@ urlpatterns = [
     # PDF Management
     path('upload-pdf/', views.upload_pdf, name='upload_pdf'),
     path('delete-pdf/<int:pdf_id>/', views.delete_pdf, name='delete_pdf'),
+    
+    # User Info
+    path('refresh-user-info/', views.refresh_user_info, name='refresh_user_info'),
+    path('debug-facebook-api/', views.debug_facebook_api, name='debug_facebook_api'),
+    
+    # Human Takeover & Manual Messages
+    path('conversation/<int:conversation_id>/toggle-human/', views.toggle_human_takeover, name='toggle_human_takeover'),
+    path('conversation/<int:conversation_id>/send-message/', views.send_manual_message, name='send_manual_message'),
+    
+    # Notifications
+    path('notifications/', views.get_notifications, name='get_notifications'),
+    path('notifications/<int:notification_id>/read/', views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/<int:notification_id>/resolve/', views.mark_notification_resolved, name='mark_notification_resolved'),
+    path('notifications/mark-all-read/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
     
     # Webhook
     path('webhook/<str:page_id>/', views.webhook, name='webhook'),

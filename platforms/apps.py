@@ -1,3 +1,5 @@
+# C:\Users\Trust computer\Desktop\Final_version_socialSync\platforms\apps.py
+
 from django.apps import AppConfig
 
 
