@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}AI Caption Generator - SocialSync{% endblock %}
+{% block title %}AI Caption Generator - Sellanto{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -666,6 +666,17 @@
         background: rgba(16, 185, 129, 0.2);
     }
 
+    .btn-use {
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        color: white;
+        border: none;
+    }
+
+    .btn-use:hover {
+        background: linear-gradient(135deg, #d97706, #f59e0b);
+        box-shadow: 0 5px 15px rgba(245, 158, 11, 0.4);
+    }
+
     .btn-regenerate {
         background: rgba(245, 158, 11, 0.1);
         color: #fbbf24;
@@ -1151,6 +1162,9 @@ Examples:
                                 <button type="button" class="result-btn btn-save" onclick="saveCaption()">
                                     <i class="fas fa-bookmark"></i> Save
                                 </button>
+                                <button type="button" class="result-btn btn-use" onclick="useCaption()">
+                                    <i class="fas fa-paper-plane"></i> Use
+                                </button>
                                 <button type="button" class="result-btn btn-regenerate" onclick="regenerateCaption()">
                                     <i class="fas fa-sync-alt"></i> Regenerate
                                 </button>
@@ -1408,6 +1422,34 @@ Examples:
     function copyCaption() {
         const text = currentCaption + (currentHashtags ? '\n\n' + currentHashtags : '');
         navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard!'));
+    }
+
+    function useCaption() {
+        if (!currentCaption) {
+            showToast('No caption to use', 'error');
+            return;
+        }
+        const text = currentCaption + (currentHashtags ? '\n\n' + currentHashtags : '');
+        
+        // Create and submit form to redirect to create post
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "ai_caption:use_caption" %}';
+        
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = '{{ csrf_token }}';
+        form.appendChild(csrfInput);
+        
+        const captionInput = document.createElement('input');
+        captionInput.type = 'hidden';
+        captionInput.name = 'caption';
+        captionInput.value = text;
+        form.appendChild(captionInput);
+        
+        document.body.appendChild(form);
+        form.submit();
     }
 
     async function saveCaption() {

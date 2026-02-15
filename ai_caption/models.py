@@ -65,10 +65,20 @@ class UserAPISettings(models.Model):
         return None
     
     @property
+    def openai_api_key(self):
+        """Get the decoded API key"""
+        return self.get_openai_api_key()
+
+    @openai_api_key.setter
+    def openai_api_key(self, value):
+        """Set the API key (will be encoded)"""
+        self.set_openai_api_key(value)
+
+    @property
     def has_api_key(self):
         """Check if user has set an API key"""
         return bool(self._openai_api_key)
-    
+
     @property
     def masked_api_key(self):
         """Return masked version of API key for display"""

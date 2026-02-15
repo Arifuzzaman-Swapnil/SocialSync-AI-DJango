@@ -282,7 +282,7 @@ def start_scheduler():
     )
     
     scheduler.start()
-    print("⏰ Auto-posting scheduler active (checks every 60 seconds)")
+    print("[SCHEDULER] Auto-posting scheduler active (checks every 60 seconds)")
 
 
 def check_and_post():
@@ -320,7 +320,7 @@ def check_and_post():
         print(f"[CHECK] No posts due yet\n")
         return
     
-    print(f"\n📤 POSTING {count} POST(S)...")
+    print(f"\n[POSTING] {count} POST(S)...")
     print("="*70)
     
     for post in due_posts:
@@ -480,7 +480,11 @@ def post_instagram(post, account, caption, media_files):
         
         page_id = fb_account.facebook_page_id
         page_access_token = fb_account.facebook_access_token
-        
+
+        # Ensure it's a Page token, not User token
+        from platforms.services.facebook import FacebookService
+        page_access_token = FacebookService._get_page_token(page_id, page_access_token)
+
     except SocialAccount.DoesNotExist:
         error = "Facebook account required for Instagram posting"
         post.instagram_error = error
@@ -514,7 +518,7 @@ def post_instagram(post, account, caption, media_files):
         post.save()
         return False, error
     
-    print(f"      Media type: {'🎥 VIDEO' if ext in ['.mp4', '.mov', '.avi'] else '📸 IMAGE'}")
+    print(f"      Media type: {'VIDEO' if ext in ['.mp4', '.mov', '.avi'] else 'IMAGE'}")
     print(f"      Using FB Page: {page_id[:20]}...")
     print(f"      Using IG Account: {business_account_id[:20]}...")
     
@@ -550,7 +554,7 @@ def post_instagram(post, account, caption, media_files):
 def publish_post(post):
     """Publish single post with detailed error logging"""
     
-    print(f"\n📝 Post #{post.id}: {post.caption[:50]}...")
+    print(f"\n[POST] Post #{post.id}: {post.caption[:50]}...")
     print(f"   Scheduled: {post.scheduled_time.strftime('%Y-%m-%d %H:%M')}")
     print(f"   Platforms: {', '.join(post.platforms_list)}")
     
@@ -590,18 +594,18 @@ def publish_post(post):
             
             if result:
                 success += 1
-                print("✅ SUCCESS")
+                print("[OK] SUCCESS")
             else:
                 failed += 1
-                print(f"❌ FAILED")
+                print(f"[FAIL] FAILED")
                 if error_msg:
                     print(f"      Error: {error_msg[:60]}")
                 
         except SocialAccount.DoesNotExist:
-            print("❌ NO ACCOUNT")
+            print("[FAIL] NO ACCOUNT")
             failed += 1
         except Exception as e:
-            print(f"❌ ERROR: {str(e)[:60]}")
+            print(f"[ERROR] {str(e)[:60]}")
             failed += 1
     
     # Update status
@@ -615,5 +619,5 @@ def publish_post(post):
     
     post.save()
     
-    print(f"\n   📊 RESULT: {success} success, {failed} failed → {status}")
+    print(f"\n   [RESULT] {success} success, {failed} failed -> {status}")
     print("="*70)

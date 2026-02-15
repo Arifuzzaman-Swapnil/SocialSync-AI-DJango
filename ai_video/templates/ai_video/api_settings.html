@@ -431,27 +431,26 @@
                 <div class="form-group">
                     <label class="form-label">Default Style</label>
                     <select name="default_style" class="form-control" style="font-family: inherit;">
-                        <option value="realistic" {% if video_settings.default_style=='realistic' %}selected{% endif %}>
+                        <option value="realistic" {% if video_settings.default_style == 'realistic' %}selected{% endif %}>
                             Realistic</option>
-                        <option value="cinematic" {% if video_settings.default_style=='cinematic' %}selected{% endif %}>
+                        <option value="cinematic" {% if video_settings.default_style == 'cinematic' %}selected{% endif %}>
                             Cinematic</option>
-                        <option value="anime" {% if video_settings.default_style=='anime' %}selected{% endif %}>Anime
+                        <option value="anime" {% if video_settings.default_style == 'anime' %}selected{% endif %}>Anime
                         </option>
-                        <option value="3d_animation" {% if video_settings.default_style=='3d_animation' %}selected{%
-                            endif %}>3D Animation</option>
+                        <option value="3d_animation" {% if video_settings.default_style == '3d_animation' %}selected{% endif %}>3D Animation</option>
                     </select>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Default Duration</label>
                     <select name="default_duration" class="form-control" style="font-family: inherit;">
-                        <option value="3" {% if video_settings.default_duration==3 %}selected{% endif %}>3 seconds
+                        <option value="3" {% if video_settings.default_duration == 3 %}selected{% endif %}>3 seconds
                         </option>
-                        <option value="5" {% if video_settings.default_duration==5 %}selected{% endif %}>5 seconds
+                        <option value="5" {% if video_settings.default_duration == 5 %}selected{% endif %}>5 seconds
                         </option>
-                        <option value="8" {% if video_settings.default_duration==8 %}selected{% endif %}>8 seconds
+                        <option value="8" {% if video_settings.default_duration == 8 %}selected{% endif %}>8 seconds
                         </option>
-                        <option value="10" {% if video_settings.default_duration==10 %}selected{% endif %}>10 seconds
+                        <option value="10" {% if video_settings.default_duration == 10 %}selected{% endif %}>10 seconds
                         </option>
                     </select>
                 </div>
@@ -459,11 +458,11 @@
                 <div class="form-group">
                     <label class="form-label">Default Resolution</label>
                     <select name="default_resolution" class="form-control" style="font-family: inherit;">
-                        <option value="720p" {% if video_settings.default_resolution=='720p' %}selected{% endif %}>720p
+                        <option value="720p" {% if video_settings.default_resolution == '720p' %}selected{% endif %}>720p
                             (HD)</option>
-                        <option value="1080p" {% if video_settings.default_resolution=='1080p' %}selected{% endif %}>
+                        <option value="1080p" {% if video_settings.default_resolution == '1080p' %}selected{% endif %}>
                             1080p (Full HD)</option>
-                        <option value="4k" {% if video_settings.default_resolution=='4k' %}selected{% endif %}>4K (Ultra
+                        <option value="4k" {% if video_settings.default_resolution == '4k' %}selected{% endif %}>4K (Ultra
                             HD)</option>
                     </select>
                 </div>

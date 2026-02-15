@@ -17,15 +17,12 @@ from .forms import (
     CaptionTemplateForm, SaveCaptionForm, VariationsForm
 )
 from .openai_service import CaptionGeneratorService
+from accounts.api_keys import get_openai_key
 
 
 def get_user_api_key(user):
-    """Get user's OpenAI API key if set"""
-    try:
-        api_settings = user.api_settings
-        return api_settings.get_openai_api_key()
-    except UserAPISettings.DoesNotExist:
-        return None
+    """Get user's OpenAI API key - checks all sources via centralized lookup"""
+    return get_openai_key(user)
 
 
 def get_or_create_api_settings(user):
@@ -141,10 +138,10 @@ def api_settings_ajax(request):
 def caption_generator(request):
     """Main caption generator page"""
     
-    # Check if user has API key
+    # Check if user has API key - uses centralized lookup
     api_settings = get_or_create_api_settings(request.user)
-    has_api_key = api_settings.has_api_key
-    
+    has_api_key = bool(get_user_api_key(request.user))
+
     if request.method == 'POST':
         if not has_api_key:
             messages.error(request, 'Please set your OpenAI API key first.')
@@ -295,9 +292,9 @@ def generate_ajax(request):
     """AJAX endpoint for caption generation"""
     
     try:
-        # Check if user has API key
+        # Check if user has API key - centralized lookup
         api_settings = get_or_create_api_settings(request.user)
-        if not api_settings.has_api_key:
+        if not get_user_api_key(request.user):
             return JsonResponse({
                 'success': False,
                 'error': 'Please set your OpenAI API key in settings first.',
@@ -693,15 +690,15 @@ def create_template(request):
 def use_template(request, pk):
     """Use a template to generate caption"""
     
-    # Check if user has API key
+    # Check if user has API key - centralized lookup
     api_settings = get_or_create_api_settings(request.user)
-    if not api_settings.has_api_key:
+    if not get_user_api_key(request.user):
         return JsonResponse({
             'success': False,
             'error': 'Please set your OpenAI API key first.',
             'redirect': '/ai-caption/settings/'
         })
-    
+
     template = get_object_or_404(CaptionTemplate, pk=pk)
     
     # Check access
@@ -811,3 +808,18 @@ def delete_template(request, pk):
         'success': True,
         'message': 'Template deleted successfully.'
     })
+
+
+@login_required
+@require_POST
+def use_caption(request):
+    """Store caption in session and redirect to create post"""
+    
+    caption = request.POST.get('caption', '')
+    
+    if caption:
+        # Store in session for create_post to use
+        request.session['prefilled_caption'] = caption
+        messages.success(request, '✅ Caption ready! Complete your post below.')
+    
+    return redirect('create_post')

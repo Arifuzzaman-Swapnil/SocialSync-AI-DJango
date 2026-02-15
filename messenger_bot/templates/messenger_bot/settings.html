@@ -282,6 +282,19 @@
         box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
     }
 
+    .btn-sm {
+        padding: 0.4rem 0.6rem;
+        font-size: 0.8rem;
+        border-radius: 0.5rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    .btn-sm.btn-success { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .btn-sm.btn-success:hover { background: rgba(16, 185, 129, 0.4); }
+    .btn-sm.btn-danger { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .btn-sm.btn-danger:hover { background: rgba(239, 68, 68, 0.4); }
+
     .btn-secondary {
         padding: 1rem 2rem;
         background: rgba(255, 255, 255, 0.05);
@@ -792,7 +805,7 @@
                 
                 {% if prompts %}
                     {% for prompt in prompts %}
-                    <div class="prompt-item {% if prompt.is_active %}active{% endif %}">
+                    <div class="prompt-item {% if prompt.is_active %}active{% endif %}" id="prompt-{{ prompt.id }}">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
                             <div>
                                 <h5>
@@ -805,9 +818,16 @@
                                 </h5>
                                 <span class="badge bg-secondary">{{ prompt.get_tone_display }}</span>
                             </div>
-                            {% if prompt.is_active %}
-                            <span class="badge bg-success">Active</span>
-                            {% endif %}
+                            <div style="display: flex; gap: 0.5rem;">
+                                {% if not prompt.is_active %}
+                                <button class="btn-sm btn-success" onclick="activatePrompt({{ prompt.id }})" title="Activate">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn-sm btn-danger" onclick="deletePrompt({{ prompt.id }}, '{{ prompt.name }}')" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
                         <p style="margin: 0; color: #94a3b8; font-size: 0.9rem;">{{ prompt.system_prompt|truncatewords:30 }}</p>
                     </div>
@@ -857,7 +877,7 @@
                 
                 {% if pdfs %}
                     {% for pdf in pdfs %}
-                    <div class="pdf-item">
+                    <div class="pdf-item" id="pdf-{{ pdf.id }}">
                         <div>
                             <strong>
                                 <i class="fas fa-file-pdf" style="color: #ef4444;"></i>
@@ -869,10 +889,13 @@
                                 {% if pdf.total_chunks %}{{ pdf.total_chunks }} chunks{% endif %}
                             </small>
                         </div>
-                        <div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
                             <span class="status-badge status-{{ pdf.status }}">
                                 {{ pdf.get_status_display }}
                             </span>
+                            <button class="btn-sm btn-danger" onclick="deletePDF({{ pdf.id }}, '{{ pdf.filename }}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
@@ -964,10 +987,8 @@ function uploadPDFs() {
         formData.append('pdfs', files[i]);
     }
     
-    // Add CSRF token
     formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
     
-    // Show loading state
     const btn = event.target;
     const originalHTML = btn.innerHTML;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
@@ -992,6 +1013,54 @@ function uploadPDFs() {
         alert('Upload failed: ' + error);
         btn.innerHTML = originalHTML;
         btn.disabled = false;
+    });
+}
+
+function activatePrompt(promptId) {
+    if (!confirm('Activate this prompt?')) return;
+    
+    fetch(`/messenger/prompts/${promptId}/activate/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) location.reload();
+        else alert('Error activating prompt');
+    });
+}
+
+function deletePrompt(promptId, name) {
+    if (!confirm(`Delete prompt "${name}"?`)) return;
+    
+    fetch(`/messenger/prompts/${promptId}/delete/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('prompt-' + promptId).remove();
+        } else {
+            alert('Error deleting prompt');
+        }
+    });
+}
+
+function deletePDF(pdfId, filename) {
+    if (!confirm(`Delete PDF "${filename}"?`)) return;
+    
+    fetch(`/messenger/delete-pdf/${pdfId}/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': '{{ csrf_token }}'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('pdf-' + pdfId).remove();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to delete'));
+        }
     });
 }
 </script>

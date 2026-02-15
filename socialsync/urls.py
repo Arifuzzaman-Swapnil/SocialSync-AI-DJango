@@ -1,51 +1,41 @@
-# C:\Users\Trust computer\Desktop\Final_version_socialSync\socialsync\urls.py
-
 """
 URL configuration for socialsync project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/4.2/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
-"""
-URL configuration for socialsync project.
+Django templates for main app + React frontend for frontend routes.
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
-from django.shortcuts import redirect
+from .views import ReactAppView
 
+# API and Admin URLs - these take priority
 urlpatterns = [
+    # Django Admin (built-in)
     path('admin/', admin.site.urls),
+    # Note: /admin-panel/ is now handled by React frontend (catch-all route below)
+
+    # REST API for React frontend - ALL API calls go here
+    path('api/v1/', include('api.urls')),
+
+    # Django Template Routes (must come BEFORE React catch-all)
     path('accounts/', include('accounts.urls')),
-    path('platforms/', include('platforms.urls')),
     path('posts/', include('posts.urls')),
-    path('', include('accounts.urls')),
-    path('', lambda request: redirect('login')),
-    path('features/', include('upcoming_features.urls')),
-
-    # Messenger Bot (KEEP ONLY THIS LINE)
+    path('platforms/', include('platforms.urls')),
+    path('ai-caption/', include('ai_caption.urls')),
+    path('ai-image/', include('ai_image.urls')),
+    path('ai-video/', include('ai_video.urls')),
+    path('ai-voice/', include('ai_voice.urls')),
     path('messenger/', include('messenger_bot.urls')),
-
-    path('ai-caption/', include('ai_caption.urls', namespace='ai_caption')),
-
-    path('ai-image/', include('ai_image.urls', namespace='ai_image')),
-
-    path('ai-video/', include('ai_video.urls', namespace='ai_video')),
-
-
+    path('business-profile/', include('brands.urls')),
 ]
 
+# Media files in DEBUG mode (static files handled by django.contrib.staticfiles)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# React Frontend - catch-all route (must be LAST)
+# This serves the React app for routes not handled by Django templates
+# Note: Static files are handled by django.contrib.staticfiles before URL routing
+urlpatterns += [
+    re_path(r'^.*$', ReactAppView.as_view(), name='react-app'),
+]

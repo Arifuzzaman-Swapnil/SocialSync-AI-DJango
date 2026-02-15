@@ -1020,8 +1020,7 @@
                                 <div class="position-grid">
                                     {% for value, label in position_choices %}
                                     {% if value != 'none' %}
-                                    <label class="position-option {% if value == 'bottom_right' %}active{% endif %}">
-                                        <input type="radio" name="logo_position" value="{{ value }}" {% if value == 'bottom_right' %}checked{% endif %}>
+                                    <label class="position-option {% if value == 'bottom_right' %}active{% endif %}" data-position="{{ value }}">
                                         {{ label }}
                                     </label>
                                     {% endif %}
@@ -1283,7 +1282,7 @@
         option.addEventListener('click', function() {
             document.querySelectorAll('.position-option').forEach(o => o.classList.remove('active'));
             this.classList.add('active');
-            document.getElementById('logoPositionHidden').value = this.querySelector('input').value;
+            document.getElementById('logoPositionHidden').value = this.dataset.position;
         });
     });
 

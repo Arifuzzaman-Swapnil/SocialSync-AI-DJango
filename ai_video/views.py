@@ -19,15 +19,12 @@ from .models import (
     SavedVideo, VideoPromptTemplate
 )
 from .gemini_service import GeminiVideoService
+from accounts.api_keys import get_gemini_key
 
 
 def get_user_api_key(user):
-    """Get user's Gemini API key if set"""
-    try:
-        video_settings = user.video_settings
-        return video_settings.get_gemini_api_key()
-    except UserVideoSettings.DoesNotExist:
-        return None
+    """Get user's Gemini API key - checks all sources via centralized lookup"""
+    return get_gemini_key(user)
 
 
 def get_or_create_video_settings(user):
@@ -150,8 +147,8 @@ def video_generator(request):
     """Main video generator page"""
     
     video_settings = get_or_create_video_settings(request.user)
-    has_api_key = video_settings.has_api_key
-    
+    has_api_key = bool(get_user_api_key(request.user))
+
     # Get user's logos
     logos = VideoLogo.objects.filter(user=request.user)
     default_logo = logos.filter(is_default=True).first()
@@ -191,7 +188,7 @@ def generate_video_ajax(request):
     try:
         # Check API key
         video_settings = get_or_create_video_settings(request.user)
-        if not video_settings.has_api_key:
+        if not get_user_api_key(request.user):
             return JsonResponse({
                 'success': False,
                 'error': 'Please set your Gemini API key first.',
@@ -254,8 +251,8 @@ def generate_video_ajax(request):
             status='processing'
         )
         
-        # Generate video
-        api_key = video_settings.get_gemini_api_key()
+        # Generate video - use centralized key lookup
+        api_key = get_user_api_key(request.user)
         service = GeminiVideoService(api_key=api_key)
         
         result = service.generate_video(

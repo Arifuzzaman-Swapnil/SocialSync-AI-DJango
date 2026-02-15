@@ -17,6 +17,7 @@ class SocialAccount(models.Model):
         ('youtube', 'YouTube'),
         ('pinterest', 'Pinterest'),
         ('telegram', 'Telegram'),
+        ('messenger', 'Facebook Messenger'),
     ]
     
     STATUS_CHOICES = [

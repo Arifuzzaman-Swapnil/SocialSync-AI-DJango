@@ -33,9 +33,9 @@ class PostsConfig(AppConfig):
         start_scheduler()
         
         print("\n" + "="*70)
-        print("🚀 SOCIALSYNC AUTO-SCHEDULER ACTIVE")
+        print("SOCIALSYNC AUTO-SCHEDULER ACTIVE")
         print("="*70)
-        print("✅ Posts will auto-publish at scheduled time")
-        print("✅ Checking every 60 seconds")
-        print("✅ Single terminal - no extra commands needed")
+        print("[OK] Posts will auto-publish at scheduled time")
+        print("[OK] Checking every 60 seconds")
+        print("[OK] Single terminal - no extra commands needed")
         print("="*70 + "\n")

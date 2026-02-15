@@ -39,4 +39,7 @@ urlpatterns = [
     path('templates/create/', views.create_template, name='create_template'),
     path('templates/use/<int:pk>/', views.use_template, name='use_template'),
     path('templates/delete/<int:pk>/', views.delete_template, name='delete_template'),
+    
+    # Use caption in post
+    path('use-caption/', views.use_caption, name='use_caption'),
 ]

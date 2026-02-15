@@ -25,10 +25,19 @@ def generated_image_path(instance, filename):
 class UserImageSettings(models.Model):
     """Store user's API keys and settings for image generation"""
     
+    PROVIDER_CHOICES = [
+        ('gemini', 'Google Gemini'),
+        ('openai', 'OpenAI DALL-E'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='image_settings')
     
-    # Encrypted API key storage (simple base64 encoding)
+    # API Keys (base64 encoded)
     _gemini_api_key = models.TextField(blank=True, null=True, db_column='gemini_api_key')
+    _openai_api_key = models.TextField(blank=True, null=True, db_column='openai_api_key')
+    
+    # Default provider
+    default_provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='openai')
     
     # Default settings
     default_style = models.CharField(max_length=50, default='realistic', choices=[
@@ -50,12 +59,25 @@ class UserImageSettings(models.Model):
         ('1024x1024', '1024x1024 (Large)'),
         ('1024x576', '1024x576 (Landscape)'),
         ('576x1024', '576x1024 (Portrait)'),
-        ('1920x1080', '1920x1080 (Full HD)'),
+        ('1792x1024', '1792x1024 (Wide)'),
+        ('1024x1792', '1024x1792 (Tall)'),
+    ])
+    
+    # OpenAI specific settings
+    openai_model = models.CharField(max_length=50, default='dall-e-3', choices=[
+        ('dall-e-3', 'DALL-E 3 (Best Quality)'),
+        ('dall-e-2', 'DALL-E 2 (Faster)'),
+    ])
+    openai_quality = models.CharField(max_length=20, default='standard', choices=[
+        ('standard', 'Standard'),
+        ('hd', 'HD (Higher Detail)'),
     ])
     
     # Usage tracking
     total_images_generated = models.IntegerField(default=0)
     total_api_calls = models.IntegerField(default=0)
+    openai_images_generated = models.IntegerField(default=0)
+    gemini_images_generated = models.IntegerField(default=0)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -64,12 +86,13 @@ class UserImageSettings(models.Model):
     class Meta:
         verbose_name = "User Image Settings"
         verbose_name_plural = "User Image Settings"
+        db_table = 'ai_image_userimagesettings'
     
     def __str__(self):
         return f"Image Settings - {self.user.username}"
     
+    # Gemini API Key methods
     def set_gemini_api_key(self, api_key):
-        """Encode and store the API key"""
         if api_key:
             encoded = base64.b64encode(api_key.encode()).decode()
             self._gemini_api_key = encoded
@@ -77,27 +100,84 @@ class UserImageSettings(models.Model):
             self._gemini_api_key = None
     
     def get_gemini_api_key(self):
-        """Decode and return the API key"""
         if self._gemini_api_key:
             try:
-                decoded = base64.b64decode(self._gemini_api_key.encode()).decode()
-                return decoded
-            except Exception:
+                return base64.b64decode(self._gemini_api_key.encode()).decode()
+            except:
+                return None
+        return None
+    
+    # OpenAI API Key methods
+    def set_openai_api_key(self, api_key):
+        if api_key:
+            encoded = base64.b64encode(api_key.encode()).decode()
+            self._openai_api_key = encoded
+        else:
+            self._openai_api_key = None
+    
+    def get_openai_api_key(self):
+        if self._openai_api_key:
+            try:
+                return base64.b64decode(self._openai_api_key.encode()).decode()
+            except:
                 return None
         return None
     
     @property
-    def has_api_key(self):
-        """Check if user has set an API key"""
+    def gemini_api_key(self):
+        """Get the decoded Gemini API key"""
+        return self.get_gemini_api_key()
+
+    @gemini_api_key.setter
+    def gemini_api_key(self, value):
+        """Set the Gemini API key (will be encoded)"""
+        self.set_gemini_api_key(value)
+
+    @property
+    def openai_api_key(self):
+        """Get the decoded OpenAI API key"""
+        return self.get_openai_api_key()
+
+    @openai_api_key.setter
+    def openai_api_key(self, value):
+        """Set the OpenAI API key (will be encoded)"""
+        self.set_openai_api_key(value)
+
+    @property
+    def has_gemini_key(self):
         return bool(self._gemini_api_key)
+
+    @property
+    def has_openai_key(self):
+        return bool(self._openai_api_key)
     
     @property
-    def masked_api_key(self):
-        """Return masked version of API key for display"""
+    def has_api_key(self):
+        """Check if user has at least one API key"""
+        return self.has_gemini_key or self.has_openai_key
+    
+    @property
+    def masked_gemini_key(self):
         key = self.get_gemini_api_key()
         if key and len(key) > 8:
             return f"{key[:6]}...{key[-4:]}"
         return None
+    
+    @property
+    def masked_openai_key(self):
+        key = self.get_openai_api_key()
+        if key and len(key) > 8:
+            return f"{key[:6]}...{key[-4:]}"
+        return None
+    
+    def get_available_providers(self):
+        """Return list of available providers based on configured API keys"""
+        providers = []
+        if self.has_openai_key:
+            providers.append(('openai', 'OpenAI DALL-E'))
+        if self.has_gemini_key:
+            providers.append(('gemini', 'Google Gemini'))
+        return providers
 
 
 class UserLogo(models.Model):
@@ -112,12 +192,12 @@ class UserLogo(models.Model):
     
     class Meta:
         ordering = ['-is_default', '-created_at']
+        db_table = 'ai_image_userlogo'
     
     def __str__(self):
         return f"{self.name} - {self.user.username}"
     
     def save(self, *args, **kwargs):
-        # If this logo is set as default, unset others
         if self.is_default:
             UserLogo.objects.filter(user=self.user, is_default=True).update(is_default=False)
         super().save(*args, **kwargs)
@@ -125,6 +205,11 @@ class UserLogo(models.Model):
 
 class ImageGeneration(models.Model):
     """Store generated images history"""
+    
+    PROVIDER_CHOICES = [
+        ('gemini', 'Google Gemini'),
+        ('openai', 'OpenAI DALL-E'),
+    ]
     
     STYLE_CHOICES = [
         ('realistic', 'Realistic'),
@@ -142,14 +227,19 @@ class ImageGeneration(models.Model):
         ('minimalist', 'Minimalist'),
         ('vintage', 'Vintage/Retro'),
         ('neon', 'Neon/Cyberpunk'),
+        ('vivid', 'Vivid'),
+        ('natural', 'Natural'),
     ]
     
     SIZE_CHOICES = [
+        ('256x256', '256x256'),
         ('512x512', '512x512'),
         ('768x768', '768x768'),
         ('1024x1024', '1024x1024'),
         ('1024x576', '1024x576 (Landscape)'),
         ('576x1024', '576x1024 (Portrait)'),
+        ('1792x1024', '1792x1024 (Wide)'),
+        ('1024x1792', '1024x1792 (Tall)'),
         ('1920x1080', '1920x1080 (Full HD)'),
         ('1080x1920', '1080x1920 (Story)'),
     ]
@@ -168,6 +258,7 @@ class ImageGeneration(models.Model):
     QUALITY_CHOICES = [
         ('standard', 'Standard'),
         ('high', 'High Quality'),
+        ('hd', 'HD'),
         ('ultra', 'Ultra HD'),
     ]
     
@@ -178,7 +269,20 @@ class ImageGeneration(models.Model):
         ('failed', 'Failed'),
     ]
     
+    PRODUCT_POSITION_CHOICES = [
+        ('center', 'Center'),
+        ('center_bottom', 'Center Bottom'),
+        ('left', 'Left'),
+        ('right', 'Right'),
+        ('center_top', 'Center Top'),
+        ('full', 'Full Frame'),
+    ]
+    
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='image_generations')
+    
+    # Provider
+    provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='openai')
+    model_used = models.CharField(max_length=50, blank=True, null=True)  # dall-e-3, gemini-2.0-flash, etc.
     
     # Input
     title = models.CharField(max_length=200, help_text="Title for the image")
@@ -195,6 +299,12 @@ class ImageGeneration(models.Model):
     logo_position = models.CharField(max_length=20, choices=LOGO_POSITION_CHOICES, default='none')
     logo_size = models.IntegerField(default=10, help_text="Logo size as percentage of image (5-30)")
     logo_opacity = models.IntegerField(default=100, help_text="Logo opacity (10-100)")
+    
+    # Product Image Upload & Compositing
+    product_image = models.ImageField(upload_to='product_uploads/', blank=True, null=True, help_text="Upload product image for compositing")
+    product_position = models.CharField(max_length=20, choices=PRODUCT_POSITION_CHOICES, default='center', help_text="Product placement in scene")
+    product_scale = models.IntegerField(default=50, help_text="Product size as percentage (20-90)")
+    composited_image = models.ImageField(upload_to=generated_image_path, blank=True, null=True, help_text="Final composited image with product")
     
     # Advanced Options
     seed = models.IntegerField(blank=True, null=True, help_text="Seed for reproducibility")
@@ -225,6 +335,7 @@ class ImageGeneration(models.Model):
     generated_image = models.ImageField(upload_to=generated_image_path, blank=True, null=True)
     generated_image_with_logo = models.ImageField(upload_to=generated_image_path, blank=True, null=True)
     enhanced_prompt = models.TextField(blank=True, null=True, help_text="AI-enhanced prompt used")
+    revised_prompt = models.TextField(blank=True, null=True, help_text="OpenAI revised prompt")
     
     # Metadata
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -239,18 +350,23 @@ class ImageGeneration(models.Model):
         ordering = ['-created_at']
         verbose_name = "Image Generation"
         verbose_name_plural = "Image Generations"
+        db_table = 'ai_image_imagegeneration'
     
     def __str__(self):
-        return f"{self.title} - {self.user.username}"
+        return f"{self.title} - {self.user.username} ({self.provider})"
     
     def get_display_image(self):
-        """Return image with logo if available, otherwise original"""
+        if self.composited_image:
+            return self.composited_image
         if self.generated_image_with_logo:
             return self.generated_image_with_logo
         return self.generated_image
     
+    @property
+    def has_product(self):
+        return bool(self.product_image)
+    
     def get_size_tuple(self):
-        """Return size as tuple (width, height)"""
         parts = self.size.split('x')
         return (int(parts[0]), int(parts[1]))
 
@@ -272,6 +388,7 @@ class SavedImage(models.Model):
     
     class Meta:
         ordering = ['-created_at']
+        db_table = 'ai_image_savedimage'
     
     def __str__(self):
         return f"{self.title} - {self.user.username}"
@@ -310,6 +427,7 @@ class PromptTemplate(models.Model):
     
     class Meta:
         ordering = ['category', 'name']
+        db_table = 'ai_image_prompttemplate'
     
     def __str__(self):
         return f"{self.name} ({self.category})"

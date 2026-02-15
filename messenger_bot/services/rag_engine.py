@@ -115,14 +115,14 @@ class RAGEngine:
         similarity_threshold: Optional[float] = None
     ) -> List[Dict[str, any]]:
         """
-        Retrieve relevant chunks for a query
-        
+        Retrieve relevant chunks for a query from both PDFs and Brand DNA.
+
         Args:
             query: User query
             connection: MessengerConnection instance
             top_k: Number of chunks to retrieve (uses ai_config default if None)
             similarity_threshold: Minimum similarity score (uses ai_config default if None)
-            
+
         Returns:
             List of relevant chunks with metadata
         """
@@ -132,49 +132,114 @@ class RAGEngine:
                 top_k = self.ai_config.top_k_results
             if similarity_threshold is None:
                 similarity_threshold = self.ai_config.similarity_threshold
-            
+
             logger.info(f"Retrieving chunks for query (top_k={top_k}, threshold={similarity_threshold})")
-            
+
             # Create query embedding
             query_embedding = self.openai_client.create_embedding(
                 query,
                 model=self.ai_config.embedding_model
             )
-            
-            # Get all chunks from completed PDFs
+
+            chunks_data = []
+
+            # --- Search PDF chunks ---
             pdf_chunks = PDFChunk.objects.filter(
                 pdf__connection=connection,
                 pdf__status='completed'
             ).select_related('pdf')
-            
-            if not pdf_chunks.exists():
-                logger.warning("No processed PDF chunks available")
-                return []
-            
-            # Get embeddings and calculate similarities
-            chunks_data = []
+
             for chunk in pdf_chunks:
                 chunk_embedding = chunk.get_embedding()
                 similarity = self.openai_client.cosine_similarity(query_embedding, chunk_embedding)
-                
+
                 if similarity >= similarity_threshold:
                     chunks_data.append({
                         'chunk': chunk,
                         'similarity': similarity,
                         'text': chunk.text,
                         'page_number': chunk.page_number,
-                        'filename': chunk.pdf.filename
+                        'filename': chunk.pdf.filename,
+                        'source_type': 'pdf',
                     })
-            
-            # Sort by similarity
+
+            # --- Search Brand DNA chunks ---
+            try:
+                from brands.models import BrandDNAChunk, Brand
+                brand = Brand.objects.filter(
+                    user=connection.user, is_primary=True
+                ).first()
+
+                if brand and brand.brand_dna_generated_at:
+                    dna_chunks = BrandDNAChunk.objects.filter(brand=brand)
+                    for chunk in dna_chunks:
+                        chunk_embedding = chunk.get_embedding()
+                        similarity = self.openai_client.cosine_similarity(query_embedding, chunk_embedding)
+
+                        if similarity >= similarity_threshold:
+                            chunks_data.append({
+                                'chunk': chunk,
+                                'similarity': similarity,
+                                'text': chunk.text,
+                                'page_title': chunk.page_title,
+                                'source_url': chunk.source_url,
+                                'source_type': 'brand_dna',
+                            })
+                    logger.info(f"Searched {dna_chunks.count()} Brand DNA chunks")
+            except Exception as e:
+                logger.warning(f"Could not search Brand DNA chunks: {e}")
+
+            # --- Search Product embeddings ---
+            try:
+                from messenger_bot.models import ECommerceSettings, Product as EComProduct
+                ecom = ECommerceSettings.objects.filter(
+                    connection=connection, is_enabled=True
+                ).first()
+
+                if ecom:
+                    ecom_products = EComProduct.objects.filter(
+                        ecommerce_settings=ecom, embedding__isnull=False
+                    ).exclude(embedding='')
+
+                    product_threshold = ecom.product_match_threshold or 0.35
+                    for product in ecom_products:
+                        prod_embedding = product.get_embedding()
+                        if prod_embedding:
+                            sim = self.openai_client.cosine_similarity(query_embedding, prod_embedding)
+                            if sim >= product_threshold:
+                                chunks_data.append({
+                                    'chunk': None,
+                                    'similarity': sim,
+                                    'text': (
+                                        f"Product: {product.name}\n"
+                                        f"Price: {ecom.currency_symbol}{product.price}\n"
+                                        f"Stock: {product.stock_status}\n"
+                                        f"Description: {product.short_description or product.description[:300]}\n"
+                                        f"SKU: {product.sku}\n"
+                                        f"Link: {product.permalink}"
+                                    ),
+                                    'source_type': 'product',
+                                    'product_id': product.woo_product_id,
+                                    'product_name': product.name,
+                                })
+
+                    logger.info(f"Searched {ecom_products.count()} product embeddings")
+            except Exception as e:
+                logger.warning(f"Could not search product embeddings: {e}")
+
+            if not chunks_data:
+                logger.warning("No relevant chunks found from any source")
+                return []
+
+            # Sort combined results by similarity
             chunks_data.sort(key=lambda x: x['similarity'], reverse=True)
-            
+
             # Return top k
             relevant_chunks = chunks_data[:top_k]
-            
+
             logger.info(f"Retrieved {len(relevant_chunks)} relevant chunks")
             return relevant_chunks
-        
+
         except Exception as e:
             logger.error(f"Error retrieving chunks: {e}")
             return []
@@ -210,14 +275,25 @@ class RAGEngine:
                 relevant_chunks = self.retrieve_relevant_chunks(query, connection)
                 
                 if relevant_chunks:
-                    # Build context from chunks
+                    # Build context from chunks (supports both PDF and Brand DNA sources)
                     context_parts = []
                     for i, chunk_data in enumerate(relevant_chunks):
-                        context_parts.append(
-                            f"[Source {i+1}: {chunk_data['filename']}, "
-                            f"Page {chunk_data['page_number'] or 'N/A'}]\n"
-                            f"{chunk_data['text']}\n"
-                        )
+                        source_type = chunk_data.get('source_type', 'pdf')
+                        if source_type == 'product':
+                            source_label = (
+                                f"[Source {i+1}: Product - {chunk_data.get('product_name', 'N/A')}]"
+                            )
+                        elif source_type == 'brand_dna':
+                            source_label = (
+                                f"[Source {i+1}: Brand Website - {chunk_data.get('page_title', 'N/A')}, "
+                                f"URL: {chunk_data.get('source_url', 'N/A')}]"
+                            )
+                        else:
+                            source_label = (
+                                f"[Source {i+1}: {chunk_data.get('filename', 'Document')}, "
+                                f"Page {chunk_data.get('page_number') or 'N/A'}]"
+                            )
+                        context_parts.append(f"{source_label}\n{chunk_data['text']}\n")
                     context_text = "\n".join(context_parts)
                     logger.info(f"Using {len(relevant_chunks)} chunks as context")
             
@@ -246,7 +322,25 @@ IMPORTANT RULES:
 3. RESPONSE STYLE:
    - Be helpful and friendly
    - Give complete answers, don't cut off mid-sentence
-   - Be concise but thorough"""
+   - Be concise but thorough
+   - When sharing product info, include the price, availability, and link if available"""
+
+            # Add e-commerce context if products exist
+            try:
+                from messenger_bot.models import ECommerceSettings as EComSettings
+                ecom = EComSettings.objects.filter(
+                    connection=connection, is_enabled=True
+                ).first()
+                if ecom and ecom.products.exists():
+                    product_count = ecom.products.count()
+                    system_prompt += (
+                        f"\n\nYou have access to a product catalog with {product_count} products. "
+                        f"When users ask about products, use the product information from the knowledge base "
+                        f"to provide accurate answers including prices (in {ecom.currency_symbol}), "
+                        f"availability, and direct links. If a user wants to order, provide the product link."
+                    )
+            except Exception:
+                pass
 
             # Build messages
             messages = [{"role": "system", "content": system_prompt}]

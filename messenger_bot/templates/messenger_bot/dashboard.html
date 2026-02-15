@@ -365,6 +365,15 @@
         color: #8b5cf6;
     }
 
+    .token-badge {
+        background: rgba(251, 191, 36, 0.15);
+        color: #fbbf24;
+        padding: 0.1rem 0.4rem;
+        border-radius: 0.25rem;
+        font-size: 0.65rem;
+        font-weight: 600;
+    }
+
     /* Human/AI Toggle Switch */
     .mode-toggle {
         display: flex;
@@ -740,6 +749,10 @@
                 {% else %}
                     <span class="badge bg-warning">Auto Reply OFF</span>
                 {% endif %}
+                •
+                <span class="badge" style="background: rgba(251, 191, 36, 0.2); color: #fbbf24;">
+                    🪙 {{ total_tokens|default:0 }} tokens
+                </span>
             </p>
         </div>
         <div>
@@ -855,6 +868,9 @@
                                 {% if msg.sender == 'user' %}👤{% elif msg.model_used == 'human' %}👤{% else %}🤖{% endif %}
                                 {{ msg.timestamp|date:"M d, h:i A" }}
                                 {% if msg.message_type == 'voice' %}<i class="fas fa-microphone" title="Voice message"></i>{% endif %}
+                                {% if msg.sender == 'bot' and msg.tokens_used > 0 %}
+                                    <span class="token-badge">🪙 {{ msg.tokens_used }}</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -892,15 +908,21 @@
                         <span class="notif-badge">{{ unread_count }}</span>
                     {% endif %}
                 </h5>
-                <button class="btn-icon" onclick="markAllRead()" title="Mark All Read">
-                    <i class="fas fa-check-double"></i>
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn-icon" onclick="markAllRead()" title="Mark All Read">
+                        <i class="fas fa-check-double"></i>
+                    </button>
+                    <button class="btn-icon" onclick="deleteAllReadNotifications()" title="Delete All Read" style="color: #f87171;">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
             
             <div class="notif-scroll" id="notificationsList">
                 {% if notifications %}
                     {% for notif in notifications %}
                     <div class="notif-item {% if not notif.is_read %}unread{% endif %} {% if notif.is_resolved %}resolved{% endif %}" 
+                         id="notif-{{ notif.id }}"
                          data-id="{{ notif.id }}" 
                          onclick="viewNotification({{ notif.id }}, {{ notif.conversation_id }})">
                         
@@ -925,16 +947,19 @@
                             <span class="notif-time">{{ notif.created_at|timesince }} ago</span>
                         </div>
                         
-                        {% if not notif.is_resolved %}
                         <div class="notif-actions">
+                            {% if not notif.is_resolved %}
                             <button class="notif-btn view" onclick="event.stopPropagation(); viewConversation({{ notif.conversation_id }})">
                                 <i class="fas fa-eye"></i> View
                             </button>
                             <button class="notif-btn resolve" onclick="event.stopPropagation(); resolveNotification({{ notif.id }})">
                                 <i class="fas fa-check"></i> Resolve
                             </button>
+                            {% endif %}
+                            <button class="notif-btn" onclick="event.stopPropagation(); deleteNotification({{ notif.id }})" style="background: rgba(239, 68, 68, 0.1); color: #f87171;">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 {% else %}
@@ -1041,6 +1066,52 @@
                 item.classList.add('resolved');
                 item.querySelector('.notif-actions')?.remove();
                 showToast('✅ Resolved');
+            }
+        } catch (error) {
+            showToast('Error', true);
+        }
+    }
+
+    async function deleteNotification(notifId) {
+        try {
+            const response = await fetch(`/messenger/notifications/${notifId}/delete/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                const item = document.getElementById(`notif-${notifId}`);
+                if (item) {
+                    item.style.transition = 'all 0.3s';
+                    item.style.opacity = '0';
+                    item.style.transform = 'translateX(100%)';
+                    setTimeout(() => item.remove(), 300);
+                }
+                showToast('🗑️ Deleted');
+            }
+        } catch (error) {
+            showToast('Error', true);
+        }
+    }
+
+    async function deleteAllReadNotifications() {
+        if (!confirm('Delete all read notifications?')) return;
+        
+        try {
+            const response = await fetch('{% url "messenger_bot:delete_all_read_notifications" %}', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                document.querySelectorAll('.notif-item:not(.unread)').forEach(item => {
+                    item.style.transition = 'all 0.3s';
+                    item.style.opacity = '0';
+                    setTimeout(() => item.remove(), 300);
+                });
+                showToast(`🗑️ Deleted ${data.deleted} notifications`);
             }
         } catch (error) {
             showToast('Error', true);

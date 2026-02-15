@@ -10,6 +10,10 @@ class Post(models.Model):
     
     STATUS_CHOICES = [
         ('draft', 'Draft'),
+        ('pending_approval', 'Pending Approval'),
+        ('changes_requested', 'Changes Requested'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
         ('scheduled', 'Scheduled'),
         ('posting', 'Posting'),
         ('posted', 'Posted'),
@@ -101,7 +105,7 @@ class Post(models.Model):
     
     def can_be_edited(self):
         """Check if post can be edited"""
-        return self.status in ['draft', 'scheduled']
+        return self.status in ['draft', 'scheduled', 'changes_requested']
     
     def can_be_cancelled(self):
         """Check if post can be cancelled"""

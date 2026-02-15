@@ -35,10 +35,13 @@ class MessengerConnection(models.Model):
     webhook_url = models.URLField(blank=True, null=True)
     is_webhook_verified = models.BooleanField(default=False)
     
+    # Website for knowledge extraction
+    website_url = models.URLField(blank=True, null=True, help_text="Website URL for AI knowledge extraction")
+
     # Status
     is_active = models.BooleanField(default=True)
     auto_reply_enabled = models.BooleanField(default=True)
-    
+
     # Greeting message
     greeting_text = models.TextField(
         default="Hi! I'm an AI assistant. How can I help you today?"
@@ -536,3 +539,125 @@ class Notification(models.Model):
             'low': '#10b981',
         }
         return colors.get(self.priority, '#6b7280')
+
+
+class ECommerceSettings(models.Model):
+    """E-Commerce integration settings (WooCommerce, Shopify, etc.)"""
+
+    connection = models.OneToOneField(
+        MessengerConnection,
+        on_delete=models.CASCADE,
+        related_name='ecommerce_settings'
+    )
+
+    PLATFORM_CHOICES = [
+        ('woocommerce', 'WooCommerce'),
+        ('shopify', 'Shopify'),
+        ('custom', 'Custom API'),
+    ]
+    platform_type = models.CharField(
+        max_length=20,
+        choices=PLATFORM_CHOICES,
+        default='woocommerce'
+    )
+
+    # Store connection details
+    store_url = models.URLField(
+        blank=True,
+        default='',
+        help_text="Store URL (e.g., https://yourstore.com)"
+    )
+    consumer_key = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="WooCommerce Consumer Key (ck_...)"
+    )
+    consumer_secret = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        help_text="WooCommerce Consumer Secret (cs_...)"
+    )
+
+    # Settings
+    is_enabled = models.BooleanField(default=True)
+    product_match_threshold = models.FloatField(
+        default=0.35,
+        help_text="Minimum similarity score for product matching (0-1)"
+    )
+    currency_symbol = models.CharField(max_length=10, default='$')
+
+    # Sync metadata
+    last_synced = models.DateTimeField(blank=True, null=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'ecommerce_settings'
+        verbose_name = 'E-Commerce Settings'
+        verbose_name_plural = 'E-Commerce Settings'
+
+    def __str__(self):
+        return f"{self.get_platform_type_display()} - {self.store_url}"
+
+
+class Product(models.Model):
+    """Synced products from e-commerce platform"""
+
+    ecommerce_settings = models.ForeignKey(
+        ECommerceSettings,
+        on_delete=models.CASCADE,
+        related_name='products'
+    )
+
+    # WooCommerce product data
+    woo_product_id = models.IntegerField()
+    name = models.CharField(max_length=500)
+    description = models.TextField(blank=True)
+    short_description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    regular_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sale_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    sku = models.CharField(max_length=100, blank=True)
+    stock_status = models.CharField(
+        max_length=20,
+        default='instock',
+        help_text="instock, outofstock, onbackorder"
+    )
+    stock_quantity = models.IntegerField(null=True, blank=True)
+    permalink = models.URLField(blank=True, max_length=500)
+    images = models.JSONField(default=list, help_text="[{id, src, name, alt}]")
+    categories = models.JSONField(default=list, help_text="[{id, name, slug}]")
+
+    # Embedding for AI product matching
+    embedding = models.TextField(
+        blank=True,
+        null=True,
+        help_text="JSON array of vector embeddings for product matching"
+    )
+
+    # Timestamps
+    synced_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'ecommerce_products'
+        verbose_name = 'Product'
+        verbose_name_plural = 'Products'
+        unique_together = ['ecommerce_settings', 'woo_product_id']
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} (#{self.woo_product_id}) - {self.price}"
+
+    def get_embedding(self):
+        """Returns embedding as list of floats"""
+        if self.embedding:
+            return json.loads(self.embedding)
+        return None
+
+    def set_embedding(self, embedding_list):
+        """Stores embedding as JSON"""
+        self.embedding = json.dumps(embedding_list)

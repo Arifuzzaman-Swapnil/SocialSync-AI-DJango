@@ -247,6 +247,242 @@
         padding-right: 2.5rem;
     }
 
+    /* ========== Product Upload Styles ========== */
+    .product-upload-section {
+        background: linear-gradient(145deg, rgba(139, 92, 246, 0.08), rgba(139, 92, 246, 0.03));
+        border: 2px solid rgba(139, 92, 246, 0.2);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s;
+    }
+
+    .product-upload-section.active {
+        border-color: rgba(139, 92, 246, 0.5);
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.1);
+    }
+
+    .product-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.75rem;
+    }
+
+    .product-section-header h3 {
+        font-size: 1rem; font-weight: 700; color: #a78bfa;
+        display: flex; align-items: center; gap: 0.5rem; margin: 0;
+    }
+
+    .product-toggle {
+        position: relative;
+        width: 48px; height: 26px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 13px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .product-toggle.active {
+        background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+    }
+
+    .product-toggle::after {
+        content: '';
+        position: absolute;
+        width: 20px; height: 20px;
+        background: white;
+        border-radius: 50%;
+        top: 3px; left: 3px;
+        transition: transform 0.3s;
+    }
+
+    .product-toggle.active::after {
+        transform: translateX(22px);
+    }
+
+    .product-upload-area {
+        display: none;
+    }
+
+    .product-upload-area.show {
+        display: block;
+    }
+
+    .product-dropzone {
+        border: 2px dashed rgba(139, 92, 246, 0.3);
+        border-radius: 0.75rem;
+        padding: 2rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        position: relative;
+    }
+
+    .product-dropzone:hover {
+        border-color: rgba(139, 92, 246, 0.6);
+        background: rgba(139, 92, 246, 0.05);
+    }
+
+    .product-dropzone.dragover {
+        border-color: #8b5cf6;
+        background: rgba(139, 92, 246, 0.1);
+        transform: scale(1.01);
+    }
+
+    .product-dropzone-icon {
+        font-size: 2rem;
+        color: #a78bfa;
+        margin-bottom: 0.5rem;
+    }
+
+    .product-dropzone-text {
+        color: #e5e7eb;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .product-dropzone-hint {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    .product-dropzone input[type="file"] {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        opacity: 0; cursor: pointer;
+    }
+
+    .product-preview {
+        display: none;
+        margin-top: 1rem;
+        position: relative;
+    }
+
+    .product-preview.show {
+        display: block;
+    }
+
+    .product-preview-inner {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: rgba(139, 92, 246, 0.08);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+
+    .product-preview-img {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+        border-radius: 0.5rem;
+        background: rgba(0,0,0,0.2);
+    }
+
+    .product-preview-info {
+        flex: 1;
+    }
+
+    .product-preview-name {
+        font-weight: 600;
+        color: #e5e7eb;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px;
+    }
+
+    .product-preview-size {
+        font-size: 0.8rem; color: #64748b;
+    }
+
+    .product-preview-badge {
+        background: rgba(139, 92, 246, 0.2);
+        color: #a78bfa;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 0.25rem;
+        display: inline-block;
+        margin-top: 0.3rem;
+    }
+
+    .product-remove-btn {
+        background: rgba(239, 68, 68, 0.2);
+        color: #f87171;
+        border: none;
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+    }
+
+    .product-remove-btn:hover {
+        background: rgba(239, 68, 68, 0.4);
+    }
+
+    .product-settings {
+        display: none;
+        margin-top: 1rem;
+    }
+
+    .product-settings.show {
+        display: block;
+    }
+
+    .product-position-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .product-pos-option {
+        background: rgba(255, 255, 255, 0.03);
+        border: 2px solid rgba(139, 92, 246, 0.15);
+        border-radius: 0.5rem;
+        padding: 0.75rem 0.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+        color: #94a3b8;
+        font-size: 0.8rem;
+    }
+
+    .product-pos-option:hover {
+        border-color: rgba(139, 92, 246, 0.4);
+    }
+
+    .product-pos-option.active {
+        border-color: #8b5cf6;
+        background: rgba(139, 92, 246, 0.15);
+        color: #a78bfa;
+    }
+
+    .range-slider.purple::-webkit-slider-thumb {
+        background: #8b5cf6;
+    }
+    .range-value.purple {
+        color: #a78bfa;
+    }
+
+    .result-product-badge {
+        display: none;
+        background: rgba(139, 92, 246, 0.2);
+        color: #a78bfa;
+        padding: 0.4rem 0.8rem;
+        border-radius: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+
+    .result-product-badge.show { display: flex; align-items: center; gap: 0.4rem; }
+
     .form-hint {
         margin-top: 0.5rem;
         font-size: 0.85rem;
@@ -826,6 +1062,10 @@
             grid-template-columns: repeat(2, 1fr);
         }
 
+        .product-position-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
         .warning-content {
             flex-direction: column;
             text-align: center;
@@ -843,7 +1083,7 @@
             <div class="warning-icon"><i class="fas fa-key"></i></div>
             <div class="warning-text">
                 <h3>API Key Required</h3>
-                <p>Please set up your Google Gemini API key to start generating images</p>
+                <p>Please set up your OpenAI or Gemini API key to start generating images</p>
             </div>
             <a href="{% url 'ai_image:api_settings' %}" class="warning-btn">
                 <i class="fas fa-cog"></i> Set Up API Key
@@ -875,6 +1115,47 @@
                     <form id="generateForm" enctype="multipart/form-data">
                         {% csrf_token %}
                         
+                        <!-- Provider Selection -->
+                        <div class="form-group">
+                            <label class="form-label">AI Provider</label>
+                            <div class="provider-selection" style="display:flex; gap:1rem; margin-bottom:0.5rem;">
+                                {% if has_openai_key %}
+                                <label class="provider-option" style="flex:1; display:flex; align-items:center; gap:0.75rem; padding:1rem; background:rgba(255,255,255,0.03); border:2px solid rgba(16,185,129,0.2); border-radius:0.75rem; cursor:pointer; transition:all 0.3s;">
+                                    <input type="radio" name="provider" value="openai" {% if img_settings.default_provider == 'openai' %}checked{% endif %} style="display:none;">
+                                    <div style="width:40px; height:40px; background:rgba(16,185,129,0.2); border-radius:0.5rem; display:flex; align-items:center; justify-content:center; color:#34d399; font-size:1.1rem;">
+                                        <i class="fas fa-robot"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:600; color:#e5e7eb;">OpenAI DALL-E</div>
+                                        <div style="font-size:0.75rem; color:#64748b;">Best quality, HD</div>
+                                    </div>
+                                </label>
+                                {% endif %}
+                                
+                                {% if has_gemini_key %}
+                                <label class="provider-option" style="flex:1; display:flex; align-items:center; gap:0.75rem; padding:1rem; background:rgba(255,255,255,0.03); border:2px solid rgba(59,130,246,0.2); border-radius:0.75rem; cursor:pointer; transition:all 0.3s;">
+                                    <input type="radio" name="provider" value="gemini" {% if img_settings.default_provider == 'gemini' or not has_openai_key %}checked{% endif %} style="display:none;">
+                                    <div style="width:40px; height:40px; background:rgba(59,130,246,0.2); border-radius:0.5rem; display:flex; align-items:center; justify-content:center; color:#60a5fa; font-size:1.1rem;">
+                                        <i class="fas fa-gem"></i>
+                                    </div>
+                                    <div>
+                                        <div style="font-weight:600; color:#e5e7eb;">Google Gemini</div>
+                                        <div style="font-size:0.75rem; color:#64748b;">Flexible, experimental</div>
+                                    </div>
+                                </label>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- OpenAI Model Selection (shown when OpenAI selected) -->
+                            <div id="openaiModelSection" style="margin-top:0.75rem; display:{% if img_settings.default_provider == 'openai' %}block{% else %}none{% endif %};">
+                                <label class="form-label" style="font-size:0.8rem;">DALL-E Model</label>
+                                <select name="model" class="form-control" style="padding:0.75rem 1rem;">
+                                    <option value="dall-e-3" {% if img_settings.openai_model == 'dall-e-3' %}selected{% endif %}>DALL-E 3 (Best Quality)</option>
+                                    <option value="dall-e-2" {% if img_settings.openai_model == 'dall-e-2' %}selected{% endif %}>DALL-E 2 (Faster)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
                         <!-- Title -->
                         <div class="form-group">
                             <label class="form-label">Image Title <span class="required">*</span></label>
@@ -892,6 +1173,65 @@
                         <div class="form-group">
                             <label class="form-label">What to Avoid (Optional)</label>
                             <input type="text" name="negative_prompt" class="form-control" placeholder="e.g., blurry, low quality, distorted, watermark">
+                        </div>
+
+                        <!-- ========== PRODUCT IMAGE UPLOAD ========== -->
+                        <div class="product-upload-section" id="productSection">
+                            <div class="product-section-header">
+                                <h3><i class="fas fa-box-open"></i> Upload Product Image</h3>
+                                <div class="product-toggle" id="productToggle" onclick="toggleProductUpload()"></div>
+                            </div>
+                            <p style="color: #64748b; font-size: 0.85rem; margin-bottom: 1rem;">Upload your product photo — the media you provide is your product. AI generates a professional scene and places your product in it!</p>
+                            
+                            <div class="product-upload-area" id="productUploadArea">
+                                <!-- Dropzone -->
+                                <div class="product-dropzone" id="productDropzone">
+                                    <div class="product-dropzone-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                                    <div class="product-dropzone-text">Drop your product image here or click to upload</div>
+                                    <div class="product-dropzone-hint">PNG, JPG, WebP • Max 10MB • PNG with transparent background works best</div>
+                                    <input type="file" name="product_image" id="productImageInput" accept="image/png,image/jpeg,image/gif,image/webp">
+                                </div>
+
+                                <!-- Preview -->
+                                <div class="product-preview" id="productPreview">
+                                    <div class="product-preview-inner">
+                                        <img src="" alt="Product" class="product-preview-img" id="productPreviewImg">
+                                        <div class="product-preview-info">
+                                            <div class="product-preview-name" id="productFileName">product.png</div>
+                                            <div class="product-preview-size" id="productFileSize">1.2 MB</div>
+                                            <div class="product-preview-badge"><i class="fas fa-check-circle"></i> Ready to compose</div>
+                                        </div>
+                                        <button type="button" class="product-remove-btn" onclick="removeProductImage()">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Product Settings -->
+                                <div class="product-settings" id="productSettings">
+                                    <div class="form-group">
+                                        <label class="form-label" style="color: #a78bfa;">Product Position</label>
+                                        <div class="product-position-grid">
+                                            {% for value, label in product_position_choices %}
+                                            <div class="product-pos-option {% if value == 'center' %}active{% endif %}" 
+                                                 data-position="{{ value }}" onclick="selectProductPosition(this)">
+                                                <i class="fas fa-{% if value == 'center' %}crosshairs{% elif value == 'center_bottom' %}arrow-down{% elif value == 'left' %}arrow-left{% elif value == 'right' %}arrow-right{% elif value == 'center_top' %}arrow-up{% elif value == 'full' %}expand{% endif %}" style="display:block; margin-bottom:0.25rem;"></i>
+                                                {{ label }}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <input type="hidden" name="product_position" value="center" id="productPositionHidden">
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" style="color: #a78bfa;">Product Size</label>
+                                        <div class="range-group">
+                                            <input type="range" name="product_scale" class="range-slider purple" min="20" max="90" value="50" id="productScaleSlider">
+                                            <span class="range-value purple" id="productScaleValue">50%</span>
+                                        </div>
+                                        <p class="form-hint">How large the product appears in the final image</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Style Selection -->
@@ -954,8 +1294,7 @@
                                 <div class="position-grid">
                                     {% for value, label in position_choices %}
                                     {% if value != 'none' %}
-                                    <label class="position-option {% if value == 'bottom_right' %}active{% endif %}">
-                                        <input type="radio" name="logo_position" value="{{ value }}" {% if value == 'bottom_right' %}checked{% endif %}>
+                                    <label class="position-option {% if value == 'bottom_right' %}active{% endif %}" data-position="{{ value }}">
                                         {{ label }}
                                     </label>
                                     {% endif %}
@@ -1051,6 +1390,9 @@
                 <div class="result-card">
                     <div class="result-image-container">
                         <img src="" alt="Generated Image" class="result-image" id="resultImage">
+                    </div>
+                    <div class="result-product-badge" id="resultProductBadge">
+                        <i class="fas fa-box-open"></i> Product Composited
                     </div>
                     <div class="result-actions">
                         <button class="result-btn download" id="downloadBtn">
@@ -1162,6 +1504,148 @@
 {% block extra_js %}
 <script>
     let currentGenerationId = null;
+    let productEnabled = false;
+
+    // ========== PRODUCT UPLOAD LOGIC ==========
+    function toggleProductUpload() {
+        productEnabled = !productEnabled;
+        const toggle = document.getElementById('productToggle');
+        const area = document.getElementById('productUploadArea');
+        const section = document.getElementById('productSection');
+        
+        toggle.classList.toggle('active', productEnabled);
+        area.classList.toggle('show', productEnabled);
+        section.classList.toggle('active', productEnabled);
+        
+        if (!productEnabled) {
+            removeProductImage();
+        }
+    }
+
+    // Product image input change
+    document.getElementById('productImageInput').addEventListener('change', function(e) {
+        handleProductFile(e.target.files[0]);
+    });
+
+    // Drag and drop
+    const productDropzone = document.getElementById('productDropzone');
+    
+    productDropzone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.classList.add('dragover');
+    });
+    
+    productDropzone.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+    });
+    
+    productDropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            const input = document.getElementById('productImageInput');
+            input.files = e.dataTransfer.files;
+            handleProductFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    function handleProductFile(file) {
+        if (!file) return;
+        
+        const maxSize = 10 * 1024 * 1024; // 10MB
+        if (file.size > maxSize) {
+            showToast('File too large. Max 10MB allowed.', 'error');
+            return;
+        }
+        
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            showToast('Invalid file type. Use PNG, JPG, GIF, or WebP.', 'error');
+            return;
+        }
+        
+        // Show preview
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('productPreviewImg').src = e.target.result;
+            document.getElementById('productFileName').textContent = file.name;
+            document.getElementById('productFileSize').textContent = formatFileSize(file.size);
+            
+            document.getElementById('productDropzone').style.display = 'none';
+            document.getElementById('productPreview').classList.add('show');
+            document.getElementById('productSettings').classList.add('show');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function removeProductImage() {
+        document.getElementById('productImageInput').value = '';
+        document.getElementById('productPreview').classList.remove('show');
+        document.getElementById('productSettings').classList.remove('show');
+        document.getElementById('productDropzone').style.display = 'block';
+    }
+
+    function selectProductPosition(el) {
+        document.querySelectorAll('.product-pos-option').forEach(o => o.classList.remove('active'));
+        el.classList.add('active');
+        document.getElementById('productPositionHidden').value = el.dataset.position;
+    }
+
+    // Product scale slider
+    const productScaleSlider = document.getElementById('productScaleSlider');
+    if (productScaleSlider) {
+        productScaleSlider.addEventListener('input', function() {
+            document.getElementById('productScaleValue').textContent = this.value + '%';
+        });
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Provider selection
+    document.querySelectorAll('input[name="provider"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const openaiSection = document.getElementById('openaiModelSection');
+            if (this.value === 'openai') {
+                openaiSection.style.display = 'block';
+            } else {
+                openaiSection.style.display = 'none';
+            }
+            
+            // Update visual selection
+            document.querySelectorAll('.provider-option').forEach(opt => {
+                opt.style.borderColor = 'rgba(255,255,255,0.1)';
+                opt.style.background = 'rgba(255,255,255,0.03)';
+            });
+            
+            const selectedLabel = this.parentElement;
+            if (this.value === 'openai') {
+                selectedLabel.style.borderColor = 'rgba(16,185,129,0.5)';
+                selectedLabel.style.background = 'rgba(16,185,129,0.1)';
+            } else {
+                selectedLabel.style.borderColor = 'rgba(59,130,246,0.5)';
+                selectedLabel.style.background = 'rgba(59,130,246,0.1)';
+            }
+        });
+        
+        // Initialize visual state on page load
+        if (radio.checked) {
+            const selectedLabel = radio.parentElement;
+            if (radio.value === 'openai') {
+                selectedLabel.style.borderColor = 'rgba(16,185,129,0.5)';
+                selectedLabel.style.background = 'rgba(16,185,129,0.1)';
+            } else {
+                selectedLabel.style.borderColor = 'rgba(59,130,246,0.5)';
+                selectedLabel.style.background = 'rgba(59,130,246,0.1)';
+            }
+        }
+    });
 
     // Style selection
     document.querySelectorAll('.style-option').forEach(option => {
@@ -1199,7 +1683,7 @@
         option.addEventListener('click', function() {
             document.querySelectorAll('.position-option').forEach(o => o.classList.remove('active'));
             this.classList.add('active');
-            document.getElementById('logoPositionHidden').value = this.querySelector('input').value;
+            document.getElementById('logoPositionHidden').value = this.dataset.position;
         });
     });
 
@@ -1252,6 +1736,17 @@
                 document.getElementById('resultImage').src = data.image_url;
                 document.getElementById('resultSection').classList.add('show');
                 document.getElementById('resultSection').scrollIntoView({ behavior: 'smooth' });
+                
+                // Show product badge if applicable
+                const productBadge = document.getElementById('resultProductBadge');
+                if (productBadge) {
+                    if (data.has_product) {
+                        productBadge.classList.add('show');
+                    } else {
+                        productBadge.classList.remove('show');
+                    }
+                }
+                
                 showToast('Image generated successfully!');
             } else {
                 showToast(data.error || 'Failed to generate image', 'error');
@@ -1276,7 +1771,7 @@
         if (!currentGenerationId) return;
         
         try {
-            const response = await fetch('{% url "ai_image:save" %}', {
+            const response = await fetch('{% url "ai_image:save_image" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -1311,6 +1806,10 @@
         document.querySelectorAll('.style-option').forEach((o, i) => {
             o.classList.toggle('active', i === 0);
         });
+        // Reset product upload
+        if (productEnabled) toggleProductUpload();
+        const productBadge = document.getElementById('resultProductBadge');
+        if (productBadge) productBadge.classList.remove('show');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 

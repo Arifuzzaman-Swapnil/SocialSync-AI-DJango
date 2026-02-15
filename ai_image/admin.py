@@ -50,11 +50,11 @@ class UserLogoAdmin(admin.ModelAdmin):
 @admin.register(ImageGeneration)
 class ImageGenerationAdmin(admin.ModelAdmin):
     list_display = ['id', 'user', 'title', 'style_badge', 'size', 'status_badge', 
-                    'has_logo_badge', 'processing_time', 'created_at']
+                    'has_logo_badge', 'has_product_badge', 'processing_time', 'created_at']
     list_filter = ['status', 'style', 'size', 'logo_position', 'created_at']
     search_fields = ['user__username', 'title', 'prompt']
     readonly_fields = ['user', 'created_at', 'updated_at', 'processing_time', 
-                       'enhanced_prompt', 'image_preview']
+                       'enhanced_prompt', 'image_preview', 'product_preview']
     date_hierarchy = 'created_at'
     ordering = ['-created_at']
     
@@ -70,6 +70,10 @@ class ImageGenerationAdmin(admin.ModelAdmin):
         }),
         ('Logo Settings', {
             'fields': ('logo', 'logo_position', 'logo_size', 'logo_opacity')
+        }),
+        ('Product Image', {
+            'fields': ('product_preview', 'product_image', 'product_position', 'product_scale', 'composited_image'),
+            'classes': ('collapse',)
         }),
         ('Output', {
             'fields': ('image_preview', 'generated_image', 'generated_image_with_logo'),
@@ -122,6 +126,24 @@ class ImageGenerationAdmin(admin.ModelAdmin):
             obj.status.title()
         )
     status_badge.short_description = 'Status'
+    
+    def has_product_badge(self, obj):
+        if obj.has_product:
+            return format_html(
+                '<span style="background-color: #8b5cf6; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-size: 11px;">📦 Product</span>'
+            )
+        return '-'
+    has_product_badge.short_description = 'Product'
+    
+    def product_preview(self, obj):
+        if obj.product_image:
+            return format_html(
+                '<img src="{}" style="max-width: 150px; max-height: 150px; border-radius: 8px;"/>',
+                obj.product_image.url
+            )
+        return '-'
+    product_preview.short_description = 'Product Preview'
     
     def has_logo_badge(self, obj):
         if obj.logo and obj.logo_position != 'none':

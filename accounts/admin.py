@@ -1,8 +1,8 @@
 # C:\Users\Trust computer\Desktop\Final_version_socialSync\accounts\admin.py
 
 from django.contrib import admin
-from .models import UserProfile
-from .models import SiteConfiguration
+from django.utils.html import format_html
+from .models import UserProfile, SiteConfiguration, SupportDocument
 
 @admin.register(SiteConfiguration)
 class SiteConfigurationAdmin(admin.ModelAdmin):
@@ -45,3 +45,56 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('created_at', 'updated_at')
         }),
     )
+
+
+@admin.register(SupportDocument)
+class SupportDocumentAdmin(admin.ModelAdmin):
+    list_display = ['title', 'is_active', 'text_preview', 'file_size', 'uploaded_at']
+    list_filter = ['is_active', 'uploaded_at']
+    search_fields = ['title', 'extracted_text']
+    list_editable = ['is_active']
+    readonly_fields = ['extracted_text', 'uploaded_at', 'updated_at']
+
+    fieldsets = (
+        ('Document', {
+            'fields': ('title', 'file', 'is_active'),
+            'description': 'Upload PDF documents to add knowledge to the Sellanto AI Support Chatbot.'
+        }),
+        ('Extracted Content', {
+            'fields': ('extracted_text',),
+            'classes': ('collapse',),
+            'description': 'Text automatically extracted from the PDF. This is what the AI chatbot uses as knowledge.'
+        }),
+        ('Timestamps', {
+            'fields': ('uploaded_at', 'updated_at'),
+        }),
+    )
+
+    def text_preview(self, obj):
+        if obj.extracted_text:
+            preview = obj.extracted_text[:80] + '...' if len(obj.extracted_text) > 80 else obj.extracted_text
+            return preview
+        return format_html('<span style="color: #f59e0b;">Pending extraction</span>')
+    text_preview.short_description = 'Content Preview'
+
+    def file_size(self, obj):
+        if obj.file:
+            try:
+                size = obj.file.size
+                if size < 1024:
+                    return f"{size} B"
+                elif size < 1024 * 1024:
+                    return f"{size / 1024:.1f} KB"
+                else:
+                    return f"{size / (1024 * 1024):.1f} MB"
+            except Exception:
+                return "—"
+        return "—"
+    file_size.short_description = 'File Size'
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        # Re-extract text if file changed
+        if 'file' in form.changed_data:
+            obj.extracted_text = ''
+            obj._extract_text()

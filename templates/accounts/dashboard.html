@@ -1,7 +1,7 @@
 <!-- # C:\Users\Trust computer\Desktop\Final_version_socialSync\templates\accounts\dashboard.html -->
 {% extends 'base.html' %}
 
-{% block title %}Dashboard - SocialSync{% endblock %}
+{% block title %}Dashboard - Sellanto{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -858,6 +858,14 @@
                 </div>
                 <div class="action-btn-text">AI Video</div>
             </a>
+
+            <a href="{% url 'ai_voice:generator' %}" class="action-btn">
+                <div class="action-btn-icon">
+                    <i class="fas fa-microphone"></i>
+                </div>
+                <div class="action-btn-text">AI Voice</div>
+            </a>
+
         </div>
 
         <!-- Subscription Info -->

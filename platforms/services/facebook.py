@@ -144,7 +144,35 @@ import os
 
 
 class FacebookService:
-    
+
+    @staticmethod
+    def _get_page_token(page_id, access_token):
+        """
+        Ensure we have a Page Access Token. If a User token is passed,
+        exchange it for the Page token automatically.
+        """
+        try:
+            url = f"https://graph.facebook.com/v18.0/debug_token"
+            params = {'input_token': access_token, 'access_token': access_token}
+            r = requests.get(url, params=params, timeout=10)
+            data = r.json().get('data', {})
+
+            if data.get('type') == 'PAGE':
+                return access_token
+
+            # It's a User token - exchange for Page token
+            page_url = f"https://graph.facebook.com/v18.0/{page_id}"
+            page_params = {'fields': 'access_token', 'access_token': access_token}
+            r2 = requests.get(page_url, params=page_params, timeout=10)
+            page_data = r2.json()
+
+            if 'access_token' in page_data:
+                return page_data['access_token']
+        except Exception:
+            pass
+
+        return access_token
+
     @staticmethod
     def post_to_facebook(page_id, access_token, message, media_path=None):
         """
@@ -160,6 +188,9 @@ class FacebookService:
             (success: bool, post_id or error: str)
         """
         
+        # Ensure we have a Page token
+        access_token = FacebookService._get_page_token(page_id, access_token)
+
         # Check if media exists and post accordingly
         if media_path and os.path.exists(media_path):
             # Get file extension

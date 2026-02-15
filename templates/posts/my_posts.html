@@ -518,8 +518,8 @@
 
     .media-single img,
     .media-single video {
-        width: 100%;
-        max-height: 350px;
+        width: auto;
+        max-height: 200px;
         border-radius: 1rem;
         object-fit: cover;
         cursor: pointer;
@@ -558,7 +558,7 @@
     .media-grid-item img,
     .media-grid-item video {
         width: 100%;
-        height: 100%;
+        height: 120px;
         object-fit: cover;
         pointer-events: none;
     }
@@ -911,11 +911,11 @@
                 </div>
                 
                 <!-- Media Display -->
-                {% if post.media_files and post.media_files|length > 0 %}
+                {% if post.media_files_list and post.media_files_list|length > 0 %}
                 <div class="media-container">
-                    {% if post.media_files|length == 1 %}
+                    {% if post.media_files_list|length == 1 %}
                         <div class="media-single">
-                            {% with media=post.media_files.0 %}
+                            {% with media=post.media_files_list.0 %}
                                 {% if '.mp4' in media or '.mov' in media or '.avi' in media %}
                                     <video controls onclick="openPostModal('{{ post.id }}')">
                                         <source src="{{ MEDIA_URL }}{{ media }}" type="video/mp4">
@@ -927,7 +927,7 @@
                         </div>
                     {% else %}
                         <div class="media-grid">
-                            {% for media in post.media_files|slice:":4" %}
+                            {% for media in post.media_files_list|slice:":4" %}
                                 <div class="media-grid-item" onclick="openPostModal('{{ post.id }}')">
                                     {% if '.mp4' in media or '.mov' in media or '.avi' in media %}
                                         <video>
@@ -940,16 +940,16 @@
                                 </div>
                             {% endfor %}
                         </div>
-                        {% if post.media_files|length > 4 %}
+                        {% if post.media_files_list|length > 4 %}
                             <p class="media-info">
-                                +{{ post.media_files|length|add:"-4" }} more • <a href="#" onclick="openPostModal('{{ post.id }}'); return false;">View all</a>
+                                +{{ post.media_files_list|length|add:"-4" }} more • <a href="#" onclick="openPostModal('{{ post.id }}'); return false;">View all</a>
                             </p>
                         {% endif %}
                     {% endif %}
                     
                     <p class="media-info">
                         <i class="fas fa-paperclip"></i>
-                        {{ post.media_files|length }} file{{ post.media_files|length|pluralize }} • <a href="#" onclick="openPostModal('{{ post.id }}'); return false;">View details</a>
+                        {{ post.media_files_list|length }} file{{ post.media_files_list|length|pluralize }} • <a href="#" onclick="openPostModal('{{ post.id }}'); return false;">View details</a>
                     </p>
                 </div>
                 {% endif %}
@@ -1150,7 +1150,7 @@ const postsData = {
         scheduledTime: '{{ post.scheduled_time|date:"F d, Y" }} at {{ post.scheduled_time|date:"h:i A" }}',
         postedAt: '{% if post.posted_at %}{{ post.posted_at|date:"F d, Y" }} at {{ post.posted_at|date:"h:i A" }}{% endif %}',
         platforms: [{% for platform in post.platforms_list %}'{{ platform }}',{% endfor %}],
-        mediaFiles: [{% for media in post.media_files %}'{{ MEDIA_URL }}{{ media }}',{% endfor %}],
+        mediaFiles: [{% for media in post.media_files_list %}'{{ MEDIA_URL }}{{ media }}',{% endfor %}],
         aiGenerated: {{ post.ai_generated|lower }},
         results: {
             facebook: { success: {{ post.facebook_post_id|yesno:"true,false" }}, error: '{{ post.facebook_error|escapejs }}' },

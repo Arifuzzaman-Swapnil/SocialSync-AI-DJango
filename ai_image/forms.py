@@ -12,6 +12,7 @@ class ImageGenerationForm(forms.ModelForm):
         fields = [
             'title', 'prompt', 'negative_prompt', 'style', 'size', 'quality',
             'logo', 'logo_position', 'logo_size', 'logo_opacity',
+            'product_image', 'product_position', 'product_scale',
             'add_lighting', 'camera_angle', 'enhance_prompt', 'seed'
         ]
         widgets = {

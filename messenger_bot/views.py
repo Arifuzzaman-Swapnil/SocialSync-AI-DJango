@@ -144,6 +144,13 @@ def messenger_dashboard(request):
         is_read=False
     ).count()
     
+    # Calculate total token usage
+    from django.db.models import Sum
+    total_tokens = Message.objects.filter(
+        conversation__connection=connection,
+        sender='bot'
+    ).aggregate(Sum('tokens_used'))['tokens_used__sum'] or 0
+    
     # Get selected conversation
     conversation_id = request.GET.get('conversation')
     selected_conversation = None
@@ -164,6 +171,7 @@ def messenger_dashboard(request):
         'messages': messages_list,
         'notifications': notifications,
         'unread_count': unread_count,
+        'total_tokens': total_tokens,
     }
     
     return render(request, 'messenger_bot/dashboard.html', context)
@@ -853,3 +861,70 @@ def send_manual_message(request, conversation_id):
             return JsonResponse({'error': str(e)}, status=500)
     
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+# ============ NOTIFICATION DELETE ============
+
+@login_required
+def delete_notification(request, notification_id):
+    """Delete a notification"""
+    if request.method == 'POST':
+        try:
+            connection = MessengerConnection.objects.get(user=request.user)
+            notification = get_object_or_404(Notification, id=notification_id, connection=connection)
+            notification.delete()
+            return JsonResponse({'success': True})
+        except:
+            return JsonResponse({'error': 'Failed'}, status=500)
+    return JsonResponse({'error': 'Invalid'}, status=400)
+
+
+@login_required
+def delete_all_read_notifications(request):
+    """Delete all read notifications"""
+    if request.method == 'POST':
+        try:
+            connection = MessengerConnection.objects.get(user=request.user)
+            deleted = Notification.objects.filter(connection=connection, is_read=True).delete()[0]
+            return JsonResponse({'success': True, 'deleted': deleted})
+        except:
+            return JsonResponse({'error': 'Failed'}, status=500)
+    return JsonResponse({'error': 'Invalid'}, status=400)
+
+
+# ============ PROMPT MANAGEMENT ============
+
+@login_required
+def activate_prompt(request, prompt_id):
+    """Activate a prompt"""
+    if request.method == 'POST':
+        try:
+            connection = MessengerConnection.objects.get(user=request.user)
+            prompt = get_object_or_404(CustomPrompt, id=prompt_id, connection=connection)
+            CustomPrompt.objects.filter(connection=connection).update(is_active=False)
+            prompt.is_active = True
+            prompt.save()
+            return JsonResponse({'success': True})
+        except:
+            return JsonResponse({'error': 'Failed'}, status=500)
+    return JsonResponse({'error': 'Invalid'}, status=400)
+
+
+@login_required
+def delete_prompt(request, prompt_id):
+    """Delete a prompt"""
+    if request.method == 'POST':
+        try:
+            connection = MessengerConnection.objects.get(user=request.user)
+            prompt = get_object_or_404(CustomPrompt, id=prompt_id, connection=connection)
+            was_active = prompt.is_active
+            prompt.delete()
+            if was_active:
+                remaining = CustomPrompt.objects.filter(connection=connection).first()
+                if remaining:
+                    remaining.is_active = True
+                    remaining.save()
+            return JsonResponse({'success': True})
+        except:
+            return JsonResponse({'error': 'Failed'}, status=500)
+    return JsonResponse({'error': 'Invalid'}, status=400)

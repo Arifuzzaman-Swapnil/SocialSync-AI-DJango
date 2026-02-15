@@ -1,8 +1,6 @@
-<!-- C:\Users\Trust computer\Desktop\Final_version_socialSync\ai_caption\templates\ai_caption\result.html -->
-
 {% extends 'base.html' %}
 
-{% block title %}Caption Result - SocialSync{% endblock %}
+{% block title %}Caption Result - Sellanto{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -232,7 +230,7 @@
     /* Actions */
     .actions-grid {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         gap: 1rem;
     }
 
@@ -277,25 +275,36 @@
         transform: translateY(-3px);
     }
 
-    .btn-regen {
-        background: rgba(245, 158, 11, 0.1);
-        color: #fbbf24;
-        border: 1px solid rgba(245, 158, 11, 0.2);
+    .btn-use {
+        background: linear-gradient(135deg, #f59e0b, #fbbf24);
+        color: white;
+        border: none;
     }
 
-    .btn-regen:hover {
-        background: rgba(245, 158, 11, 0.2);
+    .btn-use:hover {
         transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
     }
 
-    .btn-new {
+    .btn-regen {
         background: rgba(139, 92, 246, 0.1);
         color: #a855f7;
         border: 1px solid rgba(139, 92, 246, 0.2);
     }
 
-    .btn-new:hover {
+    .btn-regen:hover {
         background: rgba(139, 92, 246, 0.2);
+        transform: translateY(-3px);
+    }
+
+    .btn-new {
+        background: rgba(239, 68, 68, 0.1);
+        color: #f87171;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-new:hover {
+        background: rgba(239, 68, 68, 0.2);
         transform: translateY(-3px);
     }
 
@@ -419,6 +428,10 @@
                     <i class="fas fa-bookmark"></i>
                     <span>Save</span>
                 </button>
+                <button class="action-btn btn-use" onclick="useCaption()">
+                    <i class="fas fa-paper-plane"></i>
+                    <span>Use</span>
+                </button>
                 <button class="action-btn btn-regen" onclick="location.href='{% url 'ai_caption:generator' %}'">
                     <i class="fas fa-redo"></i>
                     <span>Regenerate</span>
@@ -431,6 +444,12 @@
         </div>
     </div>
 </div>
+
+<!-- Hidden form for use caption -->
+<form id="useCaptionForm" method="POST" action="{% url 'ai_caption:use_caption' %}" style="display: none;">
+    {% csrf_token %}
+    <input type="hidden" name="caption" id="captionForPost">
+</form>
 
 <div class="toast" id="toast">Success!</div>
 {% endblock %}
@@ -459,6 +478,15 @@
         } catch(e) {
             showToast('Error');
         }
+    }
+
+    function useCaption() {
+        const caption = document.getElementById('caption-text').textContent;
+        const hashtags = document.getElementById('hashtags-text')?.textContent || '';
+        const fullCaption = caption + (hashtags ? '\n\n' + hashtags : '');
+        
+        document.getElementById('captionForPost').value = fullCaption;
+        document.getElementById('useCaptionForm').submit();
     }
 
     function showToast(msg) {

@@ -4,14 +4,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
+from django.http import JsonResponse
 from datetime import datetime
-import os  # ADD THIS
-import time  # ADD THIS
-from django.conf import settings  # ADD THIS
+import os
+import time
+import json
+import pytz
+from django.conf import settings
 
 from .models import Post
 from platforms.models import SocialAccount
 from accounts.models import UserProfile
+
 
 @login_required
 def create_post(request):
@@ -30,46 +34,31 @@ def create_post(request):
             platforms[account.platform] = []
         platforms[account.platform].append(account)
     
+    # Get pre-filled caption from session (from AI Caption)
+    prefilled_caption = request.session.pop('prefilled_caption', '')
+    
     if request.method == 'POST':
         try:
-            # DEBUG: Print all POST data
-            print("=" * 50)
-            print("POST DATA RECEIVED:")
-            for key, value in request.POST.items():
-                print(f"{key}: {value}")
-            print("=" * 50)
-            
             caption = request.POST.get('caption', '').strip()
             scheduled_time = request.POST.get('scheduled_time', '').strip()
             selected_platforms = request.POST.getlist('platforms')
             ai_generated = request.POST.get('ai_generated') == 'true'
             
-            # DEBUG: Print extracted values
-            print(f"Caption: {caption}")
-            print(f"Scheduled Time: {scheduled_time}")
-            print(f"Platforms: {selected_platforms}")
-            print(f"AI Generated: {ai_generated}")
-            
             # Validation
             if not caption:
-                print("ERROR: Caption is empty")
                 messages.error(request, '❌ Caption is required')
                 return redirect('create_post')
             
             if not selected_platforms:
-                print("ERROR: No platforms selected")
                 messages.error(request, '❌ Please select at least one platform')
                 return redirect('create_post')
             
             if not scheduled_time:
-                print("ERROR: No scheduled time")
                 messages.error(request, '❌ Scheduled time is required')
                 return redirect('create_post')
             
             # Parse scheduled time
             try:
-                import pytz
-                
                 # Handle both formats
                 if 'T' in scheduled_time:
                     scheduled_dt = datetime.strptime(scheduled_time, '%Y-%m-%dT%H:%M')
@@ -84,24 +73,18 @@ def create_post(request):
                 
                 # Convert to UTC (this is what gets saved to database)
                 scheduled_dt = scheduled_dt.astimezone(pytz.UTC)
-                
-                print(f"User input: {scheduled_time}")
-                print(f"Saved as UTC: {scheduled_dt}")
                     
             except ValueError as e:
-                print(f"ERROR: Date parsing failed: {e}")
                 messages.error(request, f'❌ Invalid date/time format: {str(e)}')
                 return redirect('create_post')
             
             # Check monthly limit
             profile = request.user.profile
             if profile.posts_this_month >= profile.max_posts_per_month:
-                print("ERROR: Monthly limit reached")
                 messages.error(request, f'❌ Monthly limit reached ({profile.max_posts_per_month} posts)')
                 return redirect('create_post')
             
             # Create post first
-            print("Creating post...")
             post = Post.objects.create(
                 user=request.user,
                 caption=caption,
@@ -110,26 +93,18 @@ def create_post(request):
                 status='scheduled'
             )
             
-            print(f"Post created with ID: {post.id}")
-            
             # Set platforms
             post.set_platforms(selected_platforms)
-            print(f"Platforms set: {selected_platforms}")
             
-            # ========================================
-            # MULTIPLE MEDIA HANDLING - NEW CODE
-            # ========================================
+            # Handle multiple media files
             media_files_list = request.FILES.getlist('media')
             saved_paths = []
-            
-            print(f"Received {len(media_files_list)} media files")
             
             if len(media_files_list) > 0:
                 for idx, uploaded_file in enumerate(media_files_list):
                     # Validate size (50MB max per file)
                     max_size = 50 * 1024 * 1024
                     if uploaded_file.size > max_size:
-                        print(f"File {idx+1} too large: {uploaded_file.size / (1024*1024):.2f}MB, skipping")
                         continue
                     
                     # Get extension
@@ -138,7 +113,6 @@ def create_post(request):
                     # Validate file type
                     allowed_types = ['.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.avi']
                     if ext not in allowed_types:
-                        print(f"File {idx+1} invalid type: {ext}, skipping")
                         continue
                     
                     # Create unique filename
@@ -160,30 +134,21 @@ def create_post(request):
                             destination.write(chunk)
                     
                     saved_paths.append(file_path)
-                    print(f"Media {idx+1} saved: {file_path}")
                 
                 # Save media paths to post
                 if saved_paths:
                     post.set_media_files(saved_paths)
-                    print(f"Total media files saved: {len(saved_paths)}")
-            # ========================================
-            # END MULTIPLE MEDIA HANDLING
-            # ========================================
             
             post.save()
-            print("Post saved successfully!")
             
             # Update monthly counter
             profile.posts_this_month += 1
             profile.save()
-            print(f"Monthly counter updated: {profile.posts_this_month}")
             
             messages.success(request, f'✅ Post scheduled for {scheduled_dt.strftime("%B %d, %Y at %I:%M %p")}')
-            print("SUCCESS: Redirecting to my_posts")
             return redirect('my_posts')
             
         except Exception as e:
-            print(f"EXCEPTION during post creation: {str(e)}")
             import traceback
             traceback.print_exc()
             messages.error(request, f'❌ Failed to create post: {str(e)}')
@@ -194,9 +159,12 @@ def create_post(request):
         'connected_accounts': connected_accounts,
         'platforms': platforms,
         'has_accounts': connected_accounts.exists(),
+        'prefilled_caption': prefilled_caption,  # Pre-filled caption from AI
+        'MEDIA_URL': settings.MEDIA_URL,
     }
     
     return render(request, 'posts/create_post.html', context)
+
 
 @login_required
 def my_posts(request):
@@ -228,6 +196,7 @@ def my_posts(request):
         'scheduled_posts': scheduled_posts,
         'posted_posts': posted_posts,
         'failed_posts': failed_posts,
+        'MEDIA_URL': settings.MEDIA_URL,  # Add MEDIA_URL to context
     }
     
     return render(request, 'posts/my_posts.html', context)
@@ -267,11 +236,7 @@ def edit_post(request, post_id):
             # Convert to UTC for database
             post.scheduled_time = scheduled_dt.astimezone(pytz.UTC)
             
-            print(f"Edit: User input (BD): {scheduled_time}")
-            print(f"Edit: Saved as (UTC): {post.scheduled_time}")
-            
         except ValueError as e:
-            print(f"Edit: Date parsing error: {e}")
             messages.error(request, '❌ Invalid date/time format')
             return redirect('edit_post', post_id=post_id)
         
@@ -295,9 +260,11 @@ def edit_post(request, post_id):
         'connected_accounts': connected_accounts,
         'selected_platforms': post.platforms_list,
         'scheduled_time_local': scheduled_bd.strftime('%Y-%m-%dT%H:%M'),
+        'MEDIA_URL': settings.MEDIA_URL,
     }
     
     return render(request, 'posts/edit_post.html', context)
+
 
 @login_required
 def delete_post(request, post_id):
