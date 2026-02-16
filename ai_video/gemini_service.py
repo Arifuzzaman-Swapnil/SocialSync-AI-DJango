@@ -94,14 +94,12 @@ class GeminiVideoService:
             if intensity_addition:
                 enhanced_parts.append(intensity_addition)
         
-        # Add quality boosters
-        enhanced_parts.append("smooth motion, high quality, professional video")
-        
-        return ", ".join(enhanced_parts)
+        return ". ".join(filter(None, enhanced_parts))
     
     def generate_video(self, prompt, style='realistic', duration=5, resolution='1080p',
                        aspect_ratio='16:9', fps=30, negative_prompt=None,
-                       camera_motion=None, motion_intensity=None, enhance=True, seed=None):
+                       camera_motion=None, motion_intensity=None, enhance=True, seed=None,
+                       reference_image=None):
         """
         Generate video using Gemini/Veo API
         """
@@ -128,7 +126,7 @@ class GeminiVideoService:
             final_prompt += f". Duration: {duration} seconds, aspect ratio: {aspect_ratio}"
             
             # Try Veo model first
-            result = self._generate_with_veo(final_prompt, duration, resolution, aspect_ratio)
+            result = self._generate_with_veo(final_prompt, duration, resolution, aspect_ratio, reference_image=reference_image)
             
             if result.get('success'):
                 result['enhanced_prompt'] = final_prompt
@@ -156,16 +154,16 @@ class GeminiVideoService:
                 'processing_time': time.time() - start_time
             }
     
-    def _generate_with_veo(self, prompt, duration, resolution, aspect_ratio):
+    def _generate_with_veo(self, prompt, duration, resolution, aspect_ratio, reference_image=None):
         """Generate using Veo model"""
         try:
             # Veo 2 model endpoint
             url = f"{self.base_url}/models/veo-2.0-generate-001:predictLongRunning"
-            
+
             headers = {
                 'Content-Type': 'application/json',
             }
-            
+
             # Get resolution dimensions
             resolutions = {
                 '480p': {'width': 854, 'height': 480},
@@ -174,11 +172,17 @@ class GeminiVideoService:
                 '4k': {'width': 3840, 'height': 2160},
             }
             res = resolutions.get(resolution, resolutions['1080p'])
-            
+
+            # Build instance with optional reference image
+            instance = {'prompt': prompt}
+            if reference_image:
+                instance['image'] = {
+                    'bytesBase64Encoded': base64.b64encode(reference_image).decode(),
+                    'mimeType': 'image/png'
+                }
+
             payload = {
-                'instances': [{
-                    'prompt': prompt
-                }],
+                'instances': [instance],
                 'parameters': {
                     'aspectRatio': aspect_ratio,
                     'durationSeconds': duration,

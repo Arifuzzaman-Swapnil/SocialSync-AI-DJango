@@ -18,6 +18,8 @@ import {
   KeyIcon,
   CheckCircleIcon,
   CloudArrowUpIcon,
+  TrashIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon, StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { formatDistanceToNow } from 'date-fns';
@@ -158,6 +160,10 @@ export function AIVideoPage() {
   const [selectedCameraMotion, setSelectedCameraMotion] = useState<CameraMotion | undefined>(undefined);
   const [selectedMotionIntensity, setSelectedMotionIntensity] = useState<MotionIntensity | undefined>(undefined);
 
+  // Reference image state
+  const [referenceImage, setReferenceImage] = useState<File | null>(null);
+  const [referencePreview, setReferencePreview] = useState<string | null>(null);
+
   // Error state
   const [error, setError] = useState<string | null>(null);
 
@@ -296,6 +302,7 @@ export function AIVideoPage() {
         formData.append('logo_opacity', String(logoOpacity));
       }
 
+      if (referenceImage) formData.append('reference_image', referenceImage);
       if (seed !== undefined) formData.append('seed', String(seed));
       if (selectedCameraMotion) formData.append('camera_motion', selectedCameraMotion);
       if (selectedMotionIntensity) formData.append('motion_intensity', selectedMotionIntensity);
@@ -472,6 +479,53 @@ export function AIVideoPage() {
                   />
                 </div>
               </div>
+            </Card>
+
+            {/* Reference Image */}
+            <Card>
+              <div className="flex items-center gap-3 mb-4">
+                <PhotoIcon className="w-5 h-5 text-orange-400" />
+                <h3 className="font-semibold text-text-primary">Reference Image (Optional)</h3>
+              </div>
+              <p className="text-xs text-text-muted mb-4">
+                Upload an image to animate into a video. The AI will use it as a starting frame.
+              </p>
+
+              {referencePreview ? (
+                <div className="relative inline-block w-full">
+                  <img
+                    src={referencePreview}
+                    alt="Reference preview"
+                    className="w-full max-h-48 object-contain rounded-xl border border-white/10"
+                  />
+                  <button
+                    onClick={() => {
+                      setReferenceImage(null);
+                      setReferencePreview(null);
+                    }}
+                    className="absolute top-2 right-2 p-1.5 bg-danger/80 rounded-lg hover:bg-danger transition-colors"
+                  >
+                    <TrashIcon className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-orange-500/50 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setReferenceImage(file);
+                        setReferencePreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <CloudArrowUpIcon className="w-10 h-10 text-text-muted" />
+                  <span className="text-sm text-text-secondary">Click to upload reference image</span>
+                </label>
+              )}
             </Card>
 
             {/* Style Selection */}

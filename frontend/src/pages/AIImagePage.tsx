@@ -149,10 +149,10 @@ export function AIImagePage() {
   const [logoPosition, setLogoPosition] = useState<LogoPosition>('none');
   const [logoSize, setLogoSize] = useState(10);
   const [logoOpacity, setLogoOpacity] = useState(100);
-  const [productImage, _setProductImage] = useState<File | null>(null);
-  const [_productPreview, _setProductPreview] = useState<string | null>(null);
-  const [productPosition, _setProductPosition] = useState<ProductPosition>('center');
-  const [productScale, _setProductScale] = useState(50);
+  const [productImage, setProductImage] = useState<File | null>(null);
+  const [productPreview, setProductPreview] = useState<string | null>(null);
+  const [productPosition, setProductPosition] = useState<ProductPosition>('center');
+  const [productScale, setProductScale] = useState(50);
   const [seed, setSeed] = useState<number | undefined>(undefined);
   const [enhancePrompt, setEnhancePrompt] = useState(true);
   const [selectedLighting, setSelectedLighting] = useState<LightingStyle | undefined>(undefined);
@@ -575,6 +575,85 @@ export function AIImagePage() {
                   </button>
                 ))}
               </div>
+            </Card>
+
+            {/* Product Upload */}
+            <Card>
+              <div className="flex items-center gap-3 mb-4">
+                <CloudArrowUpIcon className="w-5 h-5 text-green-400" />
+                <h3 className="font-semibold text-text-primary">Product Image (Optional)</h3>
+              </div>
+              <p className="text-xs text-text-muted mb-4">
+                Upload your product photo. AI will generate a matching background and place your product in it.
+              </p>
+
+              {productPreview ? (
+                <div className="space-y-4">
+                  <div className="relative inline-block w-full">
+                    <img
+                      src={productPreview}
+                      alt="Product preview"
+                      className="w-full max-h-48 object-contain rounded-xl border border-white/10"
+                    />
+                    <button
+                      onClick={() => {
+                        setProductImage(null);
+                        setProductPreview(null);
+                      }}
+                      className="absolute top-2 right-2 p-1.5 bg-danger/80 rounded-lg hover:bg-danger transition-colors"
+                    >
+                      <TrashIcon className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-text-secondary mb-2">Position</label>
+                      <select
+                        value={productPosition}
+                        onChange={(e) => setProductPosition(e.target.value as ProductPosition)}
+                        className="w-full px-3 py-2 bg-dark-700 border border-white/10 rounded-xl text-text-primary"
+                      >
+                        <option value="center">Center</option>
+                        <option value="left">Left</option>
+                        <option value="right">Right</option>
+                        <option value="top">Top</option>
+                        <option value="bottom">Bottom</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-text-secondary mb-2">
+                        Scale: {productScale}%
+                      </label>
+                      <input
+                        type="range"
+                        min="20"
+                        max="90"
+                        value={productScale}
+                        onChange={(e) => setProductScale(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-3 p-8 border-2 border-dashed border-white/10 rounded-xl cursor-pointer hover:border-green-500/50 transition-colors">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setProductImage(file);
+                        setProductPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  <PhotoIcon className="w-10 h-10 text-text-muted" />
+                  <span className="text-sm text-text-secondary">Click to upload product image</span>
+                </label>
+              )}
             </Card>
 
             {/* Advanced Options Toggle */}

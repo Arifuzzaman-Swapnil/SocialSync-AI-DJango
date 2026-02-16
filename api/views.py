@@ -514,6 +514,9 @@ def generate_caption(request):
             caption_gen.media_file = media_file
             caption_gen.save()
 
+        # Get or create user API settings for usage tracking
+        api_settings, _ = CaptionAPISettings.objects.get_or_create(user=request.user)
+
         # Initialize service with the user's API key
         service = CaptionGeneratorService(api_key=user_api_key)
 
@@ -1320,6 +1323,12 @@ def generate_video(request):
         logo_size = int(request.data.get('logo_size', 10))
         logo_opacity = int(request.data.get('logo_opacity', 100))
 
+        # Reference image
+        reference_file = request.FILES.get('reference_image')
+        reference_image_data = None
+        if reference_file:
+            reference_image_data = reference_file.read()
+
         # Advanced settings
         camera_motion = request.data.get('camera_motion', '')
         motion_intensity = request.data.get('motion_intensity', '')
@@ -1372,7 +1381,8 @@ def generate_video(request):
             camera_motion=camera_motion,
             motion_intensity=motion_intensity,
             enhance=enhance_prompt,
-            seed=seed
+            seed=seed,
+            reference_image=reference_image_data
         )
 
         if result.get('success'):

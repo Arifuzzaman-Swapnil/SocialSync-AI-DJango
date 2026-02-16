@@ -93,10 +93,7 @@ class GeminiImageService:
             if camera_addition:
                 enhanced_parts.append(camera_addition)
         
-        # Add quality boosters
-        enhanced_parts.append("masterpiece, best quality, highly detailed")
-        
-        return ", ".join(enhanced_parts)
+        return ". ".join(filter(None, enhanced_parts))
     
     def generate_image(self, prompt, style='realistic', size='1024x1024', quality='high',
                        negative_prompt=None, lighting=None, camera_angle=None,
@@ -168,7 +165,7 @@ class GeminiImageService:
             payload = {
                 'contents': [{
                     'parts': [{
-                        'text': f"Generate an image: {prompt}"
+                        'text': prompt
                     }]
                 }],
                 'generationConfig': {

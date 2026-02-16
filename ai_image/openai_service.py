@@ -95,10 +95,7 @@ class OpenAIImageService:
             if camera_addition:
                 enhanced_parts.append(camera_addition)
         
-        # Add quality boosters
-        enhanced_parts.append("masterpiece, best quality, highly detailed")
-        
-        return ", ".join(enhanced_parts)
+        return ". ".join(filter(None, enhanced_parts))
     
     def _get_valid_size(self, size, model='dall-e-3'):
         """Get valid size for DALL-E model"""
