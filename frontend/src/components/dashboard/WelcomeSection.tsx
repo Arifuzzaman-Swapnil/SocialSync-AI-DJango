@@ -46,7 +46,7 @@ export function WelcomeSection({ username }: WelcomeSectionProps) {
           <motion.div
             animate={{ scale: [1, 1.05, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-[0_10px_30px_rgba(255,107,107,0.4)]"
+            className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-[0_10px_30px_rgb(var(--c-primary)_/_0.4)]"
           >
             <SparklesIcon className="w-7 h-7 text-white" />
           </motion.div>
@@ -63,7 +63,7 @@ export function WelcomeSection({ username }: WelcomeSectionProps) {
 
         {/* Right: Time display */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 px-5 py-3 bg-primary/10 border border-primary/20 rounded-xl hover:bg-primary/15 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgba(255,107,107,0.2)]">
+          <div className="flex items-center gap-3 px-5 py-3 bg-primary/10 border border-primary/20 rounded-xl hover:bg-primary/15 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_10px_30px_rgb(var(--c-primary)_/_0.2)]">
             <div className="w-2 h-2 bg-primary rounded-full animate-pulse-dot" />
             <div className="text-right">
               <p className="text-xl font-bold text-text-primary">

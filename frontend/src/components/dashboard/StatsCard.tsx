@@ -55,17 +55,17 @@ export function StatsCard({ title, value, icon, trend, progress, delay = 0 }: St
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: delay / 1000, duration: 0.5 }}
       whileHover={{ y: -12 }}
-      className="relative p-6 rounded-2xl bg-gradient-to-br from-dark-700/80 to-dark-800/80 border border-white/5 overflow-hidden transition-all duration-500 group shadow-[0_10px_40px_rgba(0,0,0,0.3)] hover:border-primary/20 hover:shadow-[0_25px_60px_rgba(255,107,107,0.25)]"
+      className="relative p-6 rounded-2xl bg-gradient-to-br from-dark-700/80 to-dark-800/80 border border-white/5 overflow-hidden transition-all duration-500 group shadow-[0_10px_40px_rgba(0,0,0,0.3)] hover:border-primary/20 hover:shadow-[0_25px_60px_rgb(var(--c-primary)_/_0.25)]"
     >
       {/* Hover glow effect */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,107,107,0.1),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgb(var(--c-primary)_/_0.1),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-6">
           <motion.div
             whileHover={{ rotate: -10, scale: 1.1 }}
             transition={{ duration: 0.4 }}
-            className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-[0_10px_30px_rgba(255,107,107,0.3)] relative"
+            className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-[0_10px_30px_rgb(var(--c-primary)_/_0.3)] relative"
           >
             {/* Gradient border effect */}
             <div className="absolute inset-0 rounded-xl p-[2px] bg-gradient-to-br from-primary to-secondary opacity-50" style={{ WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)', WebkitMaskComposite: 'xor', maskComposite: 'exclude' }} />
@@ -105,7 +105,7 @@ export function StatsCard({ title, value, icon, trend, progress, delay = 0 }: St
             </div>
             <div className="h-2 bg-dark-900/50 rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-primary to-secondary rounded-full shadow-[0_0_10px_rgba(255,107,107,0.5)]"
+                className="h-full bg-gradient-to-r from-primary to-secondary rounded-full shadow-[0_0_10px_rgb(var(--c-primary)_/_0.5)]"
                 initial={{ width: 0 }}
                 animate={{ width: `${progressWidth}%` }}
                 transition={{ duration: 0.8, delay: delay / 1000 + 0.3 }}

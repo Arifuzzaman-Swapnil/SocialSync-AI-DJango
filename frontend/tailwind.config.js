@@ -66,8 +66,8 @@ export default {
         'gradient-dark': 'linear-gradient(180deg, rgb(var(--c-dark-800)) 0%, rgb(var(--c-dark-700)) 100%)',
       },
       boxShadow: {
-        'glow-primary': '0 0 20px rgba(var(--c-primary), 0.3)',
-        'glow-secondary': '0 0 20px rgba(var(--c-secondary), 0.3)',
+        'glow-primary': '0 0 20px rgb(var(--c-primary) / 0.3)',
+        'glow-secondary': '0 0 20px rgb(var(--c-secondary) / 0.3)',
         'glow-success': '0 0 20px rgba(81, 207, 102, 0.3)',
         'card': 'var(--shadow-card)',
         'card-hover': 'var(--shadow-card-hover)',
@@ -94,8 +94,8 @@ export default {
           '50%': { transform: 'translateY(-10px)' },
         },
         glow: {
-          '0%': { boxShadow: '0 0 5px rgba(var(--c-primary), 0.2)' },
-          '100%': { boxShadow: '0 0 20px rgba(var(--c-primary), 0.4)' },
+          '0%': { boxShadow: '0 0 5px rgb(var(--c-primary) / 0.2)' },
+          '100%': { boxShadow: '0 0 20px rgb(var(--c-primary) / 0.4)' },
         },
       },
       backdropBlur: {

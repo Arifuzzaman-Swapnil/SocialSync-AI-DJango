@@ -252,13 +252,13 @@ export function AdminUserDetailPage() {
                   <select
                     value={planForm.plan}
                     onChange={(e) => setPlanForm(prev => ({ ...prev, plan: e.target.value }))}
-                    className="w-full px-3 py-2 bg-white/5 text-white text-sm rounded-xl border border-white/10 focus:outline-none focus:border-amber-500/30"
+                    className="w-full px-3 py-2 bg-dark-700 text-white text-sm rounded-xl border border-white/10 focus:outline-none focus:border-amber-500/30"
                   >
-                    <option value="free">Free</option>
-                    <option value="starter">Starter</option>
-                    <option value="pro">Pro</option>
-                    <option value="business">Business</option>
-                    <option value="enterprise">Enterprise</option>
+                    <option value="free" className="bg-dark-800 text-white">Free</option>
+                    <option value="starter" className="bg-dark-800 text-white">Starter</option>
+                    <option value="pro" className="bg-dark-800 text-white">Pro</option>
+                    <option value="business" className="bg-dark-800 text-white">Business</option>
+                    <option value="enterprise" className="bg-dark-800 text-white">Enterprise</option>
                   </select>
                 </div>
                 <div>
