@@ -6,6 +6,7 @@ Processes incoming messages, attachments, images, URLs, and generates AI respons
 Complete automation with image recognition, Knowledge Base matching, and Important Message Detection
 """
 
+import json
 import logging
 import requests
 import time
@@ -85,35 +86,31 @@ class MessageHandler:
         self.page_access_token = connection.page_access_token
         self.rag_engine = None
         self.openai_client = None
-        
-        print(f"🔧 Initializing MessageHandler for: {connection.page_name}")
-        
+
+        logger.info(f"[MH] Initializing MessageHandler for: {connection.page_name}")
+
         # Try to get AI config
         try:
             ai_config = getattr(connection, 'ai_config', None)
             if ai_config:
-                print(f"✅ AI Config found - Model: {ai_config.openai_model}")
-                print(f"   API Key exists: {bool(ai_config.openai_api_key)}")
-                print(f"   RAG enabled: {ai_config.rag_enabled}")
-                
+                logger.info(f"[MH] AI Config found - Model: {ai_config.openai_model}, RAG: {ai_config.rag_enabled}")
+
                 # Initialize OpenAI client
                 if ai_config.openai_api_key:
                     self.openai_client = OpenAIClient(ai_config.openai_api_key)
-                    print(f"✅ OpenAI client initialized")
-                
+                    logger.info("[MH] OpenAI client initialized")
+
                 # Initialize RAG engine
                 if ai_config.rag_enabled:
                     try:
                         self.rag_engine = RAGEngine(ai_config)
-                        print(f"✅ RAG engine initialized")
+                        logger.info("[MH] RAG engine initialized")
                     except Exception as e:
-                        print(f"⚠️ RAG engine init failed: {e}")
+                        logger.warning(f"[MH] RAG engine init failed: {e}")
             else:
-                print(f"⚠️ No AI Config found for this connection")
+                logger.warning("[MH] No AI Config found for this connection")
         except Exception as e:
-            print(f"❌ Error accessing AI config: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[MH] Error accessing AI config: {e}", exc_info=True)
     
     def process_message(
         self, 
@@ -125,19 +122,18 @@ class MessageHandler:
     ) -> bool:
         """Process incoming message with all features"""
         try:
-            print(f"\n📨 Processing message from: {sender_id}")
-            
+            logger.info(f"[MH] Processing message from: {sender_id}")
+
             if message_data:
                 message_text = message_data.get('text', '')
                 attachments = message_data.get('attachments', [])
                 message_id = message_data.get('mid')
-            
-            print(f"   Text: {message_text[:50] if message_text else '[empty]'}...")
-            
+
+            logger.info(f"[MH] Text: {(message_text[:50] if message_text else '[empty]')}...")
+
             # Get or create conversation with user info
-            print(f"🔍 Getting/creating conversation...")
             conversation = self._get_or_create_conversation(sender_id)
-            print(f"✅ Conversation ID: {conversation.id}")
+            logger.info(f"[MH] Conversation ID: {conversation.id}")
             
             # Process message content
             message_type = 'text'
@@ -150,28 +146,28 @@ class MessageHandler:
             
             # Process attachments
             if attachments:
-                print(f"📎 Processing {len(attachments)} attachments...")
+                logger.info(f"[MH] Processing {len(attachments)} attachments...")
                 attachment_info = self._process_attachments(attachments)
                 message_type = attachment_info['type']
                 image_urls = attachment_info['images']
                 file_urls = attachment_info['files']
                 audio_urls = attachment_info.get('audios', [])
-                
+
                 # Handle voice messages
                 if audio_urls and self.openai_client:
                     # Check if voice transcription is enabled
                     voice_enabled = getattr(self.connection.ai_config, 'voice_transcription_enabled', True)
                     if voice_enabled:
-                        print(f"🎤 Voice message detected!")
+                        logger.info("[MH] Voice message detected!")
                         for audio_url in audio_urls:
                             transcription = self._transcribe_voice_message(audio_url)
                             if transcription:
                                 voice_transcription = transcription
-                                processed_content = transcription  # Use transcription as message content
+                                processed_content = transcription
                                 message_type = 'voice'
-                                print(f"📝 Transcription: {transcription[:100]}...")
+                                logger.info(f"[MH] Transcription: {transcription[:100]}...")
                     else:
-                        print(f"⏭️ Voice transcription disabled - skipping")
+                        logger.info("[MH] Voice transcription disabled - skipping")
                 
                 # Handle images
                 if image_urls and self.openai_client:
@@ -226,15 +222,15 @@ class MessageHandler:
             
             # Check auto-reply - skip if disabled globally or human takeover is active
             if not self.connection.auto_reply_enabled:
-                print(f"⏸️ Auto-reply is disabled globally")
+                logger.info("[MH] Auto-reply is disabled globally")
                 return True
-            
+
             if conversation.human_takeover:
-                print(f"👤 Human takeover active for this conversation - skipping AI reply")
+                logger.info("[MH] Human takeover active for this conversation - skipping AI reply")
                 return True
-            
+
             # Generate response
-            print(f"🤖 Generating AI response...")
+            logger.info("[MH] Generating AI response...")
             start_time = time.time()
             
             if image_analysis_result and image_analysis_result.get('response'):
@@ -243,7 +239,7 @@ class MessageHandler:
                 response_data = self._generate_response(processed_content or message_text, conversation)
             
             processing_time = time.time() - start_time
-            print(f"⏱️ Response generated in {processing_time:.2f}s")
+            logger.info(f"[MH] Response generated in {processing_time:.2f}s")
             
             response_text = response_data['response']
             
@@ -268,11 +264,11 @@ class MessageHandler:
             conversation.save()
             
             # Send response
-            print(f"📤 Sending response to Facebook...")
-            
+            logger.info("[MH] Sending response to Facebook...")
+
             if voice_reply_enabled:
                 # Generate and send voice response
-                print(f"🔊 Generating voice response with '{voice_model}' voice...")
+                logger.info(f"[MH] Generating voice response with '{voice_model}' voice...")
                 audio_bytes = self._generate_voice_response(response_text, voice_model)
                 
                 if audio_bytes:
@@ -282,28 +278,26 @@ class MessageHandler:
                         self._send_facebook_message(sender_id, f"📝 {response_text[:200]}...")
                 else:
                     # Fallback to text if voice generation fails
-                    print(f"⚠️ Voice generation failed, sending text...")
+                    logger.warning("[MH] Voice generation failed, sending text...")
                     success = self._send_facebook_message(sender_id, response_text)
             else:
                 # Send text response
                 success = self._send_facebook_message(sender_id, response_text)
-            
+
             if success:
                 bot_message.delivered = True
                 bot_message.save()
-                print(f"✅ Response sent successfully!")
+                logger.info("[MH] Response sent successfully!")
             else:
                 bot_message.failed = True
                 bot_message.error_message = "Failed to send"
                 bot_message.save()
-                print(f"❌ Failed to send response")
-            
+                logger.error("[MH] Failed to send response")
+
             return success
-        
+
         except Exception as e:
-            print(f"❌ Error processing message: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[MH] Error processing message: {e}", exc_info=True)
             return False
     
     def _detect_and_create_notification(
@@ -449,26 +443,21 @@ General greetings or casual chat are NOT important."""
         
         # Fetch user info if missing
         if not conversation.sender_name or created:
-            print(f"📡 Fetching user info for: {sender_id}")
+            logger.info(f"[MH] Fetching user info for: {sender_id}")
             user_info = self._get_facebook_user_info(sender_id)
             if user_info:
                 name = user_info.get('name')
                 profile_pic = user_info.get('profile_pic', '')
-                
-                # Truncate profile_pic URL if too long (MySQL VARCHAR limit)
-                if profile_pic and len(profile_pic) > 200:
-                    print(f"⚠️ Profile pic URL too long ({len(profile_pic)} chars), truncating...")
-                    profile_pic = profile_pic[:200]
-                
+
                 if name:
                     conversation.sender_name = name
                     conversation.sender_profile_pic = profile_pic
                     conversation.save()
-                    print(f"✅ User info saved: {conversation.sender_name}")
+                    logger.info(f"[MH] User info saved: {conversation.sender_name}")
                 else:
-                    print(f"⚠️ No name found in user info")
+                    logger.warning("[MH] No name found in user info")
             else:
-                print(f"⚠️ Could not fetch user info")
+                logger.warning("[MH] Could not fetch user info")
         
         return conversation
     
@@ -625,7 +614,7 @@ General greetings or casual chat are NOT important."""
             # Download image and convert to base64 for Facebook CDN images
             image_data = self._get_image_for_openai(image_url)
             if not image_data:
-                print(f"⚠️ Could not load image for analysis")
+                logger.warning("[MH] Could not load image for analysis")
                 return None
             
             response = openai.chat.completions.create(
@@ -644,10 +633,10 @@ General greetings or casual chat are NOT important."""
                 }],
                 max_tokens=1000
             )
-            print(f"✅ Image analyzed successfully")
+            logger.info("[MH] Image analyzed successfully")
             return response.choices[0].message.content
         except Exception as e:
-            print(f"❌ Image description error: {e}")
+            logger.error(f"[MH] Image description error: {e}")
             return None
     
     def _get_image_for_openai(self, image_url: str) -> Optional[dict]:
@@ -658,12 +647,12 @@ General greetings or casual chat are NOT important."""
         try:
             # Check if it's a Facebook CDN URL
             if 'fbcdn.net' in image_url or 'facebook.com' in image_url:
-                print(f"📥 Downloading Facebook image...")
-                
+                logger.info("[MH] Downloading Facebook image...")
+
                 # Download the image
                 response = requests.get(image_url, timeout=30)
                 if response.status_code != 200:
-                    print(f"❌ Failed to download image: {response.status_code}")
+                    logger.error(f"[MH] Failed to download image: {response.status_code}")
                     return None
                 
                 # Detect content type
@@ -679,7 +668,7 @@ General greetings or casual chat are NOT important."""
                 
                 # Convert to base64
                 image_base64 = base64.b64encode(response.content).decode('utf-8')
-                print(f"✅ Image downloaded and converted to base64 ({len(response.content)} bytes)")
+                logger.info(f"[MH] Image downloaded and converted to base64 ({len(response.content)} bytes)")
                 
                 return {
                     "url": f"data:{media_type};base64,{image_base64}",
@@ -690,7 +679,7 @@ General greetings or casual chat are NOT important."""
                 return {"url": image_url, "detail": "high"}
                 
         except Exception as e:
-            print(f"❌ Error preparing image: {e}")
+            logger.error(f"[MH] Error preparing image: {e}")
             return None
     
     def _transcribe_voice_message(self, audio_url: str) -> Optional[str]:
@@ -699,14 +688,14 @@ General greetings or casual chat are NOT important."""
         Supports: mp3, mp4, mpeg, mpga, m4a, wav, webm, ogg
         """
         try:
-            print(f"🎤 Transcribing voice message...")
-            
+            logger.info("[MH] Transcribing voice message...")
+
             # Download audio from Facebook
-            print(f"📥 Downloading audio from: {audio_url[:50]}...")
+            logger.info(f"[MH] Downloading audio from: {audio_url[:50]}...")
             response = requests.get(audio_url, timeout=30)
-            
+
             if response.status_code != 200:
-                print(f"❌ Failed to download audio: {response.status_code}")
+                logger.error(f"[MH] Failed to download audio: {response.status_code}")
                 return None
             
             # Determine file extension from content-type
@@ -730,7 +719,7 @@ General greetings or casual chat are NOT important."""
                 temp_file.write(response.content)
                 temp_path = temp_file.name
             
-            print(f"✅ Audio saved temporarily ({len(response.content)} bytes)")
+            logger.info(f"[MH] Audio saved temporarily ({len(response.content)} bytes)")
             
             try:
                 # Transcribe using OpenAI Whisper
@@ -747,7 +736,7 @@ General greetings or casual chat are NOT important."""
                     )
                 
                 transcribed_text = transcript.text
-                print(f"✅ Transcription successful: {transcribed_text[:100]}...")
+                logger.info(f"[MH] Transcription successful: {transcribed_text[:100]}...")
                 
                 return transcribed_text
                 
@@ -757,9 +746,7 @@ General greetings or casual chat are NOT important."""
                     os.remove(temp_path)
                     
         except Exception as e:
-            print(f"❌ Voice transcription error: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error(f"[MH] Voice transcription error: {e}", exc_info=True)
             return None
     
     def _generate_voice_response(self, text: str, voice: str = "nova") -> Optional[bytes]:
@@ -768,8 +755,8 @@ General greetings or casual chat are NOT important."""
         Voices: alloy, echo, fable, onyx, nova, shimmer
         """
         try:
-            print(f"🔊 Generating voice response...")
-            
+            logger.info("[MH] Generating voice response...")
+
             import openai
             openai.api_key = self.connection.ai_config.openai_api_key
             
@@ -780,12 +767,12 @@ General greetings or casual chat are NOT important."""
             )
             
             audio_bytes = response.content
-            print(f"✅ Voice generated ({len(audio_bytes)} bytes)")
-            
+            logger.info(f"[MH] Voice generated ({len(audio_bytes)} bytes)")
+
             return audio_bytes
-            
+
         except Exception as e:
-            print(f"❌ Voice generation error: {e}")
+            logger.error(f"[MH] Voice generation error: {e}")
             return None
     
     def _send_voice_message(self, recipient_id: str, audio_bytes: bytes) -> bool:
@@ -822,10 +809,10 @@ General greetings or casual chat are NOT important."""
                     response = requests.post(url, data=data, files=files, params=params, timeout=30)
                 
                 if response.status_code == 200:
-                    print(f"✅ Voice message sent!")
+                    logger.info("[MH] Voice message sent!")
                     return True
                 else:
-                    print(f"❌ Failed to send voice: {response.text}")
+                    logger.error(f"[MH] Failed to send voice: {response.text}")
                     return False
                     
             finally:
@@ -833,7 +820,7 @@ General greetings or casual chat are NOT important."""
                     os.remove(temp_path)
                     
         except Exception as e:
-            print(f"❌ Send voice error: {e}")
+            logger.error(f"[MH] Send voice error: {e}")
             return False
     
     def _generate_image_response_with_context(
@@ -899,7 +886,7 @@ Provide helpful response."""
                 'tokens': response.usage.total_tokens
             }
         except Exception as e:
-            print(f"❌ Image response error: {e}")
+            logger.error(f"[MH] Image response error: {e}")
             return {'content': "I see your image. How can I help?", 'model': 'error', 'tokens': 0}
     
     def _process_attachments(self, attachments: List) -> Dict:

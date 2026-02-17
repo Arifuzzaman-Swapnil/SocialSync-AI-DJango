@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve
 from .views import ReactAppView
 
 # API and Admin URLs - these take priority
@@ -29,13 +30,15 @@ urlpatterns = [
     path('business-profile/', include('brands.urls')),
 ]
 
-# Media files in DEBUG mode (static files handled by django.contrib.staticfiles)
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Static & Media files - serve via Django (cPanel Passenger sends ALL requests to Django)
+# WhiteNoise middleware handles /static/ at middleware level (before URL routing)
+# These explicit patterns are a fallback safety net
+urlpatterns += [
+    re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
 
 # React Frontend - catch-all route (must be LAST)
-# This serves the React app for routes not handled by Django templates
-# Note: Static files are handled by django.contrib.staticfiles before URL routing
 urlpatterns += [
     re_path(r'^.*$', ReactAppView.as_view(), name='react-app'),
 ]

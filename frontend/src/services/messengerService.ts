@@ -34,6 +34,7 @@ interface MessengerDashboardStats {
   active_conversations: number;
   total_messages: number;
   unread_notifications: number;
+  total_tokens: number;
   recent_conversations: Conversation[];
 }
 

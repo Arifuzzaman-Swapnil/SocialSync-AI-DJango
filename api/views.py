@@ -1553,10 +1553,13 @@ class CrawlWebsiteView(APIView):
             from brands.services.brand_dna_service import BrandDNAService
 
             # Auto-create or get Brand for this user
-            workspace, _ = Workspace.objects.get_or_create(
-                owner=request.user,
-                defaults={'name': f"{request.user.username}'s Workspace"}
-            )
+            # Use filter().first() because a user can have multiple workspaces (ForeignKey, not OneToOne)
+            workspace = Workspace.objects.filter(owner=request.user).first()
+            if not workspace:
+                workspace = Workspace.objects.create(
+                    owner=request.user,
+                    name=f"{request.user.username}'s Workspace"
+                )
             brand, _ = Brand.objects.get_or_create(
                 user=request.user,
                 is_primary=True,
@@ -1824,6 +1827,8 @@ class MessengerDashboardView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from django.db.models import Sum
+
         connections = MessengerConnection.objects.filter(user=request.user)
         connection_ids = connections.values_list('id', flat=True)
 
@@ -1839,6 +1844,12 @@ class MessengerDashboardView(APIView):
             is_read=False
         ).count()
 
+        # Total OpenAI token usage (from bot messages)
+        total_tokens = Message.objects.filter(
+            conversation__connection_id__in=connection_ids,
+            sender='bot'
+        ).aggregate(Sum('tokens_used'))['tokens_used__sum'] or 0
+
         # Recent activity
         recent_conversations = Conversation.objects.filter(
             connection_id__in=connection_ids
@@ -1851,6 +1862,7 @@ class MessengerDashboardView(APIView):
             'active_conversations': active_conversations,
             'total_messages': total_messages,
             'unread_notifications': unread_notifications,
+            'total_tokens': total_tokens,
             'recent_conversations': ConversationListSerializer(recent_conversations, many=True).data,
         })
 

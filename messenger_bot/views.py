@@ -11,8 +11,12 @@ from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
+from django.conf import settings as django_settings
 import json
 import logging
+import os
+import traceback as tb
+from datetime import datetime
 
 from .models import (
     MessengerConnection, 
@@ -31,6 +35,17 @@ from .forms import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ============ WEBHOOK DEBUG LOGGING ============
+
+def _log_webhook(message):
+    """Write webhook debug info to a log file for cPanel debugging"""
+    try:
+        log_path = os.path.join(django_settings.BASE_DIR, 'webhook_debug.log')
+        with open(log_path, 'a') as f:
+            f.write(f"[{datetime.now()}] {message}\n")
+    except Exception:
+        pass
 
 
 @login_required
@@ -368,107 +383,81 @@ def webhook(request, page_id):
         mode = request.GET.get('hub.mode')
         token = request.GET.get('hub.verify_token')
         challenge = request.GET.get('hub.challenge')
-        
+
         if mode == 'subscribe':
             try:
                 connection = MessengerConnection.objects.get(page_id=page_id)
-                
+
                 if token == connection.verify_token:
                     connection.is_webhook_verified = True
                     connection.save()
-                    print(f"✅ Webhook verified for page {page_id}")
+                    logger.info(f"Webhook verified for page {page_id}")
                     return HttpResponse(challenge, content_type='text/plain')
                 else:
                     return JsonResponse({'error': 'Invalid verify token'}, status=403)
-            
+
             except MessengerConnection.DoesNotExist:
                 return JsonResponse({'error': 'Connection not found'}, status=404)
-        
+
         return JsonResponse({'error': 'Invalid request'}, status=400)
-    
+
     elif request.method == 'POST':
         try:
             data = json.loads(request.body)
-            print(f"\n{'='*50}")
-            print(f"📩 WEBHOOK RECEIVED for page: {page_id}")
-            print(f"📦 Data: {json.dumps(data, indent=2)[:500]}")
-            
+            _log_webhook("=" * 50)
+            _log_webhook(f"WEBHOOK POST received for page: {page_id}")
+            _log_webhook(f"Data: {json.dumps(data, indent=2)[:500]}")
+
             try:
                 connection = MessengerConnection.objects.get(page_id=page_id)
-                print(f"✅ Connection found: {connection.page_name}")
+                _log_webhook(f"Connection found: {connection.page_name} (auto_reply={connection.auto_reply_enabled})")
             except MessengerConnection.DoesNotExist:
-                print(f"❌ Connection NOT found for page_id: {page_id}")
-                return JsonResponse({'error': 'Connection not found'}, status=404)
-            
+                _log_webhook(f"ERROR: Connection NOT found for page_id: {page_id}")
+                # Still return 200 to Facebook so it doesn't disable the webhook
+                return JsonResponse({'status': 'received'}, status=200)
+
             if 'entry' in data:
-                print(f"📋 Processing {len(data['entry'])} entries...")
-                
-                from .services.message_handler import MessageHandler
-                
+                _log_webhook(f"Processing {len(data['entry'])} entries...")
+
+                try:
+                    from .services.message_handler import MessageHandler
+                    _log_webhook("MessageHandler imported successfully")
+                except Exception as e:
+                    _log_webhook(f"ERROR importing MessageHandler: {e}\n{tb.format_exc()}")
+                    return JsonResponse({'status': 'received'}, status=200)
+
                 try:
                     message_handler = MessageHandler(connection)
-                    print(f"✅ MessageHandler initialized")
+                    _log_webhook("MessageHandler initialized OK")
                 except Exception as e:
-                    print(f"❌ MessageHandler init ERROR: {e}")
-                    import traceback
-                    traceback.print_exc()
-                    return JsonResponse({'error': str(e)}, status=500)
-                
+                    _log_webhook(f"ERROR initializing MessageHandler: {e}\n{tb.format_exc()}")
+                    return JsonResponse({'status': 'received'}, status=200)
+
                 for entry in data['entry']:
                     if 'messaging' in entry:
                         for messaging_event in entry['messaging']:
                             sender_id = messaging_event.get('sender', {}).get('id')
-                            
-                            # Skip delivery receipts
-                            if 'delivery' in messaging_event:
-                                print(f"⏩ Skipping delivery receipt")
+
+                            # Skip non-message events
+                            if 'delivery' in messaging_event or 'read' in messaging_event:
                                 continue
-                            
-                            # Skip read receipts
-                            if 'read' in messaging_event:
-                                print(f"⏩ Skipping read receipt")
+                            if 'postback' in messaging_event or 'referral' in messaging_event:
                                 continue
-                            
-                            # Skip postbacks (button clicks)
-                            if 'postback' in messaging_event:
-                                print(f"⏩ Skipping postback")
-                                continue
-                            
-                            # Skip referrals
-                            if 'referral' in messaging_event:
-                                print(f"⏩ Skipping referral")
-                                continue
-                            
-                            print(f"👤 Sender ID: {sender_id}")
-                            
+
                             if 'message' in messaging_event:
                                 message = messaging_event['message']
-                                
-                                # Skip echo messages (sent by page)
+
                                 if message.get('is_echo'):
-                                    print(f"⏩ Skipping echo message")
                                     continue
-                                
+
                                 message_text = message.get('text', '')
                                 message_id = message.get('mid')
                                 attachments = message.get('attachments', [])
-                                
-                                # Check for duplicate message (based on mid)
-                                from .models import Message
-                                if message_id:
-                                    # Check if we already processed this message
-                                    existing = Message.objects.filter(
-                                        conversation__connection=connection,
-                                        text__contains=message_id[:20] if message_id else ''
-                                    ).exists()
-                                    # Better: store mid in a field, but for now just process
-                                
-                                print(f"💬 Message: {message_text[:100] if message_text else '[No text]'}")
-                                print(f"📎 Attachments: {len(attachments)}")
-                                
+
+                                _log_webhook(f"Message from {sender_id}: '{message_text[:100]}' (attachments: {len(attachments)})")
+
                                 if sender_id:
                                     try:
-                                        print(f"🔄 Processing message...")
                                         result = message_handler.process_message(
                                             sender_id=sender_id,
                                             message_data={
@@ -477,18 +466,18 @@ def webhook(request, page_id):
                                                 'mid': message_id
                                             }
                                         )
-                                        print(f"✅ Message processed: {result}")
+                                        _log_webhook(f"process_message result: {result}")
                                     except Exception as e:
-                                        print(f"❌ process_message ERROR: {e}")
-                                        import traceback
-                                        traceback.print_exc()
-            
-            print(f"{'='*50}\n")
+                                        _log_webhook(f"ERROR in process_message: {e}\n{tb.format_exc()}")
+
+            _log_webhook("Webhook handled OK, returning 200")
             return JsonResponse({'status': 'received'}, status=200)
-        
+
         except Exception as e:
+            _log_webhook(f"FATAL WEBHOOK ERROR: {e}\n{tb.format_exc()}")
             logger.error(f"Webhook error: {e}", exc_info=True)
-            return JsonResponse({'error': str(e)}, status=500)
+            # ALWAYS return 200 to Facebook to prevent webhook deactivation
+            return JsonResponse({'status': 'received'}, status=200)
 
 
 # ============ OTHER VIEWS ============

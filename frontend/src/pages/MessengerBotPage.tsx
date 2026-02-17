@@ -612,11 +612,12 @@ export function MessengerBotPage() {
   const renderDashboard = () => (
     <div className="space-y-6">
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
           { label: 'Active Connections', value: stats?.active_connections || '0', icon: <LinkIcon className="w-6 h-6" />, color: 'from-blue-500 to-cyan-500' },
           { label: 'Total Conversations', value: stats?.total_conversations || '0', icon: <ChatBubbleLeftRightIcon className="w-6 h-6" />, color: 'from-purple-500 to-pink-500' },
           { label: 'Messages Sent', value: stats?.total_messages || '0', icon: <DocumentTextIcon className="w-6 h-6" />, color: 'from-green-500 to-emerald-500' },
+          { label: 'Tokens Used', value: stats?.total_tokens?.toLocaleString() || '0', icon: <CpuChipIcon className="w-6 h-6" />, color: 'from-amber-500 to-yellow-500' },
           { label: 'Unread Notifications', value: stats?.unread_notifications || '0', icon: <BellIcon className="w-6 h-6" />, color: 'from-orange-500 to-red-500' },
         ].map((stat, i) => (
           <motion.div
