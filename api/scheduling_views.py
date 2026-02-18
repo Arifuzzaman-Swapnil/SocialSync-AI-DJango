@@ -7,6 +7,7 @@ from datetime import timedelta
 
 from posts.models import Post, PostCaption, ScheduledPostPlatform
 from brands.models import Brand, BestTimeSuggestion
+from accounts.services.notification_service import notify_post_scheduled
 from .serializers import (
     ScheduledPostPlatformSerializer, SchedulePostRequestSerializer,
     ConflictCheckRequestSerializer, BestTimeSuggestionSerializer,
@@ -63,6 +64,8 @@ class SchedulePostView(APIView):
         post.status = 'scheduled'
         post.scheduled_time = min(s.scheduled_at for s in created) if created else post.scheduled_time
         post.save(update_fields=['status', 'scheduled_time'])
+
+        notify_post_scheduled(post, request.user)
 
         result = ScheduledPostPlatformSerializer(created, many=True)
         return Response(result.data, status=status.HTTP_201_CREATED)

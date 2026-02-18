@@ -11,6 +11,7 @@ from rest_framework import viewsets
 from posts.models import Post, PostCaption
 from accounts.api_keys import get_openai_key
 from ai_caption.services.adaptation_service import adapt_caption
+from accounts.services.notification_service import notify_captions_ready
 from .serializers import (
     PostCaptionSerializer, GenerateCaptionsRequestSerializer,
     AdaptCaptionRequestSerializer,
@@ -137,6 +138,7 @@ Return JSON:
                 captions_created.append(caption)
 
         post.update_checklist()
+        notify_captions_ready(post)
         result = PostCaptionSerializer(captions_created, many=True)
         return Response(result.data, status=status.HTTP_201_CREATED)
 

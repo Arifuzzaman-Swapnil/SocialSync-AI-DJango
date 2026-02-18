@@ -75,6 +75,75 @@ export const analyticsService = {
 
     return { summary, platforms, trends, topPosts };
   },
+
+  // ===================== V1.2.1 Methods =====================
+
+  // Post quick stats (24h/48h snapshots)
+  async getPostStats(postId: number, snapshot?: string) {
+    const params = snapshot ? { snapshot } : {};
+    const res = await api.get(`/posts/${postId}/stats/`, { params });
+    return res.data;
+  },
+
+  // Post comments
+  async getPostComments(postId: number, sentiment?: string) {
+    const params = sentiment ? { sentiment } : {};
+    const res = await api.get(`/posts/${postId}/comments/`, { params });
+    return res.data;
+  },
+
+  // Reply to comment (human)
+  async replyToComment(commentId: number, replyBody: string) {
+    const res = await api.post(`/comments/${commentId}/reply/`, {
+      reply_body: replyBody,
+      reply_type: 'human',
+    });
+    return res.data;
+  },
+
+  // AI reply to comment
+  async aiReplyToComment(commentId: number) {
+    const res = await api.post(`/comments/${commentId}/ai-reply/`);
+    return res.data;
+  },
+
+  // Weekly report
+  async getWeeklyReport(brandId: number) {
+    const res = await api.get(`/brands/${brandId}/weekly-report/`);
+    return res.data;
+  },
+
+  // Analytics dashboard (V1.2.1)
+  async getBrandDashboard(brandId: number, period?: string) {
+    const params = period ? { period } : {};
+    const res = await api.get(`/brands/${brandId}/analytics/dashboard/`, { params });
+    return res.data;
+  },
+
+  // A/B test results
+  async getABResults(brandId: number) {
+    const res = await api.get(`/brands/${brandId}/ab-results/`);
+    return res.data;
+  },
+
+  // Learning signals
+  async getLearningSignals(brandId: number) {
+    const res = await api.get(`/brands/${brandId}/learning-signals/`);
+    return res.data;
+  },
+
+  // Winner posts
+  async getWinners(brandId: number, limit?: number) {
+    const params = limit ? { limit } : {};
+    const res = await api.get(`/brands/${brandId}/winners/`, { params });
+    return res.data;
+  },
+
+  // Repurpose post
+  async repurposePost(postId: number, repurposeFormat: string) {
+    const res = await api.post(`/posts/${postId}/repurpose/`, { repurpose_format: repurposeFormat });
+    return res.data;
+  },
 };
 
 export default analyticsService;

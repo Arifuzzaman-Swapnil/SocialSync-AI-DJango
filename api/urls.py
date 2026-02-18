@@ -11,6 +11,7 @@ from . import scheduling_views
 from . import analytics_views as v2_analytics_views
 from . import notification_views
 from . import creative_views
+from . import rbac_views
 
 # Create router for viewsets
 router = DefaultRouter()
@@ -233,6 +234,12 @@ urlpatterns = [
     path('notifications/mark-all-read/', notification_views.MarkAllNotificationsReadView.as_view(), name='api-mark-all-read'),
     path('notifications/<int:notification_id>/read/', notification_views.MarkNotificationReadView.as_view(), name='api-mark-notification-read'),
     path('notifications/<int:notification_id>/', notification_views.DeleteNotificationView.as_view(), name='api-delete-notification'),
+
+    # RBAC (V1.2.1)
+    path('workspaces/<int:workspace_id>/roles/', rbac_views.WorkspaceRolesView.as_view(), name='api-workspace-roles'),
+    path('workspaces/<int:workspace_id>/roles/assign/', rbac_views.AssignRoleView.as_view(), name='api-assign-role'),
+    path('workspaces/<int:workspace_id>/roles/remove/', rbac_views.RemoveRoleView.as_view(), name='api-remove-role'),
+    path('my-roles/', rbac_views.MyRolesView.as_view(), name='api-my-roles'),
 
     # Admin Panel API
     path('admin/dashboard/', admin_views.AdminDashboardView.as_view(), name='api-admin-dashboard'),

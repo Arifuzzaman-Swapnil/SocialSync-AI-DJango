@@ -32,6 +32,20 @@ class SubmitForApprovalView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Server-side checklist validation
+        post.update_checklist()
+        if not post.is_checklist_complete:
+            checklist = post.checklist_status or {}
+            missing = [k for k, v in checklist.items() if not v]
+            return Response(
+                {
+                    'error': 'Checklist incomplete. Complete all required items before submitting.',
+                    'missing_items': missing,
+                    'checklist': checklist,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = SubmitForApprovalSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

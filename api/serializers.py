@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from accounts.models import UserProfile, SystemNotification
+from accounts.models import UserProfile, SystemNotification, UserRole
 from posts.models import (
     Post, PostCaption, PostHashtag, HashtagGroup,
     BannedHashtag, ScheduledPostPlatform
@@ -1487,3 +1487,30 @@ class CalendarEventSerializer(serializers.Serializer):
     color = serializers.CharField(required=False)
     pillar_name = serializers.CharField(required=False, allow_blank=True)
     pillar_color = serializers.CharField(required=False, allow_blank=True)
+
+
+# ===================== RBAC SERIALIZERS =====================
+
+class UserRoleSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    workspace_name = serializers.CharField(source='workspace.name', read_only=True)
+    granted_by_username = serializers.CharField(source='granted_by.username', read_only=True, default='')
+
+    class Meta:
+        model = UserRole
+        fields = [
+            'id', 'user', 'username', 'workspace', 'workspace_name',
+            'role', 'granted_by', 'granted_by_username',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'granted_by', 'created_at', 'updated_at']
+
+
+class AssignRoleSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    role = serializers.ChoiceField(choices=['admin', 'creator', 'approver', 'publisher', 'viewer'])
+
+
+class RemoveRoleSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    role = serializers.ChoiceField(choices=['admin', 'creator', 'approver', 'publisher', 'viewer'])

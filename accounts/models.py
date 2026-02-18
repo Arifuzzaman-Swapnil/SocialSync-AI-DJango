@@ -380,6 +380,74 @@ class SystemNotification(models.Model):
         return f"{self.event_type}: {self.title} → {self.user.username}"
 
 
+# ============================================================
+# V1.2.1 NEW MODEL - Role-Based Access Control (RBAC)
+# ============================================================
+
+class UserRole(models.Model):
+    """Workspace-level role assignment for users (RBAC)"""
+
+    ROLE_CHOICES = [
+        ('owner', 'Owner'),
+        ('admin', 'Admin'),
+        ('creator', 'Creator'),
+        ('approver', 'Approver'),
+        ('publisher', 'Publisher'),
+        ('viewer', 'Viewer'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workspace_roles')
+    workspace = models.ForeignKey(
+        'brands.Workspace', on_delete=models.CASCADE, related_name='user_roles'
+    )
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    granted_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='roles_granted'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'user_roles'
+        verbose_name = 'User Role'
+        verbose_name_plural = 'User Roles'
+        unique_together = [('user', 'workspace', 'role')]
+        indexes = [
+            models.Index(fields=['user', 'workspace']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.role} @ {self.workspace.name}"
+
+    @staticmethod
+    def get_user_roles(user, workspace):
+        """Get all roles for a user in a workspace."""
+        return list(
+            UserRole.objects.filter(
+                user=user, workspace=workspace
+            ).values_list('role', flat=True)
+        )
+
+    @staticmethod
+    def has_role(user, workspace, role):
+        """Check if user has a specific role in a workspace."""
+        # Workspace owner always has all permissions
+        if workspace.owner == user:
+            return True
+        return UserRole.objects.filter(
+            user=user, workspace=workspace, role=role
+        ).exists()
+
+    @staticmethod
+    def has_any_role(user, workspace, roles):
+        """Check if user has any of the given roles."""
+        if workspace.owner == user:
+            return True
+        return UserRole.objects.filter(
+            user=user, workspace=workspace, role__in=roles
+        ).exists()
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

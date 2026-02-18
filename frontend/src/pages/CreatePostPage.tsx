@@ -31,6 +31,8 @@ import { Button, Card, Input, Textarea, Modal, PlatformIcon, platformColors, pla
 import { CaptionEditor } from '../components/CaptionEditor';
 import { HashtagManager } from '../components/HashtagManager';
 import { DraftChecklistWidget } from '../components/DraftChecklistWidget';
+import { PlatformPreviewPanel } from '../components/PlatformPreviewPanel';
+import { CreativeGenerator } from '../components/CreativeGenerator';
 import { usePostStore } from '../store';
 import type { PlatformType } from '../types';
 import { authFetch } from '../services/api';
@@ -89,7 +91,7 @@ export function CreatePostPage() {
   const [dragActive, setDragActive] = useState(false);
   const [copied, setCopied] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [contentTab, setContentTab] = useState<'captions' | 'hashtags' | 'creative'>('captions');
+  const [contentTab, setContentTab] = useState<'captions' | 'hashtags' | 'creative' | 'preview'>('captions');
   const [checklistKey, setChecklistKey] = useState(0);
 
   const {
@@ -627,7 +629,7 @@ export function CreatePostPage() {
               <Card>
                 {/* Tab Bar */}
                 <div className="flex border-b border-white/10 mb-4">
-                  {(['captions', 'hashtags', 'creative'] as const).map((tab) => (
+                  {(['captions', 'hashtags', 'creative', 'preview'] as const).map((tab) => (
                     <button
                       key={tab}
                       type="button"
@@ -638,7 +640,7 @@ export function CreatePostPage() {
                           : 'border-transparent text-text-secondary hover:text-text-primary'
                       }`}
                     >
-                      {tab === 'captions' ? 'AI Captions' : tab === 'hashtags' ? 'Hashtags' : 'Creative'}
+                      {tab === 'captions' ? 'AI Captions' : tab === 'hashtags' ? 'Hashtags' : tab === 'creative' ? 'Creative' : 'Preview'}
                     </button>
                   ))}
                 </div>
@@ -657,9 +659,17 @@ export function CreatePostPage() {
                   />
                 )}
                 {contentTab === 'creative' && (
-                  <div className="text-center py-8 text-text-secondary text-sm">
-                    Upload media above, then use AI Image/Video tools to generate creative assets.
-                  </div>
+                  <CreativeGenerator
+                    postId={Number(id)}
+                    onAssetGenerated={() => setChecklistKey((k) => k + 1)}
+                  />
+                )}
+                {contentTab === 'preview' && (
+                  <PlatformPreviewPanel
+                    caption={watchCaption}
+                    mediaUrl={existingMedia[0] || mediaPreviews[0]}
+                    platforms={watchPlatforms}
+                  />
                 )}
               </Card>
             )}

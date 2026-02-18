@@ -149,6 +149,126 @@ def notify_approval_reminder(post, approver, hours_pending):
     )
 
 
+def notify_post_scheduled(post, scheduled_by):
+    """Notify creator when post is scheduled."""
+    notify(
+        user=post.user,
+        event_type='post_scheduled',
+        title='Post scheduled',
+        message=f'Your post has been scheduled by {scheduled_by.username}.',
+        data_json={'post_id': post.id},
+    )
+
+
+def notify_captions_ready(post):
+    """Notify creator when captions are generated."""
+    notify(
+        user=post.user,
+        event_type='captions_ready',
+        title='Captions generated',
+        message=f'Caption variants are ready for your post.',
+        data_json={'post_id': post.id},
+    )
+
+
+def notify_images_ready(post):
+    """Notify creator when images are generated."""
+    notify(
+        user=post.user,
+        event_type='images_ready',
+        title='Images generated',
+        message=f'Creative assets are ready for your post.',
+        data_json={'post_id': post.id},
+    )
+
+
+def notify_video_rendering(post):
+    """Notify creator when video rendering starts."""
+    notify(
+        user=post.user,
+        event_type='video_rendering',
+        title='Video rendering started',
+        message='Your video is being rendered. We\'ll notify you when it\'s ready.',
+        data_json={'post_id': post.id},
+    )
+
+
+def notify_video_ready(post):
+    """Notify creator when video is ready."""
+    notify(
+        user=post.user,
+        event_type='video_ready',
+        title='Video ready',
+        message='Your video has been rendered and is ready to use.',
+        data_json={'post_id': post.id},
+    )
+
+
+def notify_batch_complete(user, batch_summary):
+    """Notify creator when a batch operation completes."""
+    notify(
+        user=user,
+        event_type='batch_complete',
+        title='Batch operation complete',
+        message=batch_summary,
+    )
+
+
+def notify_winner_detected(post, brand):
+    """Notify when a top-performing post is detected."""
+    # Notify creator
+    notify(
+        user=post.user,
+        event_type='winner_detected',
+        title='Winner post detected!',
+        message='Your post is in the top 20% by engagement. Consider repurposing it!',
+        data_json={'post_id': post.id, 'brand_id': brand.id},
+    )
+    # Also notify workspace owner if different
+    if brand.workspace and brand.workspace.owner != post.user:
+        notify(
+            user=brand.workspace.owner,
+            event_type='winner_detected',
+            title='Winner post detected!',
+            message=f'A post by {post.user.username} is performing exceptionally well.',
+            data_json={'post_id': post.id, 'brand_id': brand.id},
+        )
+
+
+def notify_repurpose_suggestion(post):
+    """Suggest repurposing a well-performing post."""
+    notify(
+        user=post.user,
+        event_type='repurpose_suggestion',
+        title='Repurpose this winner?',
+        message='This post performed well. Consider converting it to a carousel, thread, or reel.',
+        data_json={'post_id': post.id},
+    )
+
+
+def notify_token_expiring(user, platform, days_remaining):
+    """Notify when a platform OAuth token is about to expire."""
+    notify(
+        user=user,
+        event_type='token_expiring',
+        title=f'{platform} token expiring soon',
+        message=f'Your {platform} connection will expire in {days_remaining} days. Please reconnect.',
+        data_json={'platform': platform, 'days_remaining': days_remaining},
+        channel='both',
+    )
+
+
+def notify_daily_limit_warning(user, usage_percent):
+    """Notify when daily generation limit approaches 80%."""
+    notify(
+        user=user,
+        event_type='daily_limit_warning',
+        title='Daily generation limit approaching',
+        message=f'You\'ve used {usage_percent}% of your daily generation limit.',
+        data_json={'usage_percent': usage_percent},
+    )
+
+
 def _send_email_notification(user, title, message):
     """Stub: Send email notification. Implement with Django email or service."""
     logger.info(f"Email notification stub: {title} to {user.email}")
