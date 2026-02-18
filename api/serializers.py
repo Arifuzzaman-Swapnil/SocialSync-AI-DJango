@@ -1,19 +1,26 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from accounts.models import UserProfile
-from posts.models import Post
+from accounts.models import UserProfile, SystemNotification
+from posts.models import (
+    Post, PostCaption, PostHashtag, HashtagGroup,
+    BannedHashtag, ScheduledPostPlatform
+)
 from platforms.models import SocialAccount
 from ai_caption.models import CaptionGeneration, CaptionTemplate, SavedCaption, UserAPISettings
-from ai_image.models import ImageGeneration, SavedImage, UserLogo, PromptTemplate, UserImageSettings
+from ai_image.models import (
+    ImageGeneration, SavedImage, UserLogo, PromptTemplate, UserImageSettings,
+    AssetPlatformVariant, CreativeVersionHistory
+)
 from ai_video.models import VideoGeneration, SavedVideo, VideoLogo, VideoPromptTemplate, UserVideoSettings
 from ai_voice.models import VoiceGeneration, UserVoiceSettings
 from messenger_bot.models import MessengerConnection, AIConfiguration, PDFKnowledgeBase, Conversation, Message, Notification, CustomPrompt, ECommerceSettings, Product
-from analytics.models import Analytics
+from analytics.models import Analytics, PostAnalytics, PostComment, LearningSignal, RepurposedContent
 from onboarding.models import OnboardingProgress
 from brands.models import (
     Workspace, Brand, BrandAsset, LaunchPlan,
     ContentIdea, ContentApproval, WeeklyReport, GenerationUsage,
-    BrandDNAChunk
+    BrandDNAChunk, ContentPillar, CompetitorProfile, CompetitorInsight,
+    BrandTemplate, TrendingCache, ApprovalLog, BestTimeSuggestion
 )
 import json
 
@@ -1062,3 +1069,421 @@ class BrandDNAStatusSerializer(serializers.Serializer):
     brand_dna_generated_at = serializers.DateTimeField(allow_null=True)
     brand_dna_source = serializers.CharField(allow_blank=True)
     total_chunks = serializers.IntegerField()
+
+
+# ===================== V1.2.1 SERIALIZERS =====================
+
+# --- Strategy & Pillars ---
+
+class ContentPillarSerializer(serializers.ModelSerializer):
+    actual_percentage = serializers.SerializerMethodField()
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), required=False, allow_null=True)
+
+    class Meta:
+        model = ContentPillar
+        fields = [
+            'id', 'brand', 'name', 'description', 'target_percentage',
+            'color_code', 'is_active', 'actual_percentage',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_actual_percentage(self, obj):
+        total = obj.brand.posts.count()
+        if total == 0:
+            return 0
+        pillar_count = obj.posts.count()
+        return round((pillar_count / total) * 100, 1)
+
+
+class CompetitorProfileSerializer(serializers.ModelSerializer):
+    insights_count = serializers.SerializerMethodField()
+    brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), required=False, allow_null=True)
+
+    class Meta:
+        model = CompetitorProfile
+        fields = [
+            'id', 'brand', 'platform', 'handle_or_url',
+            'last_crawled_at', 'insights_count', 'created_at',
+        ]
+        read_only_fields = ['id', 'last_crawled_at', 'created_at']
+
+    def get_insights_count(self, obj):
+        return obj.insights.count()
+
+
+class CompetitorInsightSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompetitorInsight
+        fields = [
+            'id', 'competitor_profile', 'hook_text', 'angle',
+            'format_type', 'engagement_score', 'extracted_at',
+        ]
+        read_only_fields = ['id', 'extracted_at']
+
+
+class BrandTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BrandTemplate
+        fields = [
+            'id', 'brand', 'name', 'template_file', 'logo_position',
+            'font_family', 'primary_color', 'secondary_color',
+            'is_active', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class TrendingCacheSerializer(serializers.ModelSerializer):
+    is_expired = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = TrendingCache
+        fields = [
+            'id', 'platform', 'topic', 'volume_score',
+            'region', 'is_expired', 'fetched_at', 'expires_at',
+        ]
+        read_only_fields = ['id', 'fetched_at']
+
+
+# --- Post Captions ---
+
+class PostCaptionSerializer(serializers.ModelSerializer):
+    char_status = serializers.CharField(read_only=True)
+    is_within_limit = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = PostCaption
+        fields = [
+            'id', 'post', 'platform', 'variant_number', 'body',
+            'cta_text', 'tone', 'char_count', 'is_selected',
+            'is_ab_test', 'ab_label', 'char_status', 'is_within_limit',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'char_count', 'created_at', 'updated_at']
+
+
+class GenerateCaptionsRequestSerializer(serializers.Serializer):
+    topic = serializers.CharField(required=False, allow_blank=True)
+    tone = serializers.CharField(default='professional')
+    platforms = serializers.ListField(
+        child=serializers.ChoiceField(choices=['twitter', 'linkedin', 'facebook', 'instagram', 'all']),
+        default=['all']
+    )
+    count = serializers.IntegerField(default=3, min_value=1, max_value=10)
+    include_cta = serializers.BooleanField(default=False)
+    custom_instructions = serializers.CharField(required=False, allow_blank=True)
+
+
+class AdaptCaptionRequestSerializer(serializers.Serializer):
+    caption_id = serializers.IntegerField()
+    target_platforms = serializers.ListField(
+        child=serializers.ChoiceField(choices=['twitter', 'linkedin', 'facebook', 'instagram'])
+    )
+
+
+# --- Hashtags ---
+
+class PostHashtagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostHashtag
+        fields = [
+            'id', 'post', 'platform', 'tag', 'tier',
+            'estimated_volume', 'is_selected', 'placement', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class HashtagGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HashtagGroup
+        fields = ['id', 'brand', 'name', 'tags', 'created_by', 'created_at']
+        read_only_fields = ['id', 'created_by', 'created_at']
+
+
+class BannedHashtagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BannedHashtag
+        fields = ['id', 'brand', 'tag', 'reason', 'added_by', 'created_at']
+        read_only_fields = ['id', 'added_by', 'created_at']
+
+
+class GenerateHashtagsRequestSerializer(serializers.Serializer):
+    platform = serializers.ChoiceField(choices=['twitter', 'linkedin', 'facebook', 'instagram'])
+    caption_text = serializers.CharField(required=False, allow_blank=True)
+    topic = serializers.CharField(required=False, allow_blank=True)
+    count = serializers.IntegerField(default=20, min_value=1, max_value=30)
+
+
+# --- Creative Assets ---
+
+class AssetPlatformVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AssetPlatformVariant
+        fields = [
+            'id', 'asset', 'platform', 'format_label',
+            'file_url', 'dimensions', 'created_at',
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class CreativeVersionHistorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CreativeVersionHistory
+        fields = ['id', 'asset', 'version', 'file_url', 'generation_params', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+# --- Approval ---
+
+class ApprovalLogSerializer(serializers.ModelSerializer):
+    acted_by_username = serializers.CharField(source='acted_by.username', read_only=True)
+
+    class Meta:
+        model = ApprovalLog
+        fields = [
+            'id', 'post', 'action', 'acted_by', 'acted_by_username',
+            'comment', 'rejection_reason', 'created_at',
+        ]
+        read_only_fields = ['id', 'acted_by', 'created_at']
+
+
+class SubmitForApprovalSerializer(serializers.Serializer):
+    comment = serializers.CharField(required=False, allow_blank=True)
+
+
+class ApprovePostSerializer(serializers.Serializer):
+    comment = serializers.CharField(required=False, allow_blank=True)
+
+
+class RequestChangesSerializer(serializers.Serializer):
+    comment = serializers.CharField()
+
+
+class RejectPostSerializer(serializers.Serializer):
+    rejection_reason = serializers.ChoiceField(
+        choices=['off_brand', 'compliance_issue', 'quality', 'factual_error', 'timing', 'other']
+    )
+    comment = serializers.CharField(required=False, allow_blank=True)
+
+
+class BestTimeSuggestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BestTimeSuggestion
+        fields = [
+            'id', 'brand', 'platform', 'day_of_week', 'hour_utc',
+            'score', 'source', 'computed_at',
+        ]
+        read_only_fields = ['id', 'computed_at']
+
+
+# --- Scheduling ---
+
+class ScheduledPostPlatformSerializer(serializers.ModelSerializer):
+    caption_body = serializers.CharField(source='caption.body', read_only=True, default='')
+
+    class Meta:
+        model = ScheduledPostPlatform
+        fields = [
+            'id', 'post', 'platform', 'caption', 'caption_body',
+            'hashtag_placement', 'scheduled_at', 'timezone', 'status',
+            'publish_result_json', 'retry_count', 'created_by',
+            'created_at', 'published_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'published_at']
+
+
+class SchedulePostRequestSerializer(serializers.Serializer):
+    platforms = serializers.ListField(child=serializers.DictField())
+    # Each dict: {"platform": "twitter", "caption_id": 1, "scheduled_at": "...", "hashtag_placement": "end_of_caption"}
+
+
+class ConflictCheckRequestSerializer(serializers.Serializer):
+    platform = serializers.CharField()
+    scheduled_at = serializers.DateTimeField()
+    buffer_minutes = serializers.IntegerField(default=30)
+
+
+# --- Analytics ---
+
+class PostAnalyticsSerializer(serializers.ModelSerializer):
+    performance_indicator = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = PostAnalytics
+        fields = [
+            'id', 'post', 'platform', 'platform_post_id', 'snapshot_type',
+            'impressions', 'reach', 'engagement_rate', 'likes',
+            'comments_count', 'shares', 'clicks', 'saves', 'profile_visits',
+            'data_json', 'performance_indicator', 'fetched_at',
+        ]
+        read_only_fields = ['id', 'fetched_at']
+
+
+class PostCommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PostComment
+        fields = [
+            'id', 'post', 'platform', 'platform_comment_id',
+            'author_name', 'author_handle', 'body', 'sentiment',
+            'replied', 'reply_type', 'reply_body', 'replied_at', 'fetched_at',
+        ]
+        read_only_fields = ['id', 'fetched_at']
+
+
+class ReplyToCommentSerializer(serializers.Serializer):
+    reply_body = serializers.CharField()
+    reply_type = serializers.ChoiceField(choices=['human', 'ai'], default='human')
+
+
+class LearningSignalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LearningSignal
+        fields = ['id', 'brand', 'signal_type', 'reference_id', 'data_json', 'applied', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class RepurposedContentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RepurposedContent
+        fields = ['id', 'original_post', 'new_post', 'repurpose_format', 'created_at']
+        read_only_fields = ['id', 'new_post', 'created_at']
+
+
+class RepurposeRequestSerializer(serializers.Serializer):
+    repurpose_format = serializers.ChoiceField(
+        choices=['carousel', 'thread', 'reel', 'email', 'blog_outline']
+    )
+    target_platform = serializers.ChoiceField(
+        choices=['twitter', 'linkedin', 'facebook', 'instagram'],
+        required=False
+    )
+
+
+# --- Notifications ---
+
+class SystemNotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemNotification
+        fields = [
+            'id', 'user', 'event_type', 'title', 'message',
+            'data_json', 'channel', 'is_read', 'created_at',
+        ]
+        read_only_fields = ['id', 'user', 'created_at']
+
+
+# --- Enhanced Post Serializer with V1.2.1 fields ---
+
+class PostDetailSerializer(serializers.ModelSerializer):
+    """Extended post serializer with captions, hashtags, and analytics"""
+    platforms = serializers.SerializerMethodField()
+    media_files = serializers.SerializerMethodField()
+    platform_results = serializers.SerializerMethodField()
+    captions = PostCaptionSerializer(many=True, read_only=True)
+    hashtags = PostHashtagSerializer(many=True, read_only=True)
+    checklist_status = serializers.JSONField(read_only=True)
+    pillar_name = serializers.CharField(source='pillar.name', read_only=True, default='')
+    brand_name = serializers.CharField(source='brand.brand_name', read_only=True, default='')
+
+    class Meta:
+        model = Post
+        fields = [
+            'id', 'caption', 'media_files', 'platforms',
+            'scheduled_time', 'timezone', 'status',
+            'ai_generated', 'created_at', 'updated_at', 'posted_at',
+            'platform_results',
+            # V1.2.1 fields
+            'idea', 'brand', 'brand_name', 'pillar', 'pillar_name',
+            'hook', 'angle', 'format_type', 'cta_text', 'goal',
+            'checklist_status', 'submitted_at', 'approved_at',
+            'captions', 'hashtags',
+        ]
+        read_only_fields = ['id', 'status', 'ai_generated', 'created_at', 'updated_at', 'posted_at']
+
+    def get_platforms(self, obj):
+        try:
+            return json.loads(obj.platforms) if obj.platforms else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def get_media_files(self, obj):
+        try:
+            return json.loads(obj.media_files) if obj.media_files else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def get_platform_results(self, obj):
+        results = []
+        platform_list = self.get_platforms(obj)
+        for platform in platform_list:
+            post_id = getattr(obj, f'{platform}_post_id', None)
+            error = getattr(obj, f'{platform}_error', None)
+            results.append({
+                'platform': platform,
+                'success': bool(post_id) and not error,
+                'post_id': post_id,
+                'error': error,
+            })
+        return results
+
+
+# --- Enhanced ContentIdea with V1.2.1 fields ---
+
+class ContentIdeaDetailSerializer(serializers.ModelSerializer):
+    pillar_name = serializers.CharField(source='pillar.name', read_only=True, default='')
+
+    class Meta:
+        model = ContentIdea
+        fields = [
+            'id', 'brand', 'title', 'hook', 'angle', 'platform',
+            'goal', 'content_format', 'language', 'persona',
+            'status', 'post', 'batch_id', 'generation_run',
+            # V1.2.1 fields
+            'pillar', 'pillar_name', 'engagement_tier', 'source',
+            'trending_topic_ref', 'metadata_json',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'batch_id', 'generation_run', 'created_at', 'updated_at']
+
+
+class GenerateIdeasRequestSerializer(serializers.Serializer):
+    brand_id = serializers.IntegerField()
+    pillar_id = serializers.IntegerField(required=False)
+    platform = serializers.ChoiceField(
+        choices=['twitter', 'linkedin', 'facebook', 'instagram', 'all'],
+        default='all'
+    )
+    goal = serializers.ChoiceField(
+        choices=['leads', 'growth', 'authority', ''],
+        default='', required=False, allow_blank=True
+    )
+    content_format = serializers.CharField(required=False, allow_blank=True)
+    language = serializers.CharField(default='en')
+    count = serializers.IntegerField(default=10, min_value=1, max_value=50)
+
+
+# --- Enhanced WeeklyReport with V1.2.1 fields ---
+
+class WeeklyReportDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WeeklyReport
+        fields = [
+            'id', 'brand', 'workspace', 'period_start', 'period_end', 'data',
+            'winners', 'losers', 'best_hooks', 'best_times',
+            'pillar_performance', 'ab_test_results', 'recommendations',
+            'test_plan', 'generated_at',
+        ]
+        read_only_fields = ['id', 'generated_at']
+
+
+# --- Calendar data serializer ---
+
+class CalendarEventSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    start = serializers.DateTimeField()
+    end = serializers.DateTimeField(required=False)
+    platform = serializers.CharField()
+    status = serializers.CharField()
+    color = serializers.CharField(required=False)
+    pillar_name = serializers.CharField(required=False, allow_blank=True)
+    pillar_color = serializers.CharField(required=False, allow_blank=True)

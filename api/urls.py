@@ -3,6 +3,14 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from . import admin_views
+from . import strategy_views
+from . import caption_views
+from . import hashtag_views
+from . import approval_views
+from . import scheduling_views
+from . import analytics_views as v2_analytics_views
+from . import notification_views
+from . import creative_views
 
 # Create router for viewsets
 router = DefaultRouter()
@@ -35,6 +43,14 @@ router.register(r'brand-assets', views.BrandAssetViewSet, basename='brand-asset'
 router.register(r'content-ideas', views.ContentIdeaViewSet, basename='content-idea')
 router.register(r'content-approvals', views.ContentApprovalViewSet, basename='content-approval')
 router.register(r'weekly-reports', views.WeeklyReportViewSet, basename='weekly-report')
+
+# V1.2.1 routers
+router.register(r'content-pillars', strategy_views.ContentPillarViewSet, basename='content-pillar')
+router.register(r'competitor-profiles', strategy_views.CompetitorProfileViewSet, basename='competitor-profile')
+router.register(r'brand-templates', strategy_views.BrandTemplateViewSet, basename='brand-template')
+router.register(r'post-captions', caption_views.PostCaptionViewSet, basename='post-caption')
+router.register(r'hashtag-groups', hashtag_views.HashtagGroupViewSet, basename='hashtag-group')
+router.register(r'banned-hashtags', hashtag_views.BannedHashtagViewSet, basename='banned-hashtag')
 
 urlpatterns = [
     # Auth endpoints
@@ -137,7 +153,7 @@ urlpatterns = [
     path('brands/<int:brand_id>/generate-dna/', views.GenerateBrandDNAView.as_view(), name='api-generate-brand-dna'),
     path('brands/<int:brand_id>/dna-status/', views.BrandDNAStatusView.as_view(), name='api-brand-dna-status'),
 
-    # Analytics endpoints
+    # Analytics endpoints (V1.1)
     path('analytics/summary/', views.AnalyticsSummaryView.as_view(), name='api-analytics-summary'),
     path('analytics/platforms/', views.PlatformAnalyticsView.as_view(), name='api-analytics-platforms'),
     path('analytics/trends/', views.AnalyticsTrendView.as_view(), name='api-analytics-trends'),
@@ -145,6 +161,78 @@ urlpatterns = [
 
     # Support Chat
     path('support-chat/', views.SupportChatView.as_view(), name='api-support-chat'),
+
+    # ============================
+    # V1.2.1 NEW ENDPOINTS
+    # ============================
+
+    # Strategy & Pillars
+    path('brands/<int:brand_id>/pillar-compliance/', strategy_views.PillarComplianceView.as_view(), name='api-pillar-compliance'),
+    path('brands/<int:brand_id>/competitors/crawl/', strategy_views.CompetitorCrawlView.as_view(), name='api-competitor-crawl'),
+    path('brands/<int:brand_id>/competitors/insights/', strategy_views.CompetitorInsightsView.as_view(), name='api-competitor-insights'),
+
+    # Ideation
+    path('ideas/generate/', strategy_views.GenerateIdeasView.as_view(), name='api-generate-ideas'),
+    path('ideas/<int:idea_id>/regenerate/', strategy_views.RegenerateIdeaView.as_view(), name='api-regenerate-idea'),
+    path('ideas/<int:idea_id>/add-to-calendar/', strategy_views.AddIdeaToCalendarView.as_view(), name='api-idea-to-calendar'),
+    path('trending/', strategy_views.TrendingTopicsView.as_view(), name='api-trending'),
+
+    # Draft Captions
+    path('drafts/<int:post_id>/captions/', caption_views.DraftCaptionsView.as_view(), name='api-draft-captions'),
+    path('drafts/<int:post_id>/captions/generate/', caption_views.GenerateCaptionsView.as_view(), name='api-generate-captions'),
+    path('drafts/<int:post_id>/captions/adapt/', caption_views.AdaptCaptionView.as_view(), name='api-adapt-caption'),
+    path('captions/<int:caption_id>/select/', caption_views.SelectCaptionView.as_view(), name='api-select-caption'),
+    path('captions/<int:caption_id>/ab-tag/', caption_views.ABTagCaptionView.as_view(), name='api-ab-tag-caption'),
+
+    # Draft Hashtags
+    path('drafts/<int:post_id>/hashtags/', hashtag_views.DraftHashtagsView.as_view(), name='api-draft-hashtags'),
+    path('drafts/<int:post_id>/hashtags/generate/', hashtag_views.GenerateHashtagsView.as_view(), name='api-generate-hashtags'),
+    path('hashtags/<int:hashtag_id>/', hashtag_views.ToggleHashtagView.as_view(), name='api-toggle-hashtag'),
+
+    # Draft Checklist
+    path('drafts/<int:post_id>/checklist/', approval_views.DraftChecklistView.as_view(), name='api-draft-checklist'),
+
+    # Approval Pipeline
+    path('drafts/<int:post_id>/submit/', approval_views.SubmitForApprovalView.as_view(), name='api-submit-approval'),
+    path('drafts/<int:post_id>/approve/', approval_views.ApprovePostView.as_view(), name='api-approve-post'),
+    path('drafts/<int:post_id>/request-changes/', approval_views.RequestChangesView.as_view(), name='api-request-changes'),
+    path('drafts/<int:post_id>/reject/', approval_views.RejectPostView.as_view(), name='api-reject-post'),
+    path('approvals/pending/', approval_views.PendingApprovalsView.as_view(), name='api-pending-approvals'),
+    path('drafts/<int:post_id>/approval-log/', approval_views.ApprovalLogView.as_view(), name='api-approval-log'),
+
+    # Scheduling
+    path('drafts/<int:post_id>/schedule/', scheduling_views.SchedulePostView.as_view(), name='api-schedule-post'),
+    path('scheduled-posts/<int:spp_id>/', scheduling_views.RescheduleView.as_view(), name='api-reschedule'),
+    path('schedule/calendar/', scheduling_views.CalendarView.as_view(), name='api-calendar'),
+    path('brands/<int:brand_id>/best-times/', scheduling_views.BestTimeSuggestionsView.as_view(), name='api-best-times'),
+    path('schedule/conflict-check/', scheduling_views.ConflictCheckView.as_view(), name='api-conflict-check'),
+
+    # Post Analytics (V1.2.1)
+    path('posts/<int:post_id>/stats/', v2_analytics_views.PostQuickStatsView.as_view(), name='api-post-stats'),
+    path('posts/<int:post_id>/comments/', v2_analytics_views.PostCommentsView.as_view(), name='api-post-comments'),
+    path('comments/<int:comment_id>/reply/', v2_analytics_views.ReplyToCommentView.as_view(), name='api-reply-comment'),
+    path('comments/<int:comment_id>/ai-reply/', v2_analytics_views.AIReplyToCommentView.as_view(), name='api-ai-reply-comment'),
+    path('brands/<int:brand_id>/weekly-report/', v2_analytics_views.WeeklyReportView.as_view(), name='api-weekly-report-v2'),
+    path('brands/<int:brand_id>/analytics/dashboard/', v2_analytics_views.AnalyticsDashboardView.as_view(), name='api-analytics-dashboard'),
+    path('brands/<int:brand_id>/ab-results/', v2_analytics_views.ABTestResultsView.as_view(), name='api-ab-results'),
+
+    # Learning & Repurposing
+    path('brands/<int:brand_id>/learning-signals/', v2_analytics_views.LearningSignalsView.as_view(), name='api-learning-signals'),
+    path('brands/<int:brand_id>/winners/', v2_analytics_views.WinnerPostsView.as_view(), name='api-winner-posts'),
+    path('posts/<int:post_id>/repurpose/', v2_analytics_views.RepurposePostView.as_view(), name='api-repurpose-post'),
+
+    # Creative Assets (V1.2.1)
+    path('assets/<int:asset_id>/alt-text/', creative_views.GenerateAltTextView.as_view(), name='api-generate-alt-text'),
+    path('assets/<int:asset_id>/resize/', creative_views.ResizeAssetView.as_view(), name='api-resize-asset'),
+    path('assets/<int:asset_id>/apply-template/', creative_views.ApplyTemplateView.as_view(), name='api-apply-template'),
+    path('assets/<int:asset_id>/versions/', creative_views.AssetVersionsView.as_view(), name='api-asset-versions'),
+
+    # Notifications (V1.2.1)
+    path('notifications/', notification_views.NotificationListView.as_view(), name='api-notifications'),
+    path('notifications/unread-count/', notification_views.UnreadCountView.as_view(), name='api-notification-unread'),
+    path('notifications/mark-all-read/', notification_views.MarkAllNotificationsReadView.as_view(), name='api-mark-all-read'),
+    path('notifications/<int:notification_id>/read/', notification_views.MarkNotificationReadView.as_view(), name='api-mark-notification-read'),
+    path('notifications/<int:notification_id>/', notification_views.DeleteNotificationView.as_view(), name='api-delete-notification'),
 
     # Admin Panel API
     path('admin/dashboard/', admin_views.AdminDashboardView.as_view(), name='api-admin-dashboard'),

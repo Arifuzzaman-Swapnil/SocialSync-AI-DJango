@@ -22,6 +22,11 @@ import {
   PrivacyPage,
   TermsPage,
   HelpPage,
+  // V1.2.1
+  StrategyHubPage,
+  IdeasHubPage,
+  CalendarPage,
+  ApprovalReviewPage,
 } from './pages';
 import {
   AdminDashboardPage,
@@ -152,6 +157,12 @@ function App() {
 
           {/* Analytics */}
           <Route path="/analytics" element={<AnalyticsPage />} />
+
+          {/* V1.2.1 Routes */}
+          <Route path="/strategy" element={<StrategyHubPage />} />
+          <Route path="/ideas" element={<IdeasHubPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/approvals" element={<ApprovalReviewPage />} />
 
           {/* Info Pages */}
           <Route path="/about" element={<AboutPage />} />

@@ -165,6 +165,18 @@ class ContentIdea(models.Model):
         ('story', 'Story'),
     ]
 
+    ENGAGEMENT_TIER_CHOICES = [
+        ('low', 'Low'),
+        ('mid', 'Mid'),
+        ('high', 'High'),
+    ]
+
+    SOURCE_CHOICES = [
+        ('ai_generated', 'AI Generated'),
+        ('trending', 'Trending Topic'),
+        ('competitor_inspired', 'Competitor Inspired'),
+    ]
+
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='content_ideas')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='content_ideas')
     title = models.CharField(max_length=300)
@@ -182,6 +194,21 @@ class ContentIdea(models.Model):
     )
     batch_id = models.CharField(max_length=50, blank=True)
     generation_run = models.IntegerField(default=1)
+
+    # V1.2.1 new fields
+    pillar = models.ForeignKey(
+        'ContentPillar', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='ideas'
+    )
+    engagement_tier = models.CharField(
+        max_length=10, choices=ENGAGEMENT_TIER_CHOICES, default='mid'
+    )
+    source = models.CharField(
+        max_length=25, choices=SOURCE_CHOICES, default='ai_generated'
+    )
+    trending_topic_ref = models.CharField(max_length=500, blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -233,9 +260,21 @@ class ContentApproval(models.Model):
 
 class WeeklyReport(models.Model):
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='weekly_reports')
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='weekly_reports', null=True, blank=True)
     period_start = models.DateField()
     period_end = models.DateField()
     data = models.JSONField(default=dict)
+
+    # V1.2.1 structured report fields
+    winners = models.JSONField(default=list, blank=True, help_text='Top performing posts [{post_id, metric, value}]')
+    losers = models.JSONField(default=list, blank=True, help_text='Bottom performing posts')
+    best_hooks = models.JSONField(default=list, blank=True, help_text='Best performing hooks/angles')
+    best_times = models.JSONField(default=list, blank=True, help_text='Best posting times')
+    pillar_performance = models.JSONField(default=dict, blank=True, help_text='Actual vs target per pillar')
+    ab_test_results = models.JSONField(default=list, blank=True, help_text='A/B caption comparison results')
+    recommendations = models.JSONField(default=list, blank=True, help_text='LLM-generated recommendations')
+    test_plan = models.JSONField(default=list, blank=True, help_text='Next week experiment suggestions')
+
     generated_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -283,6 +322,216 @@ class GenerationUsage(models.Model):
         obj.save()
         return obj.count
 
+
+# ============================================================
+# V1.2.1 NEW MODELS - Strategy & Content Pillars
+# ============================================================
+
+class ContentPillar(models.Model):
+    """Content strategy pillars for balanced content calendar"""
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='content_pillars')
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    target_percentage = models.IntegerField(default=0, help_text='Target % of content (0-100)')
+    color_code = models.CharField(max_length=7, default='#6366F1', help_text='Hex color for UI calendar')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'content_pillars'
+        verbose_name = 'Content Pillar'
+        verbose_name_plural = 'Content Pillars'
+        ordering = ['-target_percentage']
+
+    def __str__(self):
+        return f"{self.name} ({self.target_percentage}%) - {self.brand.brand_name}"
+
+
+class CompetitorProfile(models.Model):
+    """Competitor handles/URLs for inspiration and analysis"""
+
+    PLATFORM_CHOICES = [
+        ('twitter', 'Twitter/X'),
+        ('linkedin', 'LinkedIn'),
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+        ('website', 'Website'),
+    ]
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='competitor_profiles')
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    handle_or_url = models.CharField(max_length=500)
+    last_crawled_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'competitor_profiles'
+        verbose_name = 'Competitor Profile'
+        verbose_name_plural = 'Competitor Profiles'
+
+    def __str__(self):
+        return f"{self.handle_or_url} ({self.platform}) - {self.brand.brand_name}"
+
+
+class CompetitorInsight(models.Model):
+    """Extracted insights from competitor content"""
+
+    competitor_profile = models.ForeignKey(CompetitorProfile, on_delete=models.CASCADE, related_name='insights')
+    hook_text = models.TextField()
+    angle = models.CharField(max_length=200, blank=True)
+    format_type = models.CharField(max_length=50, blank=True)
+    engagement_score = models.FloatField(default=0, help_text='Estimated engagement score')
+    extracted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'competitor_insights'
+        verbose_name = 'Competitor Insight'
+        verbose_name_plural = 'Competitor Insights'
+        ordering = ['-engagement_score']
+
+    def __str__(self):
+        return f"Insight from {self.competitor_profile.handle_or_url}"
+
+
+class BrandTemplate(models.Model):
+    """Brand overlay templates for generated creatives"""
+
+    LOGO_POSITION_CHOICES = [
+        ('top_left', 'Top Left'),
+        ('top_right', 'Top Right'),
+        ('bottom_left', 'Bottom Left'),
+        ('bottom_right', 'Bottom Right'),
+        ('center', 'Center'),
+    ]
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='brand_templates')
+    name = models.CharField(max_length=100)
+    template_file = models.FileField(upload_to='brands/templates/', blank=True, null=True)
+    logo_position = models.CharField(max_length=20, choices=LOGO_POSITION_CHOICES, default='bottom_right')
+    font_family = models.CharField(max_length=100, blank=True)
+    primary_color = models.CharField(max_length=7, default='#000000')
+    secondary_color = models.CharField(max_length=7, default='#FFFFFF')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'brand_templates'
+        verbose_name = 'Brand Template'
+        verbose_name_plural = 'Brand Templates'
+
+    def __str__(self):
+        return f"{self.name} - {self.brand.brand_name}"
+
+
+class TrendingCache(models.Model):
+    """Cached trending topics from platform APIs"""
+
+    PLATFORM_CHOICES = [
+        ('twitter', 'Twitter/X'),
+        ('linkedin', 'LinkedIn'),
+        ('google', 'Google Trends'),
+    ]
+
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    topic = models.CharField(max_length=500)
+    volume_score = models.FloatField(default=0)
+    region = models.CharField(max_length=100, default='global')
+    fetched_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        db_table = 'trending_cache'
+        verbose_name = 'Trending Cache'
+        verbose_name_plural = 'Trending Cache'
+        ordering = ['-volume_score']
+
+    def __str__(self):
+        return f"{self.topic} ({self.platform}) - score: {self.volume_score}"
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+
+class ApprovalLog(models.Model):
+    """Track all approval state transitions with comments"""
+
+    ACTION_CHOICES = [
+        ('submitted', 'Submitted for Approval'),
+        ('approved', 'Approved'),
+        ('changes_requested', 'Changes Requested'),
+        ('rejected', 'Rejected'),
+        ('escalated', 'Escalated'),
+    ]
+
+    REJECTION_REASON_CHOICES = [
+        ('off_brand', 'Off Brand'),
+        ('compliance_issue', 'Compliance Issue'),
+        ('quality', 'Quality'),
+        ('factual_error', 'Factual Error'),
+        ('timing', 'Timing'),
+        ('other', 'Other'),
+    ]
+
+    post = models.ForeignKey('posts.Post', on_delete=models.CASCADE, related_name='approval_logs')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    acted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='approval_actions')
+    comment = models.TextField(blank=True)
+    rejection_reason = models.CharField(
+        max_length=20, choices=REJECTION_REASON_CHOICES, blank=True, null=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'approval_logs'
+        verbose_name = 'Approval Log'
+        verbose_name_plural = 'Approval Logs'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Post #{self.post.id} - {self.action} by {self.acted_by.username}"
+
+
+class BestTimeSuggestion(models.Model):
+    """Optimal posting times per platform based on analytics or industry defaults"""
+
+    SOURCE_CHOICES = [
+        ('own_data', 'Own Analytics Data'),
+        ('industry_default', 'Industry Default'),
+    ]
+
+    PLATFORM_CHOICES = [
+        ('twitter', 'Twitter/X'),
+        ('linkedin', 'LinkedIn'),
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+    ]
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='best_time_suggestions')
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    day_of_week = models.IntegerField(help_text='0=Monday, 6=Sunday')
+    hour_utc = models.IntegerField(help_text='Hour in UTC (0-23)')
+    score = models.FloatField(default=0, help_text='Engagement score')
+    source = models.CharField(max_length=20, choices=SOURCE_CHOICES, default='industry_default')
+    computed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'best_time_suggestions'
+        verbose_name = 'Best Time Suggestion'
+        verbose_name_plural = 'Best Time Suggestions'
+        ordering = ['-score']
+        unique_together = ['brand', 'platform', 'day_of_week', 'hour_utc']
+
+    def __str__(self):
+        days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        return f"{self.brand.brand_name} - {self.platform} {days[self.day_of_week]} {self.hour_utc}:00"
+
+
+# ============================================================
+# EXISTING V1.1 MODELS (unchanged)
+# ============================================================
 
 class BrandDNAChunk(models.Model):
     """Vectorized chunks of website content for Brand DNA RAG"""

@@ -266,13 +266,13 @@ scheduler = None
 def start_scheduler():
     """Start background scheduler"""
     global scheduler
-    
+
     if scheduler is not None:
         return
-    
+
     scheduler = BackgroundScheduler()
-    
-    # Check every minute
+
+    # Check every minute for due posts
     scheduler.add_job(
         check_and_post,
         'interval',
@@ -280,9 +280,68 @@ def start_scheduler():
         id='auto_poster',
         replace_existing=True
     )
-    
+
+    # V1.2.1: Check approval SLA every 30 minutes
+    scheduler.add_job(
+        run_sla_check,
+        'interval',
+        minutes=30,
+        id='sla_checker',
+        replace_existing=True
+    )
+
+    # V1.2.1: Sync analytics every 6 hours
+    scheduler.add_job(
+        run_analytics_sync,
+        'interval',
+        hours=6,
+        id='analytics_sync',
+        replace_existing=True
+    )
+
+    # V1.2.1: Generate weekly reports every Sunday at midnight UTC
+    scheduler.add_job(
+        run_weekly_report,
+        'cron',
+        day_of_week='sun',
+        hour=0,
+        minute=0,
+        id='weekly_report',
+        replace_existing=True
+    )
+
     scheduler.start()
     print("[SCHEDULER] Auto-posting scheduler active (checks every 60 seconds)")
+    print("[SCHEDULER] SLA checker active (checks every 30 minutes)")
+    print("[SCHEDULER] Analytics sync active (every 6 hours)")
+    print("[SCHEDULER] Weekly report generator active (Sunday midnight UTC)")
+
+
+def run_sla_check():
+    """Run SLA escalation check for pending approvals"""
+    try:
+        from django.core.management import call_command
+        call_command('check_sla')
+    except Exception as e:
+        print(f"[SLA CHECK] Error: {e}")
+
+
+def run_analytics_sync():
+    """Sync post analytics from platforms"""
+    try:
+        from django.core.management import call_command
+        call_command('sync_analytics')
+    except Exception as e:
+        print(f"[ANALYTICS SYNC] Error: {e}")
+
+
+def run_weekly_report():
+    """Generate weekly performance reports"""
+    try:
+        from django.core.management import call_command
+        call_command('generate_weekly_report')
+    except Exception as e:
+        print(f"[WEEKLY REPORT] Error: {e}")
 
 
 def check_and_post():

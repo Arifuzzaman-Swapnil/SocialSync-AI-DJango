@@ -96,6 +96,7 @@ from .serializers import (
     BrandAssetSerializer,
     LaunchPlanSerializer,
     ContentIdeaSerializer,
+    ContentIdeaDetailSerializer,
     ContentApprovalSerializer,
     WeeklyReportSerializer,
     GenerationUsageSerializer,
@@ -402,9 +403,9 @@ class PostViewSet(viewsets.ModelViewSet):
         """Cancel a scheduled post"""
         post = self.get_object()
 
-        if post.status != 'scheduled':
+        if post.status in ('posted', 'cancelled'):
             return Response(
-                {'error': 'Can only cancel scheduled posts'},
+                {'error': f'Cannot cancel a post with status "{post.status}"'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -2269,7 +2270,7 @@ class CreateLaunchPlanView(generics.CreateAPIView):
 
 class ContentIdeaViewSet(viewsets.ModelViewSet):
     """ViewSet for ContentIdea CRUD"""
-    serializer_class = ContentIdeaSerializer
+    serializer_class = ContentIdeaDetailSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
@@ -2621,51 +2622,122 @@ def regenerate_voice(request, generation_id):
 # ===================== BRAND DNA VIEWS =====================
 
 class GenerateBrandDNAView(APIView):
-    """Generate Brand DNA by crawling the brand's website"""
+    """Generate Brand DNA by reading the brand's website with AI"""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, brand_id):
         try:
-            brand = Brand.objects.get(id=brand_id, user=request.user)
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user),
+                id=brand_id
+            )
         except Brand.DoesNotExist:
             return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not brand.website_url:
+        # Accept website_url from POST body
+        website_url = request.data.get('website_url', '').strip()
+        if website_url:
+            brand.website_url = website_url
+            brand.save(update_fields=['website_url'])
+        elif not brand.website_url:
             return Response(
-                {'error': 'Brand has no website URL configured. Please add a website URL first.'},
+                {'error': 'Please provide your website URL.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get OpenAI key for embeddings
         api_key = get_openai_key(request.user)
         if not api_key:
             return Response(
-                {'error': 'OpenAI API key not configured. Please add your API key in Settings.'},
+                {'error': 'OpenAI API key not configured. Go to Settings to add your key.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            from brands.services.brand_dna_service import BrandDNAService
-            service = BrandDNAService(openai_api_key=api_key)
-            result = service.generate_brand_dna(brand)
+            import openai, json
+            from api.strategy_views import _fetch_page_content
 
-            if result['success']:
-                return Response({
-                    'success': True,
-                    'pages_crawled': result['pages_crawled'],
-                    'total_chunks': result['total_chunks'],
-                    'message': f"Brand DNA generated! Crawled {result['pages_crawled']} pages, created {result['total_chunks']} knowledge chunks."
-                })
-            else:
+            # Fetch the website content
+            url = brand.website_url
+            page_data = _fetch_page_content(url)
+
+            if not page_data['success']:
                 return Response(
-                    {'success': False, 'error': result.get('error', 'Unknown error')},
+                    {'error': f"Could not read website: {page_data.get('error', 'unknown error')}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            client = openai.OpenAI(api_key=api_key)
+
+            prompt = f"""Analyze this website and extract a complete Brand DNA profile.
+
+WEBSITE: {url}
+TITLE: {page_data['title']}
+DESCRIPTION: {page_data['description']}
+
+PAGE CONTENT:
+{page_data['content']}
+
+Extract a Brand DNA with these sections (be specific, use actual details from the page):
+
+1. brand_name: The brand's name
+2. tagline: Their tagline or slogan (if visible)
+3. industry: Their industry/niche
+4. description: What the brand does in 2-3 sentences
+5. products_services: List of main products or services offered (array of strings)
+6. target_audience: Who their target customers are
+7. unique_selling_points: What makes them different (array of strings, max 5)
+8. brand_voice: Their communication tone/style (e.g., professional, casual, bold, friendly)
+9. brand_values: Core values (array of strings, max 5)
+10. color_theme: Dominant colors observed (array of strings)
+11. content_themes: Main content topics/themes they focus on (array of strings)
+12. cta_style: How they write calls-to-action
+13. social_platforms: Any social media platforms mentioned (array of strings)
+14. keywords: Key SEO/marketing terms used (array of strings, max 10)
+15. competitor_positioning: How they position themselves vs competitors
+
+Return as a single JSON object. Only return valid JSON, no other text."""
+
+            response = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=[
+                    {'role': 'system', 'content': 'You are a brand strategist. Analyze the website content and extract detailed brand DNA. Return only valid JSON.'},
+                    {'role': 'user', 'content': prompt},
+                ],
+                temperature=0.3,
+                max_tokens=2500,
+            )
+
+            raw = response.choices[0].message.content.strip()
+            if raw.startswith('```'):
+                raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
+                if raw.endswith('```'):
+                    raw = raw[:-3]
+                raw = raw.strip()
+
+            dna_data = json.loads(raw)
+
+            # Save to brand
+            dna_data['website_url'] = url
+            dna_data['page_title'] = page_data['title']
+            brand.brand_dna = dna_data
+            brand.brand_dna_generated_at = timezone.now()
+            brand.brand_dna_source = 'website'
+            brand.save(update_fields=['brand_dna', 'brand_dna_generated_at', 'brand_dna_source'])
+
+            return Response({
+                'success': True,
+                'brand_dna': dna_data,
+                'generated_at': brand.brand_dna_generated_at.isoformat(),
+                'message': 'Brand DNA generated successfully from your website!',
+            })
+
+        except json.JSONDecodeError:
+            return Response({'error': 'Failed to parse AI response'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             import traceback
             traceback.print_exc()
             return Response(
-                {'success': False, 'error': f'Brand DNA generation failed: {str(e)}'},
+                {'error': f'Brand DNA generation failed: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 

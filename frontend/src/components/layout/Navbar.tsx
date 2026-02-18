@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   Bars3Icon,
-  BellIcon,
   MagnifyingGlassIcon,
   ChatBubbleLeftEllipsisIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../store';
+import { NotificationCenter } from '../NotificationCenter';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -18,7 +18,6 @@ interface NavbarProps {
 
 export function Navbar({ onMenuClick, onChatToggle, isChatOpen, isImpersonating }: NavbarProps) {
   const { user } = useAuthStore();
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
 
   const getInitials = (username: string) => {
@@ -69,26 +68,7 @@ export function Navbar({ onMenuClick, onChatToggle, isChatOpen, isImpersonating 
         {/* Right section */}
         <div className="flex items-center gap-2">
           {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="btn-icon relative"
-            >
-              <BellIcon className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-primary rounded-full" />
-            </button>
-
-            {showNotifications && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 mt-2 w-80 card p-4"
-              >
-                <h3 className="font-semibold mb-3">Notifications</h3>
-                <p className="text-text-secondary text-sm">No new notifications</p>
-              </motion.div>
-            )}
-          </div>
+          <NotificationCenter />
 
           {/* Messages / Support Chat */}
           <button

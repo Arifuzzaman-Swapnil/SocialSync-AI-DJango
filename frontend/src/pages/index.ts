@@ -17,3 +17,9 @@ export { AboutPage } from './AboutPage';
 export { PrivacyPage } from './PrivacyPage';
 export { TermsPage } from './TermsPage';
 export { HelpPage } from './HelpPage';
+
+// V1.2.1 pages
+export { StrategyHubPage } from './StrategyHubPage';
+export { IdeasHubPage } from './IdeasHubPage';
+export { CalendarPage } from './CalendarPage';
+export { ApprovalReviewPage } from './ApprovalReviewPage';

@@ -281,7 +281,7 @@ export function MyPostsPage() {
                         >
                           View
                         </Button>
-                        {post.status === 'scheduled' && (
+                        {(post.status === 'scheduled' || post.status === 'draft') && (
                           <>
                             <Link to={`/posts/${post.id}/edit`}>
                               <Button
@@ -412,7 +412,7 @@ export function MyPostsPage() {
 
             {/* Actions */}
             <div className="flex gap-3 pt-4 border-t border-white/10">
-              {selectedPost.status === 'scheduled' && (
+              {(selectedPost.status === 'scheduled' || selectedPost.status === 'draft') && (
                 <Link to={`/posts/${selectedPost.id}/edit`} className="flex-1">
                   <Button fullWidth variant="secondary" leftIcon={<PencilIcon className="w-5 h-5" />}>
                     Edit Post

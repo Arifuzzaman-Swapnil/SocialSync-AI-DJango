@@ -321,6 +321,65 @@ class SupportDocument(models.Model):
             logging.getLogger(__name__).error(f"Failed to extract PDF text: {e}")
 
 
+# ============================================================
+# V1.2.1 NEW MODEL - System-wide Notifications
+# ============================================================
+
+class SystemNotification(models.Model):
+    """System-wide notification for all events across the platform"""
+
+    EVENT_TYPE_CHOICES = [
+        ('post_submitted', 'Post Submitted for Approval'),
+        ('post_approved', 'Post Approved'),
+        ('changes_requested', 'Changes Requested'),
+        ('post_rejected', 'Post Rejected'),
+        ('approval_reminder_12h', 'Approval Pending 12h'),
+        ('approval_escalation_24h', 'Approval Escalated 24h'),
+        ('post_scheduled', 'Post Scheduled'),
+        ('post_published', 'Post Published'),
+        ('publish_failed', 'Publish Failed'),
+        ('captions_ready', 'Captions Generated'),
+        ('images_ready', 'Images Generated'),
+        ('video_rendering', 'Video Rendering Started'),
+        ('video_ready', 'Video Ready'),
+        ('batch_complete', 'Batch Complete'),
+        ('weekly_report', 'Weekly Report Ready'),
+        ('winner_detected', 'Winner Post Detected'),
+        ('repurpose_suggestion', 'Repurpose Suggestion'),
+        ('new_comment', 'New Comment on Post'),
+        ('token_expiring', 'Platform Token Expiring'),
+        ('daily_limit_warning', 'Daily Limit Approaching (80%)'),
+    ]
+
+    CHANNEL_CHOICES = [
+        ('in_app', 'In-App'),
+        ('email', 'Email'),
+        ('both', 'In-App + Email'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='system_notifications')
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    message = models.TextField(blank=True)
+    data_json = models.JSONField(default=dict, blank=True, help_text='Additional context data')
+    channel = models.CharField(max_length=10, choices=CHANNEL_CHOICES, default='in_app')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'system_notifications'
+        verbose_name = 'System Notification'
+        verbose_name_plural = 'System Notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', 'is_read']),
+            models.Index(fields=['user', 'event_type']),
+        ]
+
+    def __str__(self):
+        return f"{self.event_type}: {self.title} → {self.user.username}"
+
+
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:

@@ -15,6 +15,10 @@ import {
   XMarkIcon,
   ChartBarIcon,
   BuildingOfficeIcon,
+  MapIcon,
+  LightBulbIcon,
+  CalendarDaysIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../store';
 
@@ -33,8 +37,12 @@ interface NavItem {
 
 const mainNavItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Strategy Hub', href: '/strategy', icon: MapIcon, badge: 'New' },
+  { name: 'Ideas Hub', href: '/ideas', icon: LightBulbIcon, badge: 'New' },
   { name: 'Create Post', href: '/posts/create', icon: PlusCircleIcon },
   { name: 'My Posts', href: '/posts', icon: DocumentTextIcon },
+  { name: 'Calendar', href: '/calendar', icon: CalendarDaysIcon, badge: 'New' },
+  { name: 'Approvals', href: '/approvals', icon: ShieldCheckIcon },
   { name: 'Connect Account', href: '/platforms', icon: LinkIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
 ];

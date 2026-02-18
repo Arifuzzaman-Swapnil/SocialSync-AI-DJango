@@ -279,10 +279,17 @@ class ImageGeneration(models.Model):
     ]
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='image_generations')
-    
+
+    # V1.2.1 - Link to post/draft
+    post = models.ForeignKey('posts.Post', on_delete=models.SET_NULL, null=True, blank=True, related_name='creative_assets')
+    alt_text = models.TextField(blank=True, help_text='Accessibility alt text (max 125 chars)')
+    version = models.IntegerField(default=1)
+    is_current = models.BooleanField(default=True, help_text='Is this the current version?')
+    brand_template = models.ForeignKey('brands.BrandTemplate', on_delete=models.SET_NULL, null=True, blank=True)
+
     # Provider
     provider = models.CharField(max_length=20, choices=PROVIDER_CHOICES, default='openai')
-    model_used = models.CharField(max_length=50, blank=True, null=True)  # dall-e-3, gemini-2.0-flash, etc.
+    model_used = models.CharField(max_length=50, blank=True, null=True)
     
     # Input
     title = models.CharField(max_length=200, help_text="Title for the image")
@@ -431,3 +438,63 @@ class PromptTemplate(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.category})"
+
+
+# ============================================================
+# V1.2.1 NEW MODELS - Platform Variants & Version History
+# ============================================================
+
+class AssetPlatformVariant(models.Model):
+    """Auto-resized asset variants per platform"""
+
+    PLATFORM_CHOICES = [
+        ('twitter', 'Twitter/X'),
+        ('linkedin', 'LinkedIn'),
+        ('facebook', 'Facebook'),
+        ('instagram', 'Instagram'),
+    ]
+
+    # Platform dimension map
+    PLATFORM_DIMENSIONS = {
+        'instagram_feed': (1080, 1080),
+        'instagram_story': (1080, 1920),
+        'instagram_carousel': (1080, 1080),
+        'linkedin_feed': (1200, 627),
+        'twitter_feed': (1200, 675),
+        'facebook_feed': (1200, 630),
+        'facebook_story': (1080, 1920),
+    }
+
+    asset = models.ForeignKey(ImageGeneration, on_delete=models.CASCADE, related_name='platform_variants')
+    platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
+    format_label = models.CharField(max_length=50, help_text='e.g. feed, story, reel')
+    file_url = models.ImageField(upload_to='platform_variants/', blank=True, null=True)
+    dimensions = models.CharField(max_length=20, help_text='e.g. 1080x1080')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'asset_platform_variants'
+        verbose_name = 'Asset Platform Variant'
+        verbose_name_plural = 'Asset Platform Variants'
+
+    def __str__(self):
+        return f"{self.platform} {self.format_label} ({self.dimensions})"
+
+
+class CreativeVersionHistory(models.Model):
+    """Track all previous versions of creative assets"""
+
+    asset = models.ForeignKey(ImageGeneration, on_delete=models.CASCADE, related_name='version_history')
+    version = models.IntegerField()
+    file_url = models.ImageField(upload_to='creative_versions/')
+    generation_params = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'creative_version_history'
+        verbose_name = 'Creative Version History'
+        verbose_name_plural = 'Creative Version Histories'
+        ordering = ['-version']
+
+    def __str__(self):
+        return f"Asset #{self.asset.id} v{self.version}"

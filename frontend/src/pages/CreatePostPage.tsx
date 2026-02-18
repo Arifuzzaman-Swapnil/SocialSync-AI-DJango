@@ -28,9 +28,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { Button, Card, Input, Textarea, Modal, PlatformIcon, platformColors, platformNames } from '../components/ui';
+import { CaptionEditor } from '../components/CaptionEditor';
+import { HashtagManager } from '../components/HashtagManager';
+import { DraftChecklistWidget } from '../components/DraftChecklistWidget';
 import { usePostStore } from '../store';
 import type { PlatformType } from '../types';
 import { authFetch } from '../services/api';
+import api from '../services/api';
+import { postService } from '../services';
 
 const platforms: { id: PlatformType; maxChars: number }[] = [
   { id: 'facebook', maxChars: 63206 },
@@ -70,6 +75,8 @@ export function CreatePostPage() {
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   const [existingMedia, setExistingMedia] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showAIModal, setShowAIModal] = useState(false);
   const [aiTopic, setAiTopic] = useState('');
   const [aiTone, setAiTone] = useState('professional');
@@ -82,6 +89,8 @@ export function CreatePostPage() {
   const [dragActive, setDragActive] = useState(false);
   const [copied, setCopied] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [contentTab, setContentTab] = useState<'captions' | 'hashtags' | 'creative'>('captions');
+  const [checklistKey, setChecklistKey] = useState(0);
 
   const {
     register,
@@ -104,18 +113,31 @@ export function CreatePostPage() {
   // Load existing post data when editing
   useEffect(() => {
     if (isEditing && id) {
-      const post = posts.find((p) => p.id === Number(id));
-      if (post) {
-        const scheduledDate = new Date(post.scheduled_time);
-        reset({
-          caption: post.caption,
-          platforms: post.platforms,
-          scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
-          scheduled_time: format(scheduledDate, 'HH:mm'),
-          timezone: post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
-        });
-        setExistingMedia(post.media_files);
-      }
+      const loadPost = async () => {
+        // Try store first
+        let post = posts.find((p) => p.id === Number(id));
+        // If not in store, fetch from API
+        if (!post) {
+          try {
+            post = await postService.get(Number(id));
+          } catch (err) {
+            console.error('Failed to load post:', err);
+            return;
+          }
+        }
+        if (post) {
+          const scheduledDate = new Date(post.scheduled_time);
+          reset({
+            caption: post.caption || '',
+            platforms: post.platforms || [],
+            scheduled_date: format(scheduledDate, 'yyyy-MM-dd'),
+            scheduled_time: format(scheduledDate, 'HH:mm'),
+            timezone: post.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+          });
+          setExistingMedia(post.media_files || []);
+        }
+      };
+      loadPost();
     }
   }, [isEditing, id, posts, reset]);
 
@@ -249,6 +271,33 @@ export function CreatePostPage() {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!id) return;
+    setIsSubmittingApproval(true);
+    setSubmitError(null);
+    try {
+      // Save post first
+      const data = watch();
+      const scheduledTime = new Date(`${data.scheduled_date}T${data.scheduled_time}`);
+      await updatePost(Number(id), {
+        caption: data.caption,
+        platforms: data.platforms as PlatformType[],
+        scheduled_time: scheduledTime.toISOString(),
+        timezone: data.timezone,
+        media_files: mediaFiles,
+      });
+      // Then submit for approval
+      await api.post(`/drafts/${id}/submit/`, {});
+      setSuccessMsg('Post submitted for approval!');
+      setTimeout(() => navigate('/posts'), 1500);
+    } catch (error: any) {
+      const msg = error?.response?.data?.error || error?.message || 'Failed to submit for approval.';
+      setSubmitError(msg);
+    } finally {
+      setIsSubmittingApproval(false);
     }
   };
 
@@ -572,10 +621,64 @@ export function CreatePostPage() {
                 )}
               </AnimatePresence>
             </Card>
+
+            {/* V1.2.1 — AI Captions / Hashtags / Creative tabs (only when editing) */}
+            {isEditing && id && (
+              <Card>
+                {/* Tab Bar */}
+                <div className="flex border-b border-white/10 mb-4">
+                  {(['captions', 'hashtags', 'creative'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setContentTab(tab)}
+                      className={`px-4 py-2.5 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+                        contentTab === tab
+                          ? 'border-primary-500 text-primary-400'
+                          : 'border-transparent text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      {tab === 'captions' ? 'AI Captions' : tab === 'hashtags' ? 'Hashtags' : 'Creative'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Tab Content */}
+                {contentTab === 'captions' && (
+                  <CaptionEditor
+                    postId={Number(id)}
+                    onCaptionChange={() => setChecklistKey((k) => k + 1)}
+                  />
+                )}
+                {contentTab === 'hashtags' && (
+                  <HashtagManager
+                    postId={Number(id)}
+                    platform={watchPlatforms[0] || 'instagram'}
+                  />
+                )}
+                {contentTab === 'creative' && (
+                  <div className="text-center py-8 text-text-secondary text-sm">
+                    Upload media above, then use AI Image/Video tools to generate creative assets.
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Draft Checklist (only when editing) */}
+            {isEditing && id && (
+              <DraftChecklistWidget
+                key={checklistKey}
+                postId={Number(id)}
+                onSubmit={() => {
+                  setSuccessMsg('Post submitted for approval!');
+                  setTimeout(() => navigate('/posts'), 1500);
+                }}
+              />
+            )}
+
             {/* Schedule */}
             <Card>
               <div className="flex items-center gap-3 mb-4">
@@ -680,6 +783,20 @@ export function CreatePostPage() {
 
             {/* Actions */}
             <div className="flex flex-col gap-3">
+              {/* Success Message */}
+              <AnimatePresence>
+                {successMsg && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="p-4 bg-green-500/10 border border-green-500/30 rounded-xl"
+                  >
+                    <p className="text-sm font-medium text-green-400">{successMsg}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Error Message Display */}
               <AnimatePresence>
                 {submitError && (
@@ -692,7 +809,7 @@ export function CreatePostPage() {
                     <div className="flex items-start gap-3">
                       <XMarkIcon className="w-5 h-5 text-danger flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-danger">Failed to schedule post</p>
+                        <p className="text-sm font-medium text-danger">Failed to save post</p>
                         <p className="text-xs text-danger/80 mt-1">{submitError}</p>
                       </div>
                     </div>
@@ -709,6 +826,19 @@ export function CreatePostPage() {
               >
                 {isEditing ? 'Update Post' : 'Schedule Post'}
               </Button>
+              {isEditing && (
+                <Button
+                  type="button"
+                  fullWidth
+                  size="lg"
+                  variant="secondary"
+                  isLoading={isSubmittingApproval}
+                  leftIcon={<CheckIcon className="w-5 h-5" />}
+                  onClick={handleSubmitForApproval}
+                >
+                  Submit for Approval
+                </Button>
+              )}
               <Button type="button" variant="secondary" fullWidth onClick={() => navigate(-1)}>
                 Cancel
               </Button>
