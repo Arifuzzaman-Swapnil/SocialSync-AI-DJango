@@ -3,9 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClockIcon,
   InformationCircleIcon,
-  XMarkIcon,
   ArrowPathIcon,
-  FunnelIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
 
@@ -56,7 +54,6 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
     x: number;
     y: number;
   } | null>(null);
-  const [showLegend, setShowLegend] = useState(true);
   const [selectedPlatform, setSelectedPlatform] = useState(platform || '');
   const gridRef = useRef<HTMLDivElement>(null);
 

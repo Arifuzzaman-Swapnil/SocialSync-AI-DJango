@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
 import {
-  HashtagIcon, PlusIcon, XMarkIcon,
-  BookmarkIcon, NoSymbolIcon,
+  HashtagIcon, PlusIcon,
+  BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import hashtagService from '../services/hashtagService';
 

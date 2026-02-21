@@ -33,7 +33,7 @@ export function PermissionsPage() {
   const [success, setSuccess] = useState('');
 
   // Invite form
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [_inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('viewer');
   const [inviteUserId, setInviteUserId] = useState('');
 

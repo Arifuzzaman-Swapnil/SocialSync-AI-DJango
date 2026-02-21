@@ -37,7 +37,7 @@ export function Navbar({ onMenuClick, onChatToggle, isChatOpen, isImpersonating 
             <Bars3Icon className="w-6 h-6" />
           </button>
 
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/overflow" className="flex items-center gap-3">
             <motion.div
               className="icon-wrapper-sm"
               whileHover={{ rotate: 360 }}

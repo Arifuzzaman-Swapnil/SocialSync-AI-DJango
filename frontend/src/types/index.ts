@@ -122,6 +122,11 @@ export interface ContentApproval {
   updated_at: string;
 }
 
+export interface OverflowStatus {
+  is_completed: boolean;
+  current_step: number;
+}
+
 export interface User {
   id: number;
   username: string;
@@ -133,6 +138,7 @@ export interface User {
   date_joined: string;
   profile: UserProfile;
   onboarding_status?: OnboardingStatus;
+  overflow_status?: OverflowStatus;
 }
 
 export interface UserProfile {
@@ -256,6 +262,7 @@ export interface UpdatePostData {
   brand?: number;
   pillar?: number;
   goal?: string;
+  media_files?: File[];
 }
 
 // ============================================
@@ -1404,5 +1411,65 @@ export interface CompetitorProfile {
   platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
   handle_or_url: string;
   last_crawled_at?: string;
+  created_at: string;
+}
+
+// ============================================
+// V1.3 — OVERFLOW, TRENDING, DNA HISTORY
+// ============================================
+
+export interface OverflowProgress {
+  current_step: number;
+  completed_steps: number[];
+  dna_completed: boolean;
+  pillars_completed: boolean;
+  competitors_completed: boolean;
+  trending_completed: boolean;
+  selected_idea_ids: number[];
+  idea_media_preferences: Record<number, 'image' | 'video' | 'none'>;
+  selected_caption_ids: number[];
+  generated_media_ids: number[];
+  created_post_id: number | null;
+  is_completed: boolean;
+  is_skipped: boolean;
+  brand_id: number | null;
+}
+
+export interface BrandDNAHistoryEntry {
+  id: number;
+  website_url: string;
+  source: string;
+  is_active: boolean;
+  generated_at: string;
+  brand_name: string;
+  industry: string;
+  dna_data?: Record<string, any>;
+}
+
+export interface TrendingTopic {
+  id: number;
+  platform: string;
+  topic: string;
+  volume_score: number;
+  region: string;
+  relevance_explanation?: string;
+  expires_at: string;
+  category?: string;
+}
+
+export interface IdeaHistoryItem {
+  id: number;
+  title: string;
+  hook: string;
+  angle: string;
+  platform: string;
+  goal: string;
+  content_format: string;
+  status: string;
+  pillar_name: string;
+  engagement_tier: string;
+  source: string;
+  media_preference: string;
+  brand_name: string;
   created_at: string;
 }

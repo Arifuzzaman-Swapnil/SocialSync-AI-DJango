@@ -4,7 +4,6 @@ import {
   SparklesIcon,
   PhotoIcon,
   ArrowPathIcon,
-  PaintBrushIcon,
   ArrowsPointingOutIcon,
   DocumentTextIcon,
   SwatchIcon,
@@ -12,8 +11,6 @@ import {
   XMarkIcon,
   ExclamationTriangleIcon,
   EyeIcon,
-  TrashIcon,
-  Square2StackIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
 
@@ -180,7 +177,7 @@ export function CreativeGenerator({ postId, onAssetGenerated }: Props) {
   const handleResize = async (assetId: number) => {
     setResizingAsset(assetId);
     try {
-      const res = await api.post(`/assets/${assetId}/resize/`, {
+      await api.post(`/assets/${assetId}/resize/`, {
         width: resizeTarget.width,
         height: resizeTarget.height,
       });

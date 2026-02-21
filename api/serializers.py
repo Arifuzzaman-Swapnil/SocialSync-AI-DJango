@@ -58,10 +58,11 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model with profile"""
     profile = UserProfileSerializer(read_only=True)
     onboarding_status = serializers.SerializerMethodField()
+    overflow_status = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'profile', 'onboarding_status']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_staff', 'profile', 'onboarding_status', 'overflow_status']
         read_only_fields = ['id', 'is_staff']
 
     def get_onboarding_status(self, obj):
@@ -69,6 +70,16 @@ class UserSerializer(serializers.ModelSerializer):
             return OnboardingStatusSerializer(obj.onboarding_progress).data
         except OnboardingProgress.DoesNotExist:
             return {'current_step': 1, 'is_completed': False, 'is_skipped': False, 'needs_onboarding': True}
+
+    def get_overflow_status(self, obj):
+        try:
+            progress = obj.overflow_progress
+            return {
+                'is_completed': progress.is_completed or progress.is_skipped,
+                'current_step': progress.current_step,
+            }
+        except Exception:
+            return {'is_completed': False, 'current_step': 1}
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -1459,6 +1470,10 @@ class GenerateIdeasRequestSerializer(serializers.Serializer):
     content_format = serializers.CharField(required=False, allow_blank=True)
     language = serializers.CharField(default='en')
     count = serializers.IntegerField(default=10, min_value=1, max_value=50)
+    trending_topics = serializers.ListField(
+        child=serializers.CharField(max_length=500),
+        required=False, default=list
+    )
 
 
 # --- Enhanced WeeklyReport with V1.2.1 fields ---

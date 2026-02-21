@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -6,11 +8,13 @@ from rest_framework.views import APIView
 from django.db.models import Count, Q
 from django.utils import timezone
 
+logger = logging.getLogger(__name__)
+
 from accounts.permissions import IsWorkspaceAdmin, IsCreatorOrAbove, IsViewerOrAbove
 
 from brands.models import (
     Brand, Workspace, ContentPillar, CompetitorProfile, CompetitorInsight,
-    BrandTemplate, TrendingCache, ContentIdea
+    BrandTemplate, TrendingCache, ContentIdea, BrandDNAHistory, OverflowProgress
 )
 from .serializers import (
     ContentPillarSerializer, CompetitorProfileSerializer,
@@ -584,18 +588,77 @@ Past winning patterns (use these to inform your ideas):
 {chr(10).join(winning_items)}
 """
 
+        # V1.3 — Brand DNA context
+        dna_context = ''
+        dna = brand.brand_dna or {}
+        if dna:
+            dna_context = f"""
+Brand DNA:
+- Voice/Tone: {dna.get('brand_voice', 'professional')}
+- Target Audience: {dna.get('target_audience', 'general')}
+- USPs: {', '.join(dna.get('unique_selling_points', [])[:5])}
+- Content Themes: {', '.join(dna.get('content_themes', [])[:5])}
+- Brand Values: {', '.join(dna.get('brand_values', [])[:5])}
+- CTA Style: {dna.get('cta_style', '')}
+"""
+
+        # V1.3 — Competitor insights context
+        competitor_context = ''
+        comp_insights = CompetitorInsight.objects.filter(
+            competitor_profile__brand=brand
+        ).order_by('-engagement_score')[:10]
+        if comp_insights.exists():
+            insight_items = []
+            for ci in comp_insights:
+                hook = ci.hook_text.split(' ||REC||')[0][:120]
+                insight_items.append(f"- {hook} (score: {ci.engagement_score}/10)")
+            competitor_context = f"""
+Top competitor strategies to differentiate from:
+{chr(10).join(insight_items)}
+"""
+
+        # V1.3 — Trending topics context (user-selected take priority)
+        trending_context = ''
+        user_selected_trends = data.get('trending_topics', [])
+        if user_selected_trends:
+            trending_items = [f"- {t}" for t in user_selected_trends[:10]]
+            trending_context = f"""
+USER-SELECTED trending topics (MUST incorporate these into the ideas):
+{chr(10).join(trending_items)}
+Each idea should be inspired by or directly related to one of these selected trending topics.
+"""
+        else:
+            trending = TrendingCache.objects.filter(
+                brand=brand, expires_at__gt=timezone.now()
+            ).order_by('-volume_score')[:10]
+            if trending.exists():
+                trending_items = [f"- {t.topic} (score: {t.volume_score})" for t in trending]
+                trending_context = f"""
+Current trending topics relevant to your brand:
+{chr(10).join(trending_items)}
+Incorporate these trends where appropriate.
+"""
+
         # Build prompt
         platform_text = platform if platform != 'all' else 'all platforms (Twitter, LinkedIn, Facebook, Instagram)'
-        prompt = f"""Generate {count} unique content ideas for a {brand.industry} brand called "{brand.brand_name}".
-Target region: {brand.target_region}
+        prompt = f"""I have a {brand.industry} brand/business called "{brand.brand_name}" in {brand.target_region}.
+
+{dna_context}{competitor_context}{trending_context}{learning_context}
 Content pillars: {pillar_context}
 {f'Focus pillar: {specific_pillar.name}' if specific_pillar else ''}
 Platform: {platform_text}
-{learning_context}
-For each idea, provide:
-- title: A catchy title (max 80 chars)
-- hook: An attention-grabbing opening line
-- angle: The unique perspective or approach
+
+Based on the above context — especially the trending topics — generate exactly {count} unique, actionable content ideas that I can post on social media to increase my brand visibility, engagement, and sales.
+
+Each idea must be:
+- Directly inspired by one of the trending topics or current events
+- Tailored to my brand, industry, and target audience
+- Ready to execute — specific enough to write a caption from
+
+For each idea, return:
+- title: A catchy, scroll-stopping title (max 80 chars, NO generic text like "Idea 1")
+- hook: An attention-grabbing opening line that makes people stop scrolling
+- angle: The unique perspective, story, or approach
 - platform: Best platform for this idea (twitter/linkedin/facebook/instagram)
 - goal: Content goal (leads/growth/authority)
 - content_format: Format type (text/image/video/carousel/reel/thread)
@@ -619,10 +682,10 @@ Return as JSON array. Only return the JSON array, no other text."""
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
                 messages=[
-                    {'role': 'system', 'content': 'You are a social media content strategist. Return only valid JSON arrays.'},
+                    {'role': 'system', 'content': 'You are a senior social media analyst and business development strategist. You analyze trending topics and create viral, high-converting content ideas that drive real business results — more followers, more engagement, more sales. Return only valid JSON arrays.'},
                     {'role': 'user', 'content': prompt},
                 ],
-                temperature=0.8,
+                temperature=0.85,
                 max_tokens=3000,
             )
 
@@ -826,3 +889,215 @@ class AddIdeaToCalendarView(APIView):
             'message': 'Idea added to calendar as draft',
             'post_id': post.id,
         }, status=status.HTTP_201_CREATED)
+
+
+# ============================================================
+# V1.3 NEW VIEWS — Trending, DNA History, Overflow, Idea History
+# ============================================================
+
+
+class GenerateTrendingView(APIView):
+    """Generate trending topics for a brand using pytrends + OpenAI"""
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
+
+    def post(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user),
+                id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            from .trending_service import generate_trending_for_brand
+            result = generate_trending_for_brand(brand_id, request.user)
+            return Response(result)
+        except Exception as e:
+            logger.error(f"Trending generation failed for brand {brand_id}: {e}", exc_info=True)
+            return Response(
+                {'error': f'Trending generation failed: {str(e)}', 'topics': []},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class BrandTrendingTopicsView(APIView):
+    """Get cached trending topics for a specific brand"""
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
+
+    def get(self, request, brand_id):
+        topics = TrendingCache.objects.filter(
+            brand_id=brand_id,
+            expires_at__gt=timezone.now()
+        ).order_by('-volume_score')[:30]
+
+        data = [{
+            'id': t.id,
+            'platform': t.platform,
+            'topic': t.topic,
+            'volume_score': t.volume_score,
+            'region': t.region,
+            'relevance_explanation': t.relevance_explanation,
+            'expires_at': t.expires_at.isoformat(),
+        } for t in topics]
+
+        return Response({'brand_id': brand_id, 'count': len(data), 'topics': data})
+
+
+class BrandDNAHistoryView(APIView):
+    """List and manage DNA generation history for a brand"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, brand_id):
+        history = BrandDNAHistory.objects.filter(
+            brand_id=brand_id,
+            brand__user=request.user
+        ).order_by('-generated_at')[:20]
+
+        data = [{
+            'id': h.id,
+            'website_url': h.website_url,
+            'source': h.source,
+            'is_active': h.is_active,
+            'generated_at': h.generated_at.isoformat(),
+            'brand_name': h.dna_data.get('brand_name', ''),
+            'industry': h.dna_data.get('industry', ''),
+        } for h in history]
+
+        return Response({'brand_id': brand_id, 'history': data})
+
+
+class RestoreDNAView(APIView):
+    """Restore a previous DNA version as the active one"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, brand_id, history_id):
+        try:
+            brand = Brand.objects.get(id=brand_id, user=request.user)
+            history_entry = BrandDNAHistory.objects.get(id=history_id, brand=brand)
+        except (Brand.DoesNotExist, BrandDNAHistory.DoesNotExist):
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Deactivate all, activate this one
+        BrandDNAHistory.objects.filter(brand=brand).update(is_active=False)
+        history_entry.is_active = True
+        history_entry.save()
+
+        # Restore to brand
+        brand.brand_dna = history_entry.dna_data
+        brand.brand_dna_generated_at = history_entry.generated_at
+        brand.brand_dna_source = history_entry.source
+        brand.website_url = history_entry.website_url
+        brand.save()
+
+        return Response({
+            'message': 'DNA restored successfully',
+            'dna_data': brand.brand_dna,
+            'generated_at': brand.brand_dna_generated_at.isoformat() if brand.brand_dna_generated_at else None,
+        })
+
+
+class OverflowProgressView(APIView):
+    """Get or update overflow flow progress"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        progress, created = OverflowProgress.objects.get_or_create(user=request.user)
+        return Response({
+            'current_step': progress.current_step,
+            'completed_steps': progress.completed_steps,
+            'dna_completed': progress.dna_completed,
+            'pillars_completed': progress.pillars_completed,
+            'competitors_completed': progress.competitors_completed,
+            'trending_completed': progress.trending_completed,
+            'selected_idea_ids': progress.selected_idea_ids,
+            'idea_media_preferences': progress.idea_media_preferences,
+            'selected_caption_ids': progress.selected_caption_ids,
+            'generated_media_ids': progress.generated_media_ids,
+            'created_post_id': progress.created_post_id,
+            'is_completed': progress.is_completed,
+            'is_skipped': progress.is_skipped,
+            'brand_id': progress.brand_id,
+        })
+
+    def put(self, request):
+        progress, _ = OverflowProgress.objects.get_or_create(user=request.user)
+        data = request.data
+
+        for field in [
+            'current_step', 'dna_completed', 'pillars_completed',
+            'competitors_completed', 'trending_completed',
+            'selected_idea_ids', 'idea_media_preferences',
+            'selected_caption_ids', 'generated_media_ids',
+            'created_post_id', 'is_completed', 'brand_id',
+        ]:
+            if field in data:
+                setattr(progress, field, data[field])
+
+        # Auto-manage completed_steps
+        if data.get('current_step') and data['current_step'] not in progress.completed_steps:
+            prev = data['current_step'] - 1
+            if prev > 0 and prev not in progress.completed_steps:
+                progress.completed_steps.append(prev)
+
+        if data.get('is_completed'):
+            progress.completed_at = timezone.now()
+
+        progress.save()
+        return Response({'message': 'Progress updated', 'current_step': progress.current_step})
+
+
+class OverflowSkipView(APIView):
+    """Skip the overflow flow"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        progress, _ = OverflowProgress.objects.get_or_create(user=request.user)
+        progress.is_skipped = True
+        progress.save()
+        return Response({'message': 'Overflow flow skipped'})
+
+
+class IdeaHistoryView(APIView):
+    """List all historical ideas for the user"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        brand_id = request.query_params.get('brand_id')
+        status_filter = request.query_params.get('status', '')
+        platform = request.query_params.get('platform', '')
+        search = request.query_params.get('search', '')
+
+        ideas = ContentIdea.objects.filter(
+            Q(brand__user=request.user) | Q(user=request.user)
+        ).select_related('pillar', 'brand')
+
+        if brand_id:
+            ideas = ideas.filter(brand_id=brand_id)
+        if status_filter:
+            ideas = ideas.filter(status=status_filter)
+        if platform:
+            ideas = ideas.filter(platform=platform)
+        if search:
+            ideas = ideas.filter(Q(title__icontains=search) | Q(hook__icontains=search))
+
+        ideas = ideas.order_by('-created_at')[:100]
+
+        data = [{
+            'id': i.id,
+            'title': i.title,
+            'hook': i.hook,
+            'angle': i.angle,
+            'platform': i.platform,
+            'goal': i.goal,
+            'content_format': i.content_format,
+            'status': i.status,
+            'pillar_name': i.pillar.name if i.pillar else '',
+            'engagement_tier': i.engagement_tier,
+            'source': i.source,
+            'media_preference': i.media_preference,
+            'brand_name': i.brand.brand_name if i.brand else '',
+            'created_at': i.created_at.isoformat(),
+        } for i in ideas]
+
+        return Response({'count': len(data), 'ideas': data})

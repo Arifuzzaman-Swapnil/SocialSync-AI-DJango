@@ -178,6 +178,15 @@ urlpatterns = [
     path('ideas/<int:idea_id>/add-to-calendar/', strategy_views.AddIdeaToCalendarView.as_view(), name='api-idea-to-calendar'),
     path('trending/', strategy_views.TrendingTopicsView.as_view(), name='api-trending'),
 
+    # V1.3 — Overflow, Trending, DNA History, Idea History
+    path('overflow/progress/', strategy_views.OverflowProgressView.as_view(), name='api-overflow-progress'),
+    path('overflow/skip/', strategy_views.OverflowSkipView.as_view(), name='api-overflow-skip'),
+    path('brands/<int:brand_id>/trending/generate/', strategy_views.GenerateTrendingView.as_view(), name='api-generate-trending'),
+    path('brands/<int:brand_id>/trending/', strategy_views.BrandTrendingTopicsView.as_view(), name='api-brand-trending'),
+    path('brands/<int:brand_id>/dna-history/', strategy_views.BrandDNAHistoryView.as_view(), name='api-dna-history'),
+    path('brands/<int:brand_id>/dna-history/<int:history_id>/restore/', strategy_views.RestoreDNAView.as_view(), name='api-dna-restore'),
+    path('ideas/history/', strategy_views.IdeaHistoryView.as_view(), name='api-idea-history'),
+
     # Draft Captions
     path('drafts/<int:post_id>/captions/', caption_views.DraftCaptionsView.as_view(), name='api-draft-captions'),
     path('drafts/<int:post_id>/captions/generate/', caption_views.GenerateCaptionsView.as_view(), name='api-generate-captions'),

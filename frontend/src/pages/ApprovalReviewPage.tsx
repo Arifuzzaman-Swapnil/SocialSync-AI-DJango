@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircleIcon, XCircleIcon, ArrowPathIcon,
-  ChatBubbleLeftIcon, ClockIcon, UserIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import approvalService from '../services/approvalService';
 

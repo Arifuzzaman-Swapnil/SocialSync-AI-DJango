@@ -2670,11 +2670,23 @@ class GenerateBrandDNAView(APIView):
 
         try:
             import openai, json
-            from api.strategy_views import _fetch_page_content
+            from api.strategy_views import _crawl_site_pages, _fetch_page_content
 
-            # Fetch the website content
+            # Fetch the website content — multi-page crawl for richer DNA
             url = brand.website_url
-            page_data = _fetch_page_content(url)
+            try:
+                pages = _crawl_site_pages(url, max_pages=5)
+                if pages:
+                    combined_content = ''
+                    combined_title = pages[0].get('title', '')
+                    combined_desc = pages[0].get('description', '')
+                    for p in pages:
+                        combined_content += f"\n--- Page: {p.get('url', '')} ---\n{p.get('content', '')}\n"
+                    page_data = {'success': True, 'title': combined_title, 'description': combined_desc, 'content': combined_content[:8000]}
+                else:
+                    page_data = _fetch_page_content(url)
+            except Exception:
+                page_data = _fetch_page_content(url)
 
             if not page_data['success']:
                 return Response(
@@ -2739,6 +2751,17 @@ Return as a single JSON object. Only return valid JSON, no other text."""
             brand.brand_dna_generated_at = timezone.now()
             brand.brand_dna_source = 'website'
             brand.save(update_fields=['brand_dna', 'brand_dna_generated_at', 'brand_dna_source'])
+
+            # V1.3 — Save to DNA history
+            from brands.models import BrandDNAHistory
+            BrandDNAHistory.objects.filter(brand=brand).update(is_active=False)
+            BrandDNAHistory.objects.create(
+                brand=brand,
+                dna_data=dna_data,
+                website_url=url,
+                source='website',
+                is_active=True,
+            )
 
             return Response({
                 'success': True,

@@ -3,12 +3,14 @@ import { motion } from 'framer-motion';
 import {
   PlusIcon, TrashIcon, PencilIcon,
   ChartPieIcon, GlobeAltIcon, SparklesIcon,
-  MagnifyingGlassIcon, LightBulbIcon, ArrowPathIcon,
+  MagnifyingGlassIcon, LightBulbIcon,
   ArrowTopRightOnSquareIcon, BeakerIcon,
-  CheckCircleIcon,
+  CheckCircleIcon, FireIcon, ClockIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import strategyService from '../services/strategyService';
 import api from '../services/api';
+import type { TrendingTopic, BrandDNAHistoryEntry } from '../types';
 
 interface Pillar {
   id: number;
@@ -64,7 +66,7 @@ export function StrategyHubPage() {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [compliance, setCompliance] = useState<ComplianceData | null>(null);
   const [insights, setInsights] = useState<CompetitorInsight[]>([]);
-  const [activeTab, setActiveTab] = useState<'pillars' | 'competitors' | 'dna'>('pillars');
+  const [activeTab, setActiveTab] = useState<'pillars' | 'competitors' | 'dna' | 'trending'>('pillars');
   const [loading, setLoading] = useState(true);
   const [brandId, setBrandId] = useState<number | null>(null);
 
@@ -79,6 +81,15 @@ export function StrategyHubPage() {
   const [dnaError, setDnaError] = useState<string | null>(null);
   const [dnaData, setDnaData] = useState<Record<string, any> | null>(null);
   const [dnaGeneratedAt, setDnaGeneratedAt] = useState<string | null>(null);
+
+  // Trending
+  const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
+  const [trendingError, setTrendingError] = useState<string | null>(null);
+
+  // DNA History
+  const [dnaHistory, setDnaHistory] = useState<BrandDNAHistoryEntry[]>([]);
+  const [showDnaHistory, setShowDnaHistory] = useState(false);
 
   // Pillar form
   const [showPillarForm, setShowPillarForm] = useState(false);
@@ -141,6 +152,12 @@ export function StrategyHubPage() {
           if (dnaStatus.website_url) setDnaUrl(dnaStatus.website_url);
         }
       } catch { /* no DNA yet */ }
+
+      // Load cached trending
+      try {
+        const tData = await strategyService.getBrandTrending(brandId);
+        setTrendingTopics(Array.isArray(tData) ? tData : tData.topics || []);
+      } catch { setTrendingTopics([]); }
     } catch (err) {
       console.error('Failed to load strategy data:', err);
     }
@@ -231,6 +248,53 @@ export function StrategyHubPage() {
     setDnaLoading(false);
   };
 
+  const handleGenerateTrending = async () => {
+    if (!brandId) {
+      setTrendingError('No brand selected. Please create a brand first.');
+      return;
+    }
+    setTrendingLoading(true);
+    setTrendingError(null);
+    try {
+      const result = await strategyService.generateTrending(brandId);
+      const topics = result?.topics || [];
+      setTrendingTopics(topics);
+      if (topics.length === 0) {
+        setTrendingError('No trending topics found. Try again.');
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        'Failed to generate trending topics.';
+      setTrendingError(msg);
+    } finally {
+      setTrendingLoading(false);
+    }
+  };
+
+  const handleLoadDNAHistory = async () => {
+    if (!brandId) return;
+    try {
+      const data = await strategyService.getDNAHistory(brandId);
+      setDnaHistory(Array.isArray(data) ? data : data.history || []);
+      setShowDnaHistory(true);
+    } catch { setDnaHistory([]); setShowDnaHistory(true); }
+  };
+
+  const handleRestoreDNA = async (historyId: number) => {
+    if (!brandId) return;
+    try {
+      const result = await strategyService.restoreDNA(brandId, historyId);
+      if (result.brand_dna) {
+        setDnaData(result.brand_dna);
+        setDnaGeneratedAt(result.restored_at || new Date().toISOString());
+      }
+      setShowDnaHistory(false);
+    } catch { /* ignore */ }
+  };
+
   const totalPercentage = pillars.reduce((sum, p) => sum + p.target_percentage, 0);
 
   const statusColors: Record<string, string> = {
@@ -280,7 +344,7 @@ export function StrategyHubPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-white/10 pb-0">
-        {(['pillars', 'competitors', 'dna'] as const).map((tab) => (
+        {(['pillars', 'competitors', 'dna', 'trending'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -290,7 +354,7 @@ export function StrategyHubPage() {
                 : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
           >
-            {tab === 'pillars' ? 'Content Pillars' : tab === 'competitors' ? 'Competitors' : 'Generate DNA'}
+            {tab === 'pillars' ? 'Content Pillars' : tab === 'competitors' ? 'Competitors' : tab === 'dna' ? 'Generate DNA' : 'Trending Topics'}
           </button>
         ))}
       </div>
@@ -688,14 +752,20 @@ export function StrategyHubPage() {
                 ) : (
                   <SparklesIcon className="w-4 h-4" />
                 )}
-                {dnaLoading ? 'Generating...' : 'Generate DNA'}
+                {dnaLoading ? 'Generating...' : dnaData ? 'Reanalyze' : 'Generate DNA'}
               </button>
             </div>
             {dnaGeneratedAt && (
-              <p className="text-xs text-text-secondary mt-3 flex items-center gap-1">
-                <CheckCircleIcon className="w-3.5 h-3.5 text-green-400" />
-                Last generated: {new Date(dnaGeneratedAt).toLocaleString()}
-              </p>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-xs text-text-secondary flex items-center gap-1">
+                  <CheckCircleIcon className="w-3.5 h-3.5 text-green-400" />
+                  Last generated: {new Date(dnaGeneratedAt).toLocaleString()}
+                </p>
+                <button onClick={handleLoadDNAHistory} className="text-xs text-primary-400 hover:underline flex items-center gap-1">
+                  <ClockIcon className="w-3.5 h-3.5" />
+                  DNA History
+                </button>
+              </div>
             )}
           </div>
 
@@ -874,6 +944,175 @@ export function StrategyHubPage() {
               <p className="text-xs text-text-secondary mt-1">AI will analyze your website and extract your brand's identity</p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ===== TRENDING TAB ===== */}
+      {activeTab === 'trending' && (
+        <div className="space-y-6">
+          {/* Generate Button */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <FireIcon className="w-5 h-5 text-orange-400" />
+                  Trending Topics
+                </h3>
+                <p className="text-sm text-text-secondary mt-1">
+                  Discover trending topics relevant to your brand using Google Trends + AI analysis
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateTrending}
+                disabled={trendingLoading}
+                className="btn-primary flex items-center gap-2"
+              >
+                {trendingLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                ) : (
+                  <ArrowPathIcon className="w-4 h-4" />
+                )}
+                {trendingLoading ? 'Analyzing Trends...' : 'Generate Trending'}
+              </button>
+            </div>
+            {!dnaData && (
+              <p className="text-xs text-amber-400 bg-amber-400/10 rounded-lg px-3 py-2">
+                Tip: Generate your Brand DNA first for more relevant trending results.
+              </p>
+            )}
+          </div>
+
+          {trendingError && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
+              {trendingError}
+            </div>
+          )}
+
+          {/* Loading */}
+          {trendingLoading && (
+            <div className="card p-12 text-center">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-text-muted mt-3 text-sm">Fetching Google Trends & analyzing with AI...</p>
+              <p className="text-text-muted text-xs mt-1">This may take 15-30 seconds</p>
+            </div>
+          )}
+
+          {/* Topic Cards */}
+          {!trendingLoading && trendingTopics.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-text-muted">{trendingTopics.length} trending topics found</p>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {trendingTopics.map((topic, idx) => (
+                  <motion.div
+                    key={topic.id || idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className={`card p-4 hover:border-white/10 transition-colors ${
+                      topic.category === 'seasonal' || topic.category === 'cultural'
+                        ? 'border-orange-500/20 bg-gradient-to-br from-orange-500/5 to-transparent'
+                        : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2 gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-orange-400 text-xs font-bold">#{idx + 1}</span>
+                        <h4 className="font-semibold text-sm text-text-primary truncate">{topic.topic}</h4>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {topic.category && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium capitalize ${
+                            topic.category === 'seasonal' ? 'bg-purple-500/20 text-purple-400' :
+                            topic.category === 'cultural' ? 'bg-pink-500/20 text-pink-400' :
+                            topic.category === 'viral' ? 'bg-cyan-500/20 text-cyan-400' :
+                            topic.category === 'evergreen' ? 'bg-green-500/20 text-green-400' :
+                            'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {topic.category}
+                          </span>
+                        )}
+                        {topic.volume_score != null && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            topic.volume_score >= 80 ? 'bg-red-500/20 text-red-400' :
+                            topic.volume_score >= 50 ? 'bg-orange-500/20 text-orange-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            {topic.volume_score >= 80 ? 'Hot' : topic.volume_score >= 50 ? 'Rising' : 'Emerging'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {topic.relevance_explanation && (
+                      <p className="text-xs text-text-secondary mb-3">{topic.relevance_explanation}</p>
+                    )}
+                    {topic.volume_score != null && (
+                      <div className="mb-3">
+                        <div className="h-1 bg-dark-600 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              topic.volume_score >= 80 ? 'bg-red-500' : topic.volume_score >= 50 ? 'bg-orange-500' : 'bg-yellow-500'
+                            }`}
+                            style={{ width: `${Math.min(topic.volume_score, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!trendingLoading && trendingTopics.length === 0 && !trendingError && (
+            <div className="card p-12 text-center">
+              <FireIcon className="w-12 h-12 mx-auto text-text-secondary mb-3" />
+              <p className="text-text-secondary">No trending topics yet</p>
+              <p className="text-xs text-text-secondary mt-1">Click "Generate Trending" to discover what's trending for your brand</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ===== DNA HISTORY MODAL ===== */}
+      {showDnaHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowDnaHistory(false)}>
+          <div className="card p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <ClockIcon className="w-5 h-5 text-primary-400" />
+              DNA Generation History
+            </h3>
+            {dnaHistory.length === 0 ? (
+              <p className="text-sm text-text-secondary text-center py-6">No history found.</p>
+            ) : (
+              <div className="space-y-3">
+                {dnaHistory.map((entry) => (
+                  <div key={entry.id} className={`rounded-lg p-3 border ${entry.is_active ? 'border-primary-500/50 bg-primary-500/5' : 'border-white/5 bg-dark-700/30'}`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium">
+                          {entry.dna_data?.brand_name || 'Brand DNA'}
+                          {entry.is_active && <span className="ml-2 text-xs text-primary-400">(Active)</span>}
+                        </p>
+                        <p className="text-xs text-text-secondary mt-0.5">
+                          {entry.source || 'website'} &middot; {new Date(entry.generated_at).toLocaleString()}
+                        </p>
+                        {entry.website_url && (
+                          <p className="text-xs text-text-muted mt-0.5 truncate">{entry.website_url}</p>
+                        )}
+                      </div>
+                      {!entry.is_active && (
+                        <button onClick={() => handleRestoreDNA(entry.id)} className="btn-secondary text-xs px-3 py-1.5">
+                          Restore
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowDnaHistory(false)} className="btn-secondary w-full mt-4">Close</button>
+          </div>
         </div>
       )}
     </div>

@@ -28,6 +28,9 @@ import {
   CalendarPage,
   ApprovalReviewPage,
   PermissionsPage,
+  // V1.3
+  OverflowPage,
+  IdeaHistoryPage,
 } from './pages';
 import {
   AdminDashboardPage,
@@ -67,11 +70,12 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user } = useAuthStore();
 
   if (isAuthenticated) {
-    // Admin users go to admin panel, regular users go to dashboard
+    // Admin users go to admin panel
     if (user?.is_staff) {
       return <Navigate to="/admin-panel" replace />;
     }
-    return <Navigate to="/" replace />;
+    // Regular users always land on overflow page
+    return <Navigate to="/overflow" replace />;
   }
 
   return <>{children}</>;
@@ -165,6 +169,10 @@ function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/approvals" element={<ApprovalReviewPage />} />
           <Route path="/settings/permissions" element={<PermissionsPage />} />
+
+          {/* V1.3 Routes */}
+          <Route path="/overflow" element={<OverflowPage />} />
+          <Route path="/ideas/history" element={<IdeaHistoryPage />} />
 
           {/* Info Pages */}
           <Route path="/about" element={<AboutPage />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  CheckCircleIcon, XCircleIcon, ExclamationTriangleIcon,
+  CheckCircleIcon, XCircleIcon,
   ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
 import approvalService from '../services/approvalService';

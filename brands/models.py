@@ -208,6 +208,11 @@ class ContentIdea(models.Model):
     )
     trending_topic_ref = models.CharField(max_length=500, blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
+    media_preference = models.CharField(
+        max_length=10,
+        choices=[('none', 'None'), ('image', 'Image'), ('video', 'Video')],
+        default='none', blank=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -438,6 +443,8 @@ class TrendingCache(models.Model):
     topic = models.CharField(max_length=500)
     volume_score = models.FloatField(default=0)
     region = models.CharField(max_length=100, default='global')
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, blank=True, related_name='trending_topics')
+    relevance_explanation = models.TextField(blank=True)
     fetched_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 
@@ -565,3 +572,69 @@ class BrandDNAChunk(models.Model):
         """Stores embedding as JSON"""
         import json
         self.embedding = json.dumps(embedding_list)
+
+
+class BrandDNAHistory(models.Model):
+    """Historical DNA generations for reuse/rollback"""
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='dna_history')
+    dna_data = models.JSONField(default=dict)
+    website_url = models.URLField(max_length=2000)
+    source = models.CharField(
+        max_length=20,
+        choices=[('website', 'Website'), ('pdf', 'PDF'), ('manual', 'Manual')],
+        default='website'
+    )
+    is_active = models.BooleanField(default=True)
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'brand_dna_history'
+        verbose_name = 'Brand DNA History'
+        verbose_name_plural = 'Brand DNA Histories'
+        ordering = ['-generated_at']
+
+    def __str__(self):
+        return f"DNA v{self.id} - {self.brand.brand_name} ({self.generated_at:%Y-%m-%d})"
+
+
+class OverflowProgress(models.Model):
+    """Tracks user progress through the guided overflow flow"""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='overflow_progress')
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True)
+    current_step = models.IntegerField(default=1)
+    completed_steps = models.JSONField(default=list, blank=True)
+
+    # Step 1 sub-steps
+    dna_completed = models.BooleanField(default=False)
+    pillars_completed = models.BooleanField(default=False)
+    competitors_completed = models.BooleanField(default=False)
+    trending_completed = models.BooleanField(default=False)
+
+    # Step 2 selections
+    selected_idea_ids = models.JSONField(default=list, blank=True)
+    idea_media_preferences = models.JSONField(default=dict, blank=True)
+
+    # Step 3 selections
+    selected_caption_ids = models.JSONField(default=list, blank=True)
+
+    # Step 4 generated media
+    generated_media_ids = models.JSONField(default=list, blank=True)
+
+    # Step 5 post
+    created_post_id = models.IntegerField(null=True, blank=True)
+
+    is_completed = models.BooleanField(default=False)
+    is_skipped = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'overflow_progress'
+        verbose_name = 'Overflow Progress'
+        verbose_name_plural = 'Overflow Progress'
+
+    def __str__(self):
+        return f"Overflow: {self.user.username} - Step {self.current_step} ({'done' if self.is_completed else 'active'})"

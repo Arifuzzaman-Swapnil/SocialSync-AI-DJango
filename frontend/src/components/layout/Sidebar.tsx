@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   HomeIcon,
@@ -19,6 +20,8 @@ import {
   LightBulbIcon,
   CalendarDaysIcon,
   ShieldCheckIcon,
+  ChevronDownIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { useAuthStore } from '../../store';
 
@@ -33,14 +36,24 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
+  children?: NavItem[];
 }
 
 const mainNavItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Strategy Hub', href: '/strategy', icon: MapIcon, badge: 'New' },
-  { name: 'Ideas Hub', href: '/ideas', icon: LightBulbIcon, badge: 'New' },
-  { name: 'Create Post', href: '/posts/create', icon: PlusCircleIcon },
-  { name: 'My Posts', href: '/posts', icon: DocumentTextIcon },
+  {
+    name: 'Ideas Hub', href: '/ideas', icon: LightBulbIcon, badge: 'New',
+    children: [
+      { name: 'Idea History', href: '/ideas/history', icon: ClockIcon },
+    ],
+  },
+  {
+    name: 'Create Post', href: '/posts/create', icon: PlusCircleIcon,
+    children: [
+      { name: 'My Post History', href: '/posts', icon: DocumentTextIcon },
+    ],
+  },
   { name: 'Calendar', href: '/calendar', icon: CalendarDaysIcon, badge: 'New' },
   { name: 'Approvals', href: '/approvals', icon: ShieldCheckIcon },
   { name: 'Connect Account', href: '/platforms', icon: LinkIcon },
@@ -72,6 +85,65 @@ function GemIconCustom({ className }: { className?: string }) {
   );
 }
 
+function NavItemWithChildren({ item, onClose }: { item: NavItem; onClose: () => void }) {
+  const location = useLocation();
+  const isChildActive = item.children?.some((c) => location.pathname === c.href) || false;
+  const [expanded, setExpanded] = useState(isChildActive);
+
+  return (
+    <div>
+      <div className="flex items-center">
+        <NavLink
+          to={item.href}
+          onClick={onClose}
+          className={({ isActive }) =>
+            `sidebar-link flex-1 ${isActive ? 'active' : ''}`
+          }
+        >
+          <item.icon className="w-5 h-5" />
+          <span className="flex-1">{item.name}</span>
+          {item.badge && (
+            <span className="badge badge-primary text-[10px]">{item.badge}</span>
+          )}
+        </NavLink>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="p-1.5 mr-2 rounded-md text-text-muted hover:text-text-primary hover:bg-white/5 transition-colors"
+        >
+          <ChevronDownIcon
+            className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          />
+        </button>
+      </div>
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            {item.children?.map((child) => (
+              <NavLink
+                key={child.name}
+                to={child.href}
+                onClick={onClose}
+                className={({ isActive }) =>
+                  `sidebar-link pl-11 text-sm ${isActive ? 'active' : ''}`
+                }
+              >
+                <child.icon className="w-4 h-4" />
+                <span className="flex-1">{child.name}</span>
+              </NavLink>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function Sidebar({ isOpen, onClose, isImpersonating }: SidebarProps) {
   const { user } = useAuthStore();
 
@@ -83,22 +155,26 @@ export function Sidebar({ isOpen, onClose, isImpersonating }: SidebarProps) {
         </h3>
       )}
       <nav className="space-y-1">
-        {items.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            onClick={onClose}
-            className={({ isActive }) =>
-              `sidebar-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="flex-1">{item.name}</span>
-            {item.badge && (
-              <span className="badge badge-primary text-[10px]">{item.badge}</span>
-            )}
-          </NavLink>
-        ))}
+        {items.map((item) =>
+          item.children ? (
+            <NavItemWithChildren key={item.name} item={item} onClose={onClose} />
+          ) : (
+            <NavLink
+              key={item.name}
+              to={item.href}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `sidebar-link ${isActive ? 'active' : ''}`
+              }
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="flex-1">{item.name}</span>
+              {item.badge && (
+                <span className="badge badge-primary text-[10px]">{item.badge}</span>
+              )}
+            </NavLink>
+          )
+        )}
       </nav>
     </div>
   );

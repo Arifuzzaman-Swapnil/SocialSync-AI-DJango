@@ -32,7 +32,9 @@ export const useAuthStore = create<AuthState>()(
           const { user } = await authService.login(credentials);
           set({ user, isAuthenticated: true, isLoading: false });
         } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : 'Login failed';
+          const axiosErr = error as { response?: { data?: { error?: string } } };
+          const message = axiosErr?.response?.data?.error
+            || (error instanceof Error ? error.message : 'Login failed');
           set({ error: message, isLoading: false });
           throw error;
         }

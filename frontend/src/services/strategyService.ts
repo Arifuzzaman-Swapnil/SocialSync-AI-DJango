@@ -56,7 +56,7 @@ export const strategyService = {
   },
 
   // Ideas
-  async generateIdeas(data: { brand_id: number; pillar_id?: number; platform?: string; count?: number }) {
+  async generateIdeas(data: { brand_id: number; pillar_id?: number; platform?: string; count?: number; trending_topics?: string[] }) {
     const res = await api.post('/ideas/generate/', data);
     return res.data;
   },
@@ -81,6 +81,46 @@ export const strategyService = {
   },
   async getDNAStatus(brandId: number) {
     const res = await api.get(`/brands/${brandId}/dna-status/`);
+    return res.data;
+  },
+
+  // V1.3 — DNA History
+  async getDNAHistory(brandId: number) {
+    const res = await api.get(`/brands/${brandId}/dna-history/`);
+    return res.data;
+  },
+  async restoreDNA(brandId: number, historyId: number) {
+    const res = await api.post(`/brands/${brandId}/dna-history/${historyId}/restore/`);
+    return res.data;
+  },
+
+  // V1.3 — Brand-specific Trending
+  async generateTrending(brandId: number) {
+    const res = await api.post(`/brands/${brandId}/trending/generate/`);
+    return res.data;
+  },
+  async getBrandTrending(brandId: number) {
+    const res = await api.get(`/brands/${brandId}/trending/`);
+    return res.data;
+  },
+
+  // V1.3 — Overflow Flow
+  async getOverflowProgress() {
+    const res = await api.get('/overflow/progress/');
+    return res.data;
+  },
+  async updateOverflowProgress(data: Record<string, unknown>) {
+    const res = await api.put('/overflow/progress/', data);
+    return res.data;
+  },
+  async skipOverflow() {
+    const res = await api.post('/overflow/skip/');
+    return res.data;
+  },
+
+  // V1.3 — Idea History
+  async getIdeaHistory(params?: { brand_id?: number; status?: string; platform?: string; search?: string }) {
+    const res = await api.get('/ideas/history/', { params });
     return res.data;
   },
 };

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeftIcon, ChevronRightIcon,
-  CalendarDaysIcon, ClockIcon,
+  ClockIcon,
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/outline';
 import calendarService from '../services/calendarService';
@@ -26,20 +26,12 @@ const PLATFORM_COLORS: Record<string, string> = {
   instagram: '#E4405F',
 };
 
-const STATUS_BADGES: Record<string, string> = {
-  draft: 'bg-gray-500/20 text-gray-400',
-  pending_approval: 'bg-yellow-500/20 text-yellow-400',
-  approved: 'bg-blue-500/20 text-blue-400',
-  scheduled: 'bg-purple-500/20 text-purple-400',
-  posted: 'bg-green-500/20 text-green-400',
-  failed: 'bg-red-500/20 text-red-400',
-};
-
 export function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'week'>('month');
-  const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_loading, setLoading] = useState(true);
   const [showBestTimes, setShowBestTimes] = useState(false);
   const [dragEvent, setDragEvent] = useState<CalendarEvent | null>(null);
   const [dropTargetDate, setDropTargetDate] = useState<string | null>(null);

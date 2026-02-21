@@ -24,3 +24,7 @@ export { IdeasHubPage } from './IdeasHubPage';
 export { CalendarPage } from './CalendarPage';
 export { ApprovalReviewPage } from './ApprovalReviewPage';
 export { PermissionsPage } from './PermissionsPage';
+
+// V1.3 pages
+export { OverflowPage } from './OverflowPage';
+export { IdeaHistoryPage } from './IdeaHistoryPage';
