@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 
+from accounts.permissions import IsCreatorOrAbove, IsApproverOrAbove, IsViewerOrAbove
+
 from posts.models import Post
 from brands.models import ApprovalLog, ContentApproval
 from accounts.services.notification_service import (
@@ -18,7 +20,7 @@ from .serializers import (
 
 
 class SubmitForApprovalView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request, post_id):
         try:
@@ -70,7 +72,7 @@ class SubmitForApprovalView(APIView):
 
 
 class ApprovePostView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApproverOrAbove]
 
     def post(self, request, post_id):
         try:
@@ -108,7 +110,7 @@ class ApprovePostView(APIView):
 
 
 class RequestChangesView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApproverOrAbove]
 
     def post(self, request, post_id):
         try:
@@ -147,7 +149,7 @@ class RequestChangesView(APIView):
 
 
 class RejectPostView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApproverOrAbove]
 
     def post(self, request, post_id):
         try:
@@ -187,7 +189,7 @@ class RejectPostView(APIView):
 
 
 class PendingApprovalsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsApproverOrAbove]
 
     def get(self, request):
         posts = Post.objects.filter(
@@ -200,7 +202,7 @@ class PendingApprovalsView(APIView):
 
 
 class ApprovalLogView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, post_id):
         logs = ApprovalLog.objects.filter(
@@ -212,7 +214,7 @@ class ApprovalLogView(APIView):
 
 
 class DraftChecklistView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def get(self, request, post_id):
         try:

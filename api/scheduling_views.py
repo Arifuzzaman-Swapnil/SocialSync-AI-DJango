@@ -5,6 +5,8 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from datetime import timedelta
 
+from accounts.permissions import IsPublisherOrAbove, IsViewerOrAbove
+
 from posts.models import Post, PostCaption, ScheduledPostPlatform
 from brands.models import Brand, BestTimeSuggestion
 from accounts.services.notification_service import notify_post_scheduled
@@ -17,7 +19,7 @@ from .serializers import (
 
 class SchedulePostView(APIView):
     """Schedule a post per-platform with specific captions and times"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsPublisherOrAbove]
 
     def post(self, request, post_id):
         try:
@@ -73,7 +75,7 @@ class SchedulePostView(APIView):
 
 class RescheduleView(APIView):
     """Reschedule a platform-specific scheduled post"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsPublisherOrAbove]
 
     def patch(self, request, spp_id):
         try:
@@ -102,7 +104,7 @@ class RescheduleView(APIView):
 
 class CalendarView(APIView):
     """Get calendar data for FullCalendar integration"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request):
         start = request.query_params.get('start')
@@ -150,7 +152,7 @@ class CalendarView(APIView):
 
 
 class BestTimeSuggestionsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, brand_id):
         try:
@@ -169,7 +171,7 @@ class BestTimeSuggestionsView(APIView):
 
 class ConflictCheckView(APIView):
     """Check for scheduling conflicts (same platform within buffer window)"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def post(self, request):
         serializer = ConflictCheckRequestSerializer(data=request.data)

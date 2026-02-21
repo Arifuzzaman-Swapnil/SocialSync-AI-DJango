@@ -94,6 +94,13 @@ export function CreatePostPage() {
   const [contentTab, setContentTab] = useState<'captions' | 'hashtags' | 'creative' | 'preview'>('captions');
   const [checklistKey, setChecklistKey] = useState(0);
 
+  // Brand / Pillar / Goal selectors
+  const [brands, setBrands] = useState<{ id: number; brand_name: string }[]>([]);
+  const [pillarOptions, setPillarOptions] = useState<{ id: number; name: string }[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<number | ''>('');
+  const [selectedPillar, setSelectedPillar] = useState<number | ''>('');
+  const [selectedGoal, setSelectedGoal] = useState<string>('');
+
   const {
     register,
     control,
@@ -150,6 +157,42 @@ export function CreatePostPage() {
       setValue('caption', state.caption);
     }
   }, [location.state, setValue]);
+
+  // Fetch brands on mount
+  useEffect(() => {
+    const fetchBrands = async () => {
+      try {
+        const res = await api.get('/brands/');
+        const data = Array.isArray(res.data) ? res.data : res.data.results || [];
+        setBrands(data);
+      } catch (err) {
+        console.error('Failed to fetch brands:', err);
+      }
+    };
+    fetchBrands();
+  }, []);
+
+  // Fetch pillars (optionally filtered by brand)
+  useEffect(() => {
+    const fetchPillars = async () => {
+      try {
+        const params: Record<string, unknown> = {};
+        if (selectedBrand) {
+          params.brand_id = selectedBrand;
+        }
+        const res = await api.get('/content-pillars/', { params });
+        const data = Array.isArray(res.data) ? res.data : res.data.results || [];
+        setPillarOptions(data);
+        // Reset pillar selection if the current one is no longer in the list
+        if (selectedPillar && !data.find((p: { id: number }) => p.id === selectedPillar)) {
+          setSelectedPillar('');
+        }
+      } catch (err) {
+        console.error('Failed to fetch pillars:', err);
+      }
+    };
+    fetchPillars();
+  }, [selectedBrand]);
 
   const watchCaption = watch('caption', '');
   const watchPlatforms = watch('platforms', []);
@@ -255,6 +298,9 @@ export function CreatePostPage() {
         scheduled_time: scheduledTime.toISOString(),
         timezone: data.timezone,
         media_files: mediaFiles,
+        ...(selectedBrand ? { brand: selectedBrand as number } : {}),
+        ...(selectedPillar ? { pillar: selectedPillar as number } : {}),
+        ...(selectedGoal ? { goal: selectedGoal } : {}),
       };
 
       if (isEditing && id) {
@@ -406,6 +452,72 @@ export function CreatePostPage() {
                   {errors.platforms.message}
                 </p>
               )}
+            </Card>
+
+            {/* Brand / Pillar / Goal Selectors */}
+            <Card>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                  <BriefcaseIcon className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-text-primary">Content Strategy</h2>
+                  <p className="text-sm text-text-secondary">Assign brand, pillar, and goal</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Brand Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Brand
+                  </label>
+                  <select
+                    value={selectedBrand}
+                    onChange={(e) => setSelectedBrand(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-white/10 bg-dark-700/50 text-text-primary text-sm focus:border-primary focus:outline-none transition-colors"
+                  >
+                    <option value="">Select a brand...</option>
+                    {brands.map((b) => (
+                      <option key={b.id} value={b.id}>{b.brand_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Pillar Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Content Pillar
+                  </label>
+                  <select
+                    value={selectedPillar}
+                    onChange={(e) => setSelectedPillar(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-white/10 bg-dark-700/50 text-text-primary text-sm focus:border-primary focus:outline-none transition-colors"
+                  >
+                    <option value="">Select a pillar...</option>
+                    {pillarOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Goal Selector */}
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Goal
+                  </label>
+                  <select
+                    value={selectedGoal}
+                    onChange={(e) => setSelectedGoal(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border-2 border-white/10 bg-dark-700/50 text-text-primary text-sm focus:border-primary focus:outline-none transition-colors"
+                  >
+                    <option value="">Select a goal...</option>
+                    <option value="leads">Lead Generation</option>
+                    <option value="growth">Audience Growth</option>
+                    <option value="authority">Thought Leadership</option>
+                  </select>
+                </div>
+              </div>
             </Card>
 
             {/* Caption Editor */}

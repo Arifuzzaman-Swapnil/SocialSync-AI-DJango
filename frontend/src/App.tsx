@@ -27,6 +27,7 @@ import {
   IdeasHubPage,
   CalendarPage,
   ApprovalReviewPage,
+  PermissionsPage,
 } from './pages';
 import {
   AdminDashboardPage,
@@ -163,6 +164,7 @@ function App() {
           <Route path="/ideas" element={<IdeasHubPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/approvals" element={<ApprovalReviewPage />} />
+          <Route path="/settings/permissions" element={<PermissionsPage />} />
 
           {/* Info Pages */}
           <Route path="/about" element={<AboutPage />} />

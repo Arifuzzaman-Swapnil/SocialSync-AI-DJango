@@ -1,253 +1,10 @@
-# """
-# Post Scheduler Service
-# Automatically posts scheduled posts at their scheduled time
-# """
-
-# from django.utils import timezone
-# from .models import Post
-# from platforms.models import SocialAccount
-# from platforms.services.facebook import FacebookService
-# from platforms.services.twitter import TwitterService
-# from platforms.services.instagram import InstagramService
-# from platforms.services.linkedin import LinkedInService
-# import logging
-
-# logger = logging.getLogger(__name__)
-
-
-# def process_scheduled_posts():
-#     """
-#     Process all posts that are due to be posted
-#     Called by scheduler every minute
-#     """
-    
-#     # Get posts due for posting
-#     now = timezone.now()
-#     due_posts = Post.objects.filter(
-#         status='scheduled',
-#         scheduled_time__lte=now
-#     )
-    
-#     logger.info(f"Found {due_posts.count()} posts due for posting")
-    
-#     for post in due_posts:
-#         try:
-#             post_to_platforms(post)
-#         except Exception as e:
-#             logger.error(f"Error processing post {post.id}: {str(e)}")
-
-
-# def post_to_platforms(post):
-#     """Post to all selected platforms"""
-    
-#     logger.info(f"Processing post {post.id} for user {post.user.username}")
-    
-#     # Mark as posting
-#     post.status = 'posting'
-#     post.save()
-    
-#     platforms = post.platforms_list
-#     success_count = 0
-#     error_count = 0
-    
-#     for platform in platforms:
-#         try:
-#             # Get user's account for this platform
-#             account = SocialAccount.objects.get(
-#                 user=post.user,
-#                 platform=platform,
-#                 is_active=True
-#             )
-            
-#             # Post to platform
-#             success = False
-            
-#             if platform == 'facebook':
-#                 success = post_to_facebook(post, account)
-#             elif platform == 'twitter':
-#                 success = post_to_twitter(post, account)
-#             elif platform == 'instagram':
-#                 success = post_to_instagram(post, account)
-#             elif platform == 'linkedin':
-#                 success = post_to_linkedin(post, account)
-            
-#             if success:
-#                 success_count += 1
-#             else:
-#                 error_count += 1
-                
-#         except SocialAccount.DoesNotExist:
-#             logger.error(f"No active account for {platform}")
-#             error_count += 1
-#         except Exception as e:
-#             logger.error(f"Error posting to {platform}: {str(e)}")
-#             error_count += 1
-    
-#     # Update post status
-#     if success_count > 0 and error_count == 0:
-#         post.status = 'posted'
-#         post.posted_at = timezone.now()
-#     elif success_count > 0 and error_count > 0:
-#         post.status = 'posted'  # Partial success
-#         post.posted_at = timezone.now()
-#     else:
-#         post.status = 'failed'
-    
-#     post.save()
-    
-#     logger.info(f"Post {post.id} completed: {success_count} success, {error_count} errors")
-
-
-# def post_to_facebook(post, account):
-#     """Post to Facebook"""
-#     try:
-#         creds = account.get_credentials()
-        
-#         # Get media URL if exists
-#         media_url = None
-#         if post.media_files_list:
-#             # TODO: Convert local path to public URL
-#             pass
-        
-#         success, result = FacebookService.post_to_facebook(
-#             creds['page_id'],
-#             creds['access_token'],
-#             post.caption,
-#             media_url
-#         )
-        
-#         if success:
-#             post.facebook_post_id = result
-#             post.facebook_error = None
-#             post.save()
-#             logger.info(f"Posted to Facebook: {result}")
-#             return True
-#         else:
-#             post.facebook_error = result
-#             post.save()
-#             logger.error(f"Facebook error: {result}")
-#             return False
-            
-#     except Exception as e:
-#         post.facebook_error = str(e)
-#         post.save()
-#         logger.error(f"Facebook exception: {str(e)}")
-#         return False
-
-
-# def post_to_twitter(post, account):
-#     """Post to Twitter"""
-#     try:
-#         creds = account.get_credentials()
-        
-#         # Twitter has 280 char limit
-#         caption = post.caption[:280]
-        
-#         success, result = TwitterService.post_tweet(
-#             creds['api_key'],
-#             creds['api_secret'],
-#             creds['access_token'],
-#             creds['access_token_secret'],
-#             caption
-#         )
-        
-#         if success:
-#             post.twitter_post_id = result
-#             post.twitter_error = None
-#             post.save()
-#             logger.info(f"Posted to Twitter: {result}")
-#             return True
-#         else:
-#             post.twitter_error = result
-#             post.save()
-#             logger.error(f"Twitter error: {result}")
-#             return False
-            
-#     except Exception as e:
-#         post.twitter_error = str(e)
-#         post.save()
-#         logger.error(f"Twitter exception: {str(e)}")
-#         return False
-
-
-# def post_to_instagram(post, account):
-#     """Post to Instagram"""
-#     try:
-#         creds = account.get_credentials()
-        
-#         # Instagram requires image URL
-#         if not post.media_files_list:
-#             post.instagram_error = "Instagram requires an image"
-#             post.save()
-#             return False
-        
-#         # TODO: Convert local media to public URL
-#         image_url = "https://placeholder.com/image.jpg"  # Placeholder
-        
-#         success, result = InstagramService.post_to_instagram(
-#             creds['access_token'],
-#             creds['business_account_id'],
-#             post.caption,
-#             image_url
-#         )
-        
-#         if success:
-#             post.instagram_post_id = result
-#             post.instagram_error = None
-#             post.save()
-#             logger.info(f"Posted to Instagram: {result}")
-#             return True
-#         else:
-#             post.instagram_error = result
-#             post.save()
-#             logger.error(f"Instagram error: {result}")
-#             return False
-            
-#     except Exception as e:
-#         post.instagram_error = str(e)
-#         post.save()
-#         logger.error(f"Instagram exception: {str(e)}")
-#         return False
-
-
-# def post_to_linkedin(post, account):
-#     """Post to LinkedIn"""
-#     try:
-#         creds = account.get_credentials()
-        
-#         success, result = LinkedInService.post_to_linkedin(
-#             creds['access_token'],
-#             creds['person_urn'],
-#             post.caption
-#         )
-        
-#         if success:
-#             post.linkedin_post_id = result
-#             post.linkedin_error = None
-#             post.save()
-#             logger.info(f"Posted to LinkedIn: {result}")
-#             return True
-#         else:
-#             post.linkedin_error = result
-#             post.save()
-#             logger.error(f"LinkedIn error: {result}")
-#             return False
-            
-#     except Exception as e:
-#         post.linkedin_error = str(e)
-#         post.save()
-#         logger.error(f"LinkedIn exception: {str(e)}")
-#         return False
-
-
-# C:\Users\Trust computer\Desktop\Final_version_socialSync\posts\scheduler.py
 """
 Auto Scheduler - YOUR main.py logic automated
 Runs in background with Django server
 """
 
 from django.utils import timezone
-from .models import Post
+from .models import Post, ScheduledPostPlatform, PostHashtag
 from platforms.models import SocialAccount
 from platforms.services.facebook import FacebookService
 from platforms.services.twitter import TwitterService
@@ -257,6 +14,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from django.conf import settings
 import os
 import pytz
+from accounts.services.notification_service import notify_post_published, notify_publish_failed
 
 
 # Global scheduler
@@ -310,11 +68,42 @@ def start_scheduler():
         replace_existing=True
     )
 
+    # V1.2.1: Sync comments every 15 minutes
+    scheduler.add_job(
+        run_comment_sync,
+        'interval',
+        minutes=15,
+        id='comment_sync',
+        replace_existing=True
+    )
+
+    # V1.2.1: Check token health daily at 6:00 AM UTC
+    scheduler.add_job(
+        run_token_health_check,
+        'cron',
+        hour=6,
+        minute=0,
+        id='token_health',
+        replace_existing=True
+    )
+
+    # V1.2.1: Fetch trending topics every 6 hours
+    scheduler.add_job(
+        run_trending_fetch,
+        'interval',
+        hours=6,
+        id='trending_fetch',
+        replace_existing=True
+    )
+
     scheduler.start()
     print("[SCHEDULER] Auto-posting scheduler active (checks every 60 seconds)")
     print("[SCHEDULER] SLA checker active (checks every 30 minutes)")
     print("[SCHEDULER] Analytics sync active (every 6 hours)")
     print("[SCHEDULER] Weekly report generator active (Sunday midnight UTC)")
+    print("[SCHEDULER] Comment sync active (every 15 minutes)")
+    print("[SCHEDULER] Token health check active (daily 6:00 AM UTC)")
+    print("[SCHEDULER] Trending topics fetch active (every 6 hours)")
 
 
 def run_sla_check():
@@ -342,6 +131,33 @@ def run_weekly_report():
         call_command('generate_weekly_report')
     except Exception as e:
         print(f"[WEEKLY REPORT] Error: {e}")
+
+
+def run_comment_sync():
+    """Sync comments from platform APIs"""
+    try:
+        from django.core.management import call_command
+        call_command('sync_comments')
+    except Exception as e:
+        print(f"[COMMENT SYNC] Error: {e}")
+
+
+def run_token_health_check():
+    """Check for expiring platform tokens"""
+    try:
+        from django.core.management import call_command
+        call_command('check_token_health')
+    except Exception as e:
+        print(f"[TOKEN HEALTH] Error: {e}")
+
+
+def run_trending_fetch():
+    """Fetch trending topics for Ideas Hub"""
+    try:
+        from django.core.management import call_command
+        call_command('fetch_trending')
+    except Exception as e:
+        print(f"[TRENDING] Error: {e}")
 
 
 def check_and_post():
@@ -384,6 +200,9 @@ def check_and_post():
     
     for post in due_posts:
         publish_post(post)
+
+    # V1.2.1: Also process per-platform scheduled posts
+    process_v121_scheduled_posts()
 
 
 
@@ -680,3 +499,255 @@ def publish_post(post):
     
     print(f"\n   [RESULT] {success} success, {failed} failed -> {status}")
     print("="*70)
+
+
+def process_v121_scheduled_posts():
+    """
+    V1.2.1 Per-Platform Scheduler
+    Processes ScheduledPostPlatform records that are due for publishing.
+    Each platform entry can have its own caption, hashtags, and schedule.
+    """
+    import logging
+    from collections import defaultdict
+
+    logger = logging.getLogger(__name__)
+    now = timezone.now()
+
+    due_entries = ScheduledPostPlatform.objects.filter(
+        scheduled_at__lte=now,
+        status='scheduled',
+    ).select_related('post', 'caption', 'post__user')
+
+    count = due_entries.count()
+    if count == 0:
+        return
+
+    print(f"\n[V1.2.1] {count} per-platform post(s) due for publishing")
+    logger.info(f"[V1.2.1] Processing {count} ScheduledPostPlatform entries")
+
+    # Group entries by post so we can update the parent Post status afterwards
+    post_entries = defaultdict(list)
+
+    for spp in due_entries:
+        post_entries[spp.post_id].append(spp)
+
+        # Mark as publishing
+        spp.status = 'publishing'
+        spp.save(update_fields=['status'])
+
+        post = spp.post
+        platform = spp.platform
+
+        print(f"  [V1.2.1] Post #{post.id} -> {platform.upper()}")
+
+        # -------------------------------------------------------
+        # 1. Build caption text
+        # -------------------------------------------------------
+        # Use the per-platform caption if linked, otherwise fall back to post.caption
+        if spp.caption and spp.caption.body:
+            caption_text = spp.caption.body
+        else:
+            caption_text = post.caption
+
+        # -------------------------------------------------------
+        # 2. Gather selected hashtags for this platform
+        # -------------------------------------------------------
+        selected_hashtags = PostHashtag.objects.filter(
+            post=post,
+            platform=platform,
+            is_selected=True,
+        )
+        hashtag_string = ' '.join(f'#{ht.tag.lstrip("#")}' for ht in selected_hashtags)
+
+        first_comment_hashtags = None
+
+        if spp.hashtag_placement == 'end_of_caption' and hashtag_string:
+            caption_text = f"{caption_text}\n\n{hashtag_string}"
+        elif spp.hashtag_placement == 'inline':
+            # Hashtags are assumed to be already embedded in the caption body
+            pass
+        elif spp.hashtag_placement == 'first_comment' and hashtag_string:
+            # Store hashtags to post as the first comment after publishing
+            first_comment_hashtags = hashtag_string
+
+        # -------------------------------------------------------
+        # 3. Get media files from the parent Post
+        # -------------------------------------------------------
+        media_files = post.media_files_list
+
+        # -------------------------------------------------------
+        # 4. Resolve the SocialAccount for this platform
+        # -------------------------------------------------------
+        try:
+            account = SocialAccount.objects.get(
+                user=post.user,
+                platform=platform,
+                is_active=True,
+            )
+        except SocialAccount.DoesNotExist:
+            error_msg = f"No active {platform} account for user {post.user.username}"
+            logger.error(f"[V1.2.1] {error_msg}")
+            print(f"    [FAIL] {error_msg}")
+            _handle_spp_failure(spp, error_msg, now)
+            continue
+
+        # -------------------------------------------------------
+        # 5. Call the platform-specific publish function
+        # -------------------------------------------------------
+        try:
+            result_ok = False
+            error_msg = None
+
+            if platform == 'facebook':
+                result_ok, error_msg = post_facebook(post, account, caption_text, media_files)
+            elif platform == 'twitter':
+                result_ok, error_msg = post_twitter(post, account, caption_text, media_files)
+            elif platform == 'linkedin':
+                result_ok, error_msg = post_linkedin(post, account, caption_text, media_files)
+            elif platform == 'instagram':
+                result_ok, error_msg = post_instagram(post, account, caption_text, media_files)
+            else:
+                error_msg = f"Unsupported platform: {platform}"
+                logger.warning(f"[V1.2.1] {error_msg}")
+
+            if result_ok:
+                # --- Success ---
+                spp.status = 'published'
+                spp.published_at = now
+                spp.publish_result_json = {'success': True, 'published_at': now.isoformat()}
+                spp.save(update_fields=['status', 'published_at', 'publish_result_json'])
+                print(f"    [OK] Published successfully")
+                logger.info(f"[V1.2.1] Post #{post.id} published to {platform}")
+
+                # Handle first-comment hashtags for Instagram
+                if platform == 'instagram' and first_comment_hashtags:
+                    ig_media_id = error_msg  # On success, error_msg holds the Instagram post ID
+                    if ig_media_id:
+                        try:
+                            comment_ok, comment_result = InstagramService.post_comment(
+                                access_token=account.instagram_access_token,
+                                media_id=ig_media_id,
+                                text=first_comment_hashtags,
+                            )
+                            if comment_ok:
+                                logger.info(
+                                    f"[V1.2.1] First-comment hashtags posted on Instagram "
+                                    f"for Post #{post.id}, comment_id={comment_result}"
+                                )
+                                print(f"    [OK] First-comment hashtags posted: {first_comment_hashtags[:60]}")
+                            else:
+                                logger.warning(
+                                    f"[V1.2.1] First-comment failed for Post #{post.id}: {comment_result}"
+                                )
+                                print(f"    [WARN] First-comment failed: {comment_result}")
+                        except Exception as fc_err:
+                            logger.warning(f"[V1.2.1] First-comment exception: {fc_err}")
+                            print(f"    [WARN] First-comment exception: {fc_err}")
+            else:
+                _handle_spp_failure(spp, error_msg or 'Unknown error', now)
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.exception(f"[V1.2.1] Exception publishing Post #{post.id} to {platform}")
+            _handle_spp_failure(spp, error_msg, now)
+
+    # -------------------------------------------------------
+    # 6. After processing all entries, update parent Post status
+    # -------------------------------------------------------
+    for post_id, entries in post_entries.items():
+        _update_parent_post_status(post_id, entries, now)
+
+    print(f"[V1.2.1] Finished processing {count} per-platform entries\n")
+
+
+def _handle_spp_failure(spp, error_msg, now):
+    """
+    Handle a failed ScheduledPostPlatform publish attempt.
+    Increments retry_count; if under max_retries keeps it scheduled,
+    otherwise marks it as failed.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    spp.retry_count += 1
+    spp.publish_result_json = {
+        'success': False,
+        'error': error_msg,
+        'retry_count': spp.retry_count,
+        'failed_at': now.isoformat(),
+    }
+
+    if spp.retry_count < spp.max_retries:
+        # Keep as scheduled so the next scheduler run will retry
+        spp.status = 'scheduled'
+        print(f"    [RETRY] Attempt {spp.retry_count}/{spp.max_retries} - will retry. Error: {error_msg[:80]}")
+        logger.warning(
+            f"[V1.2.1] Post #{spp.post_id} -> {spp.platform} failed (attempt "
+            f"{spp.retry_count}/{spp.max_retries}): {error_msg}"
+        )
+    else:
+        spp.status = 'failed'
+        print(f"    [FAIL] Max retries reached ({spp.max_retries}). Error: {error_msg[:80]}")
+        logger.error(
+            f"[V1.2.1] Post #{spp.post_id} -> {spp.platform} permanently failed "
+            f"after {spp.max_retries} attempts: {error_msg}"
+        )
+
+    spp.save(update_fields=['status', 'retry_count', 'publish_result_json'])
+
+
+def _update_parent_post_status(post_id, spp_entries, now):
+    """
+    After all ScheduledPostPlatform entries for a Post have been processed,
+    update the parent Post status and send notifications.
+
+    Rules:
+      - If ALL platforms are published   -> post.status = 'posted'
+      - If ANY platform is failed        -> post.status = 'failed'
+      - Otherwise (some still scheduled due to retries) -> leave as-is
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Refresh statuses from DB in case of concurrent updates
+    all_platforms = ScheduledPostPlatform.objects.filter(post_id=post_id)
+    statuses = set(all_platforms.values_list('status', flat=True))
+
+    try:
+        post = Post.objects.get(id=post_id)
+    except Post.DoesNotExist:
+        logger.error(f"[V1.2.1] Post #{post_id} not found when updating parent status")
+        return
+
+    if statuses == {'published'}:
+        # All platforms published successfully
+        post.status = 'posted'
+        post.posted_at = now
+        post.save(update_fields=['status', 'posted_at'])
+        print(f"  [V1.2.1] Post #{post_id} -> ALL platforms published. Status: POSTED")
+        logger.info(f"[V1.2.1] Post #{post_id} fully published across all platforms")
+        notify_post_published(post)
+
+    elif 'failed' in statuses:
+        # At least one platform permanently failed
+        # Only mark the post as failed if no platforms are still pending retry
+        if 'scheduled' not in statuses and 'publishing' not in statuses:
+            post.status = 'failed'
+            post.save(update_fields=['status'])
+            # Build error summary from failed platforms
+            failed_platforms = all_platforms.filter(status='failed')
+            error_summary = "; ".join(
+                f"{fp.platform}: {fp.publish_result_json.get('error', 'unknown')}"
+                for fp in failed_platforms
+            )
+            print(f"  [V1.2.1] Post #{post_id} -> Some platforms FAILED. Status: FAILED")
+            logger.error(f"[V1.2.1] Post #{post_id} failed: {error_summary}")
+            notify_publish_failed(post, error_summary)
+        else:
+            # Some platforms still have retries pending - do not change post status yet
+            print(f"  [V1.2.1] Post #{post_id} -> Mixed statuses {statuses}. Waiting for retries.")
+            logger.info(f"[V1.2.1] Post #{post_id} has mixed statuses: {statuses}. Deferring status update.")
+    else:
+        # All are still scheduled (retries pending) or a mix of published + scheduled
+        print(f"  [V1.2.1] Post #{post_id} -> Statuses: {statuses}. No final status yet.")
+        logger.info(f"[V1.2.1] Post #{post_id} platform statuses: {statuses}")

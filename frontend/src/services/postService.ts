@@ -19,6 +19,16 @@ export const postService = {
     formData.append('scheduled_time', data.scheduled_time);
     formData.append('timezone', data.timezone);
 
+    if (data.brand) {
+      formData.append('brand', String(data.brand));
+    }
+    if (data.pillar) {
+      formData.append('pillar', String(data.pillar));
+    }
+    if (data.goal) {
+      formData.append('goal', data.goal);
+    }
+
     data.media_files.forEach((file, index) => {
       formData.append(`media_${index}`, file);
     });

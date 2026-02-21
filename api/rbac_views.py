@@ -11,9 +11,31 @@ from rest_framework.views import APIView
 
 from django.contrib.auth.models import User
 
-from accounts.models import UserRole
+from accounts.models import UserRole, SystemNotification
 from brands.models import Workspace
 from .serializers import UserRoleSerializer, AssignRoleSerializer, RemoveRoleSerializer
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+def _log_role_change(workspace, acted_by, target_user, role, action):
+    """Create an audit trail entry for RBAC changes."""
+    SystemNotification.objects.create(
+        user=workspace.owner,
+        event_type='batch_complete',  # Using existing event type for audit
+        title=f'Role {action}: {role}',
+        message=f'{acted_by.username} {action} role "{role}" {"to" if action == "assigned" else "from"} {target_user.username} in workspace "{workspace.name}".',
+        data_json={
+            'action': f'role_{action}',
+            'workspace_id': workspace.id,
+            'target_user_id': target_user.id,
+            'target_username': target_user.username,
+            'role': role,
+            'acted_by_id': acted_by.id,
+            'acted_by_username': acted_by.username,
+        },
+    )
 
 
 class WorkspaceRolesView(APIView):
@@ -77,6 +99,8 @@ class AssignRoleView(APIView):
         if not created:
             return Response({'message': 'Role already assigned'}, status=status.HTTP_200_OK)
 
+        _log_role_change(workspace, request.user, target_user, data['role'], 'assigned')
+
         return Response(
             UserRoleSerializer(role).data,
             status=status.HTTP_201_CREATED,
@@ -109,6 +133,12 @@ class RemoveRoleView(APIView):
 
         if deleted == 0:
             return Response({'error': 'Role not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            target_user = User.objects.get(id=data['user_id'])
+            _log_role_change(workspace, request.user, target_user, data['role'], 'removed')
+        except User.DoesNotExist:
+            pass  # User deleted; skip audit
 
         return Response({'message': 'Role removed'})
 

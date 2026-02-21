@@ -183,6 +183,7 @@ urlpatterns = [
     path('drafts/<int:post_id>/captions/generate/', caption_views.GenerateCaptionsView.as_view(), name='api-generate-captions'),
     path('drafts/<int:post_id>/captions/adapt/', caption_views.AdaptCaptionView.as_view(), name='api-adapt-caption'),
     path('captions/<int:caption_id>/select/', caption_views.SelectCaptionView.as_view(), name='api-select-caption'),
+    path('captions/<int:caption_id>/preview/<str:platform>/', caption_views.CaptionPreviewView.as_view(), name='api-caption-preview'),
     path('captions/<int:caption_id>/ab-tag/', caption_views.ABTagCaptionView.as_view(), name='api-ab-tag-caption'),
 
     # Draft Hashtags
@@ -227,6 +228,17 @@ urlpatterns = [
     path('assets/<int:asset_id>/resize/', creative_views.ResizeAssetView.as_view(), name='api-resize-asset'),
     path('assets/<int:asset_id>/apply-template/', creative_views.ApplyTemplateView.as_view(), name='api-apply-template'),
     path('assets/<int:asset_id>/versions/', creative_views.AssetVersionsView.as_view(), name='api-asset-versions'),
+    path('assets/<int:asset_id>/regenerate/', creative_views.AssetRegenerateView.as_view(), name='api-asset-regenerate'),
+
+    # Draft-Scoped Assets (V1.2.1)
+    path('posts/<int:post_id>/assets/', creative_views.DraftAssetsListView.as_view(), name='api-post-assets'),
+    path('drafts/<int:post_id>/assets/', creative_views.DraftAssetsListView.as_view(), name='api-draft-assets'),
+    path('drafts/<int:post_id>/assets/generate/', creative_views.DraftAssetGenerateView.as_view(), name='api-draft-asset-generate'),
+    path('drafts/<int:post_id>/assets/upload/', creative_views.DraftAssetUploadView.as_view(), name='api-draft-asset-upload'),
+    path('drafts/<int:post_id>/assets/carousel-split/', creative_views.CarouselSplitView.as_view(), name='api-carousel-split'),
+
+    # Clone Draft (V1.2.1)
+    path('drafts/<int:post_id>/clone/', creative_views.CloneDraftView.as_view(), name='api-clone-draft'),
 
     # Notifications (V1.2.1)
     path('notifications/', notification_views.NotificationListView.as_view(), name='api-notifications'),

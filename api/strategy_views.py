@@ -6,6 +6,8 @@ from rest_framework.views import APIView
 from django.db.models import Count, Q
 from django.utils import timezone
 
+from accounts.permissions import IsWorkspaceAdmin, IsCreatorOrAbove, IsViewerOrAbove
+
 from brands.models import (
     Brand, Workspace, ContentPillar, CompetitorProfile, CompetitorInsight,
     BrandTemplate, TrendingCache, ContentIdea
@@ -43,7 +45,7 @@ def get_or_create_brand(user):
 
 class ContentPillarViewSet(viewsets.ModelViewSet):
     serializer_class = ContentPillarSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWorkspaceAdmin]
 
     def get_queryset(self):
         return ContentPillar.objects.filter(
@@ -68,7 +70,7 @@ class ContentPillarViewSet(viewsets.ModelViewSet):
 
 
 class PillarComplianceView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, brand_id):
         try:
@@ -104,7 +106,7 @@ class PillarComplianceView(APIView):
 
 class CompetitorProfileViewSet(viewsets.ModelViewSet):
     serializer_class = CompetitorProfileSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def get_queryset(self):
         return CompetitorProfile.objects.filter(
@@ -271,7 +273,7 @@ def _crawl_site_pages(base_url, max_pages=8):
 
 class CompetitorCrawlView(APIView):
     """Analyze competitors by reading their page content with AI insights"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWorkspaceAdmin]
 
     def post(self, request, brand_id):
         try:
@@ -450,7 +452,7 @@ Return as JSON array only."""
 
 
 class CompetitorInsightsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, brand_id):
         try:
@@ -507,7 +509,7 @@ class CompetitorInsightsView(APIView):
 
 class BrandTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = BrandTemplateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWorkspaceAdmin]
 
     def get_queryset(self):
         return BrandTemplate.objects.filter(
@@ -516,7 +518,7 @@ class BrandTemplateViewSet(viewsets.ModelViewSet):
 
 
 class TrendingTopicsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request):
         platform = request.query_params.get('platform', '')
@@ -536,7 +538,7 @@ class TrendingTopicsView(APIView):
 
 class GenerateIdeasView(APIView):
     """Generate content ideas using LLM with pillar context"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request):
         serializer = GenerateIdeasRequestSerializer(data=request.data)
@@ -564,6 +566,24 @@ class GenerateIdeasView(APIView):
         if pillar_id:
             specific_pillar = pillars.filter(id=pillar_id).first()
 
+        # V1.2.1 — Fetch learning signals for context
+        from analytics.models import LearningSignal
+        learning_signals = LearningSignal.objects.filter(
+            brand=brand, applied=False
+        ).order_by('-created_at')[:10]
+
+        learning_context = ''
+        if learning_signals:
+            winning_items = []
+            for sig in learning_signals:
+                winning_items.append(
+                    f"- {sig.signal_type}: {sig.insight[:150]}"
+                )
+            learning_context = f"""
+Past winning patterns (use these to inform your ideas):
+{chr(10).join(winning_items)}
+"""
+
         # Build prompt
         platform_text = platform if platform != 'all' else 'all platforms (Twitter, LinkedIn, Facebook, Instagram)'
         prompt = f"""Generate {count} unique content ideas for a {brand.industry} brand called "{brand.brand_name}".
@@ -571,7 +591,7 @@ Target region: {brand.target_region}
 Content pillars: {pillar_context}
 {f'Focus pillar: {specific_pillar.name}' if specific_pillar else ''}
 Platform: {platform_text}
-
+{learning_context}
 For each idea, provide:
 - title: A catchy title (max 80 chars)
 - hook: An attention-grabbing opening line
@@ -659,6 +679,12 @@ Return as JSON array. Only return the JSON array, no other text."""
                     'status': idea.status,
                 })
 
+            # Mark learning signals as applied
+            if learning_signals:
+                LearningSignal.objects.filter(
+                    id__in=[s.id for s in learning_signals]
+                ).update(applied=True)
+
             return Response({
                 'brand_id': brand.id,
                 'count_requested': count,
@@ -674,7 +700,7 @@ Return as JSON array. Only return the JSON array, no other text."""
 
 
 class RegenerateIdeaView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request, idea_id):
         try:
@@ -684,15 +710,90 @@ class RegenerateIdeaView(APIView):
         except ContentIdea.DoesNotExist:
             return Response({'error': 'Idea not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Stub: regenerate via LLM
+        from accounts.api_keys import get_openai_key
+        import openai, json
+
+        api_key = get_openai_key(request.user)
+        if not api_key:
+            return Response(
+                {'error': 'No OpenAI API key configured.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        brand = idea.brand
+        brand_context = f"Brand: {brand.brand_name}"
+        if brand.industry:
+            brand_context += f", Industry: {brand.industry}"
+        if brand.voice_tone:
+            brand_context += f", Voice: {brand.voice_tone}"
+
+        pillar_context = ''
+        if idea.pillar:
+            pillar_context = f", Content Pillar: {idea.pillar.name}"
+
+        prompt = f"""Regenerate a single content idea with a fresh angle.
+
+{brand_context}{pillar_context}
+
+Original idea to improve:
+- Title: {idea.title}
+- Hook: {idea.hook}
+- Angle: {idea.angle}
+- Platform: {idea.platform}
+- Goal: {idea.goal}
+- Format: {idea.content_format}
+
+{f'Additional instructions: {request.data.get("instructions", "")}' if request.data.get("instructions") else ''}
+
+Create a completely new version with a different hook and angle, keeping the same platform, goal, and format.
+
+Return JSON:
+{{"title": "...", "hook": "...", "angle": "...", "goal": "...", "content_format": "...", "engagement_tier": "high|medium|low"}}
+"""
+
+        try:
+            client = openai.OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=[
+                    {'role': 'system', 'content': 'You are an expert social media strategist. Return only valid JSON.'},
+                    {'role': 'user', 'content': prompt},
+                ],
+                temperature=0.9,
+                max_tokens=500,
+                response_format={'type': 'json_object'},
+            )
+            result = json.loads(response.choices[0].message.content)
+        except openai.AuthenticationError:
+            return Response({'error': 'Invalid OpenAI API key'}, status=status.HTTP_401_UNAUTHORIZED)
+        except Exception as e:
+            return Response({'error': f'Regeneration failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Update the idea with regenerated content
+        idea.title = result.get('title', idea.title)
+        idea.hook = result.get('hook', idea.hook)
+        idea.angle = result.get('angle', idea.angle)
+        idea.goal = result.get('goal', idea.goal)
+        idea.content_format = result.get('content_format', idea.content_format)
+        idea.engagement_tier = result.get('engagement_tier', idea.engagement_tier)
+        idea.generation_run += 1
+        idea.save()
+
         return Response({
-            'message': 'Regeneration service will be connected in services layer',
-            'idea_id': idea.id,
+            'id': idea.id,
+            'title': idea.title,
+            'hook': idea.hook,
+            'angle': idea.angle,
+            'platform': idea.platform,
+            'goal': idea.goal,
+            'content_format': idea.content_format,
+            'engagement_tier': idea.engagement_tier,
+            'generation_run': idea.generation_run,
         })
 
 
 class AddIdeaToCalendarView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request, idea_id):
         try:

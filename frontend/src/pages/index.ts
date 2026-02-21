@@ -23,3 +23,4 @@ export { StrategyHubPage } from './StrategyHubPage';
 export { IdeasHubPage } from './IdeasHubPage';
 export { CalendarPage } from './CalendarPage';
 export { ApprovalReviewPage } from './ApprovalReviewPage';
+export { PermissionsPage } from './PermissionsPage';

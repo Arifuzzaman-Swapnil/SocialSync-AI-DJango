@@ -406,6 +406,35 @@ class InstagramService:
             return False, error_msg
     
     @staticmethod
+    def post_comment(access_token, media_id, text):
+        """Post a comment on an Instagram media object (for first-comment hashtags).
+
+        Args:
+            access_token: Instagram/Facebook access token
+            media_id: The Instagram media ID returned after publishing
+            text: Comment text (e.g. hashtags)
+
+        Returns:
+            tuple: (success: bool, comment_id_or_error: str)
+        """
+        try:
+            url = f"https://graph.facebook.com/v18.0/{media_id}/comments"
+            payload = {
+                'message': text,
+                'access_token': access_token,
+            }
+            response = requests.post(url, data=payload, timeout=30)
+            data = response.json()
+
+            if 'id' in data:
+                return True, data['id']
+            else:
+                error_msg = data.get('error', {}).get('message', 'Comment failed')
+                return False, error_msg
+        except Exception as e:
+            return False, str(e)
+
+    @staticmethod
     def validate_credentials(access_token, business_account_id):
         """Validate Instagram credentials"""
         try:

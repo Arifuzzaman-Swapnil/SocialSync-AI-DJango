@@ -28,6 +28,7 @@ from ai_voice.models import VoiceGeneration as VoiceGen, UserVoiceSettings
 from messenger_bot.models import MessengerConnection, AIConfiguration, PDFKnowledgeBase, Conversation, Message, Notification, CustomPrompt, ECommerceSettings, Product
 from analytics.models import Analytics
 from onboarding.models import OnboardingProgress
+from accounts.services.notification_service import notify_images_ready, notify_daily_limit_warning
 from brands.models import (
     Workspace, Brand, BrandAsset, LaunchPlan,
     ContentIdea, ContentApproval, WeeklyReport, GenerationUsage,
@@ -1086,9 +1087,19 @@ def generate_image(request):
             except UserLogo.DoesNotExist:
                 pass
 
+        # Link to post if post_id provided
+        linked_post = None
+        post_id = request.data.get('post_id')
+        if post_id:
+            try:
+                linked_post = Post.objects.get(id=int(post_id), user=request.user)
+            except (Post.DoesNotExist, ValueError, TypeError):
+                pass
+
         # Create generation record
         generation = ImageGeneration.objects.create(
             user=request.user,
+            post=linked_post,
             provider=provider,
             title=title,
             prompt=prompt,
@@ -1192,6 +1203,11 @@ def generate_image(request):
             generation.processing_time = result.get('processing_time', 0)
             generation.status = 'completed'
             generation.save()
+
+            # Notify if linked to a post
+            if linked_post:
+                linked_post.update_checklist()
+                notify_images_ready(linked_post)
 
             # Update usage stats
             img_settings.total_images_generated += 1

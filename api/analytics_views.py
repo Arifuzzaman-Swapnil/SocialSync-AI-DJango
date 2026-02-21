@@ -10,6 +10,8 @@ from django.db.models import Avg, Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta
 
+from accounts.permissions import IsCreatorOrAbove, IsWorkspaceAdmin, IsViewerOrAbove
+
 from posts.models import Post
 from analytics.models import PostAnalytics, PostComment, LearningSignal, RepurposedContent
 from brands.models import Brand, WeeklyReport
@@ -23,7 +25,7 @@ from .serializers import (
 
 class PostQuickStatsView(APIView):
     """Get quick stats for a specific post (24h/48h snapshots)"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, post_id):
         try:
@@ -42,7 +44,7 @@ class PostQuickStatsView(APIView):
 
 class PostCommentsView(APIView):
     """Get comments for a specific post"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def get(self, request, post_id):
         try:
@@ -61,7 +63,7 @@ class PostCommentsView(APIView):
 
 class ReplyToCommentView(APIView):
     """Reply to a comment (human reply)"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request, comment_id):
         try:
@@ -85,7 +87,7 @@ class ReplyToCommentView(APIView):
 
 class AIReplyToCommentView(APIView):
     """Generate and post an AI reply to a comment"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request, comment_id):
         try:
@@ -148,7 +150,7 @@ Return only the reply text, nothing else."""
 
 
 class WeeklyReportView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWorkspaceAdmin]
 
     def get(self, request, brand_id):
         try:
@@ -163,7 +165,7 @@ class WeeklyReportView(APIView):
 
 class AnalyticsDashboardView(APIView):
     """Aggregated analytics dashboard for a brand"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, brand_id):
         try:
@@ -209,7 +211,7 @@ class AnalyticsDashboardView(APIView):
 
 class ABTestResultsView(APIView):
     """Get A/B test results for a brand"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, brand_id):
         try:
@@ -253,7 +255,7 @@ class ABTestResultsView(APIView):
 
 
 class LearningSignalsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsWorkspaceAdmin]
 
     def get(self, request, brand_id):
         try:
@@ -272,7 +274,7 @@ class LearningSignalsView(APIView):
 
 class WinnerPostsView(APIView):
     """Get top performing posts for a brand"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
 
     def get(self, request, brand_id):
         try:
@@ -304,7 +306,7 @@ class WinnerPostsView(APIView):
 
 class RepurposePostView(APIView):
     """Create a repurposed draft from a winning post"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
 
     def post(self, request, post_id):
         try:

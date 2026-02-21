@@ -10,7 +10,9 @@ from datetime import timedelta
 
 from posts.models import Post
 from brands.models import ApprovalLog
-from accounts.services.notification_service import notify_approval_reminder
+from analytics.models import PostComment
+from accounts.models import UserRole
+from accounts.services.notification_service import notify_approval_reminder, notify_reply_sla_breach
 
 
 class Command(BaseCommand):
@@ -66,14 +68,23 @@ class Command(BaseCommand):
                         escalated_24h += 1
 
             elif hours_pending >= 12:
-                # Reminder to approver
+                # Reminder to assigned approvers (not owner)
                 existing = ApprovalLog.objects.filter(
                     post=post, action='escalated',
                     comment__contains='12h'
                 ).exists()
                 if not existing:
                     if post.brand and post.brand.workspace:
-                        notify_approval_reminder(post, post.brand.workspace.owner, 12)
+                        ws = post.brand.workspace
+                        approvers = UserRole.objects.filter(
+                            workspace=ws, role='approver'
+                        ).select_related('user')
+                        if approvers.exists():
+                            for role_obj in approvers:
+                                notify_approval_reminder(post, role_obj.user, 12)
+                        else:
+                            # Fallback: notify workspace owner if no approvers assigned
+                            notify_approval_reminder(post, ws.owner, 12)
                         escalated_12h += 1
 
         self.stdout.write(
@@ -82,3 +93,28 @@ class Command(BaseCommand):
                 f'{escalated_24h} 24h escalations, {flagged_stale} stale flags'
             )
         )
+
+        # V1.2.1 — Reply SLA check (default 2 hours)
+        reply_sla_hours = 2
+        sla_cutoff = now - timedelta(hours=reply_sla_hours)
+
+        unreplied = PostComment.objects.filter(
+            replied=False,
+            fetched_at__lte=sla_cutoff,
+        ).select_related('post', 'post__user', 'post__brand')
+
+        reply_breaches = 0
+        for comment in unreplied[:50]:
+            hours_waiting = (now - comment.fetched_at).total_seconds() / 3600
+            try:
+                notify_reply_sla_breach(comment, int(hours_waiting))
+                reply_breaches += 1
+            except Exception:
+                pass
+
+        if reply_breaches:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'Reply SLA: {reply_breaches} comments breached {reply_sla_hours}h reply SLA'
+                )
+            )

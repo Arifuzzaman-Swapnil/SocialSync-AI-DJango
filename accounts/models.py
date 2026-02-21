@@ -349,6 +349,7 @@ class SystemNotification(models.Model):
         ('new_comment', 'New Comment on Post'),
         ('token_expiring', 'Platform Token Expiring'),
         ('daily_limit_warning', 'Daily Limit Approaching (80%)'),
+        ('reply_sla_breach', 'Reply SLA Breach'),
     ]
 
     CHANNEL_CHOICES = [

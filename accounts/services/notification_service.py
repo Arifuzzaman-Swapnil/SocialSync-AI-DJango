@@ -269,6 +269,62 @@ def notify_daily_limit_warning(user, usage_percent):
     )
 
 
+def notify_reply_sla_breach(comment, hours_waiting):
+    """Notify when a comment exceeds the reply SLA."""
+    post = comment.post
+    user = post.user
+    notify(
+        user=user,
+        event_type='reply_sla_breach',
+        title='Comment reply overdue',
+        message=(
+            f'A comment on your post has been waiting {hours_waiting}h for a reply. '
+            f'Comment by {comment.author_name or "someone"}: "{(comment.body or "")[:80]}"'
+        ),
+        data_json={
+            'comment_id': comment.id,
+            'post_id': post.id,
+            'hours_waiting': hours_waiting,
+        },
+    )
+
+
 def _send_email_notification(user, title, message):
-    """Stub: Send email notification. Implement with Django email or service."""
-    logger.info(f"Email notification stub: {title} to {user.email}")
+    """Send email notification using Django's send_mail."""
+    if not user.email:
+        logger.warning(f"Cannot send email to {user.username}: no email address")
+        return
+
+    try:
+        from django.core.mail import send_mail
+        from django.conf import settings
+
+        html_body = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background: #4F46E5; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+                <h2 style="margin: 0;">SaleAnto</h2>
+            </div>
+            <div style="padding: 20px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0 0 8px 8px;">
+                <h3 style="color: #111827;">{title}</h3>
+                <p style="color: #4b5563; line-height: 1.6;">{message}</p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                <p style="color: #9ca3af; font-size: 12px;">
+                    This is an automated notification from SaleAnto. Do not reply to this email.
+                </p>
+            </div>
+        </div>
+        """
+
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@saleanto.com')
+
+        send_mail(
+            subject=f'[SaleAnto] {title}',
+            message=message,
+            from_email=from_email,
+            recipient_list=[user.email],
+            html_message=html_body,
+            fail_silently=True,
+        )
+        logger.info(f"Email notification sent: {title} to {user.email}")
+    except Exception as e:
+        logger.error(f"Failed to send email to {user.email}: {e}")

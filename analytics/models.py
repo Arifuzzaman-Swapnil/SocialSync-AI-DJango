@@ -154,6 +154,7 @@ class LearningSignal(models.Model):
         ('worst_time', 'Worst Posting Time'),
         ('worst_format', 'Worst Content Format'),
         ('ab_winner', 'A/B Test Winner'),
+        ('winner', 'Winner Post'),
     ]
 
     brand = models.ForeignKey('brands.Brand', on_delete=models.CASCADE, related_name='learning_signals')

@@ -159,6 +159,74 @@ class AdminDashboardView(APIView):
             if rp.get('created_at'):
                 rp['created_at'] = str(rp['created_at'])
 
+        # V1.2.1 — Content Pipeline Status
+        pipeline_status = {
+            'draft': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'draft'"),
+            'pending_approval': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'pending_approval'"),
+            'approved': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'approved'"),
+            'scheduled': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'scheduled'"),
+            'posted': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'posted'"),
+            'failed': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'failed'"),
+            'rejected': safe_count("SELECT COUNT(*) FROM posts WHERE status = 'rejected'"),
+        }
+
+        # V1.2.1 — Pending Approval SLA (drafts pending > 24h)
+        pending_approval_posts = safe_query("""
+            SELECT p.id, p.caption, p.submitted_at, u.username as author
+            FROM posts p JOIN auth_user u ON p.user_id = u.id
+            WHERE p.status = 'pending_approval'
+            ORDER BY p.submitted_at ASC LIMIT 20
+        """)
+        for pa in pending_approval_posts:
+            if pa.get('submitted_at'):
+                pa['submitted_at'] = str(pa['submitted_at'])
+
+        # V1.2.1 — Queue Health (image/video generation jobs)
+        queue_health = {
+            'images_pending': safe_count("SELECT COUNT(*) FROM ai_image_imagegeneration WHERE status = 'pending'"),
+            'images_processing': safe_count("SELECT COUNT(*) FROM ai_image_imagegeneration WHERE status = 'processing'"),
+            'images_failed': safe_count("SELECT COUNT(*) FROM ai_image_imagegeneration WHERE status = 'failed'"),
+            'videos_pending': safe_count("SELECT COUNT(*) FROM ai_video_videogeneration WHERE status = 'pending'"),
+            'videos_processing': safe_count("SELECT COUNT(*) FROM ai_video_videogeneration WHERE status = 'processing'"),
+            'videos_failed': safe_count("SELECT COUNT(*) FROM ai_video_videogeneration WHERE status = 'failed'"),
+        }
+
+        # V1.2.1 — Platform Token Health
+        token_health = safe_query("""
+            SELECT sa.platform, sa.is_active,
+                   COUNT(*) as count
+            FROM social_accounts sa
+            GROUP BY sa.platform, sa.is_active
+        """)
+
+        # V1.2.1 — Content Pillar Compliance
+        pillar_compliance = []
+        try:
+            from brands.models import ContentPillar
+            from posts.models import Post as PostModel
+            for pillar in ContentPillar.objects.filter(is_active=True).select_related('brand'):
+                total_brand_posts = PostModel.objects.filter(
+                    brand=pillar.brand,
+                    posted_at__isnull=False,
+                ).count()
+                pillar_posts = PostModel.objects.filter(
+                    brand=pillar.brand,
+                    pillar=pillar,
+                    posted_at__isnull=False,
+                ).count()
+                actual_pct = round((pillar_posts / total_brand_posts * 100), 1) if total_brand_posts > 0 else 0
+                pillar_compliance.append({
+                    'brand': pillar.brand.brand_name,
+                    'pillar': pillar.name,
+                    'target_pct': pillar.target_percentage,
+                    'actual_pct': actual_pct,
+                    'post_count': pillar_posts,
+                    'total_posts': total_brand_posts,
+                    'compliant': abs(actual_pct - pillar.target_percentage) <= 15,
+                })
+        except Exception:
+            pass
+
         return Response({
             'total_users': total_users,
             'pending_users': pending_users,
@@ -177,6 +245,12 @@ class AdminDashboardView(APIView):
             'top_users': top_users,
             'plan_distribution': plan_distribution,
             'recent_posts': recent_posts,
+            # V1.2.1 additions
+            'pipeline_status': pipeline_status,
+            'pending_approval_posts': pending_approval_posts,
+            'queue_health': queue_health,
+            'token_health': token_health,
+            'pillar_compliance': pillar_compliance,
         })
 
 

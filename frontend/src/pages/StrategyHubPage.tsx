@@ -297,6 +297,81 @@ export function StrategyHubPage() {
 
       {activeTab === 'pillars' && (
         <div className="space-y-6">
+          {/* Pillar Distribution Chart */}
+          {compliance && compliance.pillars.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-800 rounded-xl p-6 border border-white/5">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
+                  <ChartPieIcon className="w-5 h-5 text-primary-400" />
+                  Pillar Distribution
+                </h3>
+                <span className="text-xs text-gray-400">
+                  {compliance.total_posts} total post{compliance.total_posts !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="space-y-5">
+                {compliance.pillars.map((p) => {
+                  const isWarning = p.actual_percentage < p.target_percentage * 0.7;
+                  const actualBarColor = isWarning ? 'bg-amber-500' : 'bg-indigo-500';
+                  const maxPercentage = Math.max(
+                    ...compliance!.pillars.map((cp) => Math.max(cp.target_percentage, cp.actual_percentage)),
+                    1
+                  );
+                  return (
+                    <div key={p.pillar_id}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: p.color_code }} />
+                          <span className="text-sm font-medium text-gray-200">{p.pillar_name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="text-gray-400">Target: {p.target_percentage}%</span>
+                          <span className={isWarning ? 'text-amber-400 font-medium' : 'text-indigo-400 font-medium'}>
+                            Actual: {p.actual_percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      {/* Target bar */}
+                      <div className="relative h-3 mb-1">
+                        <div className="absolute inset-0 bg-gray-700/50 rounded-full" />
+                        <div
+                          className="absolute inset-y-0 left-0 bg-slate-500/60 rounded-full transition-all duration-500"
+                          style={{ width: `${(p.target_percentage / maxPercentage) * 100}%` }}
+                        />
+                      </div>
+                      {/* Actual bar */}
+                      <div className="relative h-3">
+                        <div className="absolute inset-0 bg-gray-700/50 rounded-full" />
+                        <div
+                          className={`absolute inset-y-0 left-0 ${actualBarColor} rounded-full transition-all duration-500`}
+                          style={{ width: `${(p.actual_percentage / maxPercentage) * 100}%` }}
+                        />
+                      </div>
+                      {isWarning && (
+                        <p className="text-xs text-amber-400 mt-1">Below target threshold</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Legend */}
+              <div className="flex items-center gap-6 mt-5 pt-4 border-t border-white/5">
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className="w-3 h-2 rounded-sm bg-slate-500/60" />
+                  <span>Target</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className="w-3 h-2 rounded-sm bg-indigo-500" />
+                  <span>Actual</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <div className="w-3 h-2 rounded-sm bg-amber-500" />
+                  <span>Below 70% of target</span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Compliance Overview */}
           {compliance && compliance.pillars.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card p-6">

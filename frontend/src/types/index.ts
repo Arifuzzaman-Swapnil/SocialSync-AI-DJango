@@ -243,6 +243,9 @@ export interface CreatePostData {
   platforms: PlatformType[];
   scheduled_time: string;
   timezone: string;
+  brand?: number;
+  pillar?: number;
+  goal?: string;
 }
 
 export interface UpdatePostData {
@@ -250,6 +253,9 @@ export interface UpdatePostData {
   platforms?: PlatformType[];
   scheduled_time?: string;
   timezone?: string;
+  brand?: number;
+  pillar?: number;
+  goal?: string;
 }
 
 // ============================================
@@ -1132,4 +1138,271 @@ export interface AdminAnalyticsData {
     twitter: number;
     linkedin: number;
   };
+}
+
+// ============================================
+// V1.2.1 TYPES
+// ============================================
+
+export interface ContentPillar {
+  id: number;
+  brand: number;
+  name: string;
+  description: string;
+  target_percentage: number;
+  color_code: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PostCaptionV2 {
+  id: number;
+  post: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram' | 'all';
+  variant_number: number;
+  body: string;
+  cta_text: string;
+  tone: string;
+  char_count: number;
+  is_selected: boolean;
+  is_ab_test: boolean;
+  ab_label: 'A' | 'B' | null;
+  generation_prompt_hash: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type HashtagTier = 'high_volume' | 'mid_volume' | 'niche';
+export type HashtagPlacement = 'inline' | 'end_of_caption' | 'first_comment';
+
+export interface PostHashtag {
+  id: number;
+  post: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  tag: string;
+  tier: HashtagTier;
+  estimated_volume: number;
+  is_selected: boolean;
+  placement: HashtagPlacement;
+  created_at: string;
+}
+
+export interface HashtagGroup {
+  id: number;
+  brand: number;
+  name: string;
+  tags: string[];
+  created_by: number;
+  created_at: string;
+}
+
+export interface BannedHashtag {
+  id: number;
+  brand: number;
+  tag: string;
+  reason: string;
+  added_by: number;
+  created_at: string;
+}
+
+export type ScheduledPlatformStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
+
+export interface ScheduledPostPlatform {
+  id: number;
+  post: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  caption?: number;
+  caption_body?: string;
+  hashtag_placement: HashtagPlacement;
+  scheduled_at: string;
+  timezone: string;
+  status: ScheduledPlatformStatus;
+  asset_variant?: number;
+  publish_result_json: Record<string, unknown>;
+  retry_count: number;
+  max_retries: number;
+  created_by: number;
+  created_at: string;
+  published_at?: string;
+}
+
+export type SnapshotType = '24h' | '48h' | 'daily' | 'weekly';
+
+export interface PostAnalyticsV2 {
+  id: number;
+  post: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  platform_post_id: string;
+  snapshot_type: SnapshotType;
+  impressions: number;
+  reach: number;
+  engagement_rate: number;
+  likes: number;
+  comments_count: number;
+  shares: number;
+  clicks: number;
+  saves: number;
+  profile_visits: number;
+  data_json: Record<string, unknown>;
+  fetched_at: string;
+}
+
+export type CommentSentiment = 'positive' | 'neutral' | 'negative';
+
+export interface PostComment {
+  id: number;
+  post: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  platform_comment_id: string;
+  author_name: string;
+  author_handle: string;
+  body: string;
+  sentiment: CommentSentiment;
+  replied: boolean;
+  reply_type?: 'ai' | 'human';
+  reply_body: string;
+  replied_at?: string;
+  fetched_at: string;
+}
+
+export type LearningSignalType =
+  | 'best_hook'
+  | 'best_time'
+  | 'best_format'
+  | 'best_pillar'
+  | 'worst_hook'
+  | 'worst_time'
+  | 'worst_format'
+  | 'ab_winner'
+  | 'winner';
+
+export interface LearningSignal {
+  id: number;
+  brand: number;
+  signal_type: LearningSignalType;
+  reference_id: string;
+  data_json: Record<string, unknown>;
+  applied: boolean;
+  created_at: string;
+}
+
+export type RepurposeFormat = 'carousel' | 'thread' | 'reel' | 'email' | 'blog_outline';
+
+export interface RepurposedContent {
+  id: number;
+  original_post: number;
+  new_post: number;
+  repurpose_format: RepurposeFormat;
+  created_at: string;
+}
+
+export type ApprovalAction = 'submitted' | 'approved' | 'changes_requested' | 'rejected' | 'escalated';
+export type RejectionReason = 'off_brand' | 'compliance_issue' | 'quality' | 'factual_error' | 'timing' | 'other';
+
+export interface ApprovalLog {
+  id: number;
+  post: number;
+  action: ApprovalAction;
+  acted_by: number;
+  acted_by_username?: string;
+  comment: string;
+  rejection_reason?: RejectionReason;
+  created_at: string;
+}
+
+export interface BestTimeSuggestion {
+  id: number;
+  brand: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  day_of_week: number;
+  hour_utc: number;
+  score: number;
+  source: 'own_data' | 'industry_default';
+  computed_at: string;
+}
+
+export interface AssetPlatformVariant {
+  id: number;
+  asset: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  format_label: string;
+  file_url?: string;
+  dimensions: string;
+  created_at: string;
+}
+
+export interface CreativeVersionHistory {
+  id: number;
+  asset: number;
+  version: number;
+  file_url?: string;
+  generation_params: Record<string, unknown>;
+  created_at: string;
+}
+
+export type NotificationEventType =
+  | 'approval_submitted'
+  | 'content_approved'
+  | 'changes_requested'
+  | 'content_rejected'
+  | 'sla_breach'
+  | 'reply_sla_breach'
+  | 'winner_detected'
+  | 'images_ready'
+  | 'repurpose_suggestion'
+  | 'weekly_report'
+  | 'batch_complete'
+  | 'token_expiring';
+
+export interface SystemNotification {
+  id: number;
+  user: number;
+  event_type: NotificationEventType;
+  title: string;
+  message: string;
+  data_json: Record<string, unknown>;
+  channel: 'in_app' | 'email' | 'both';
+  is_read: boolean;
+  created_at: string;
+}
+
+export type WorkspaceRole = 'admin' | 'creator' | 'approver' | 'publisher' | 'viewer';
+
+export interface UserRole {
+  id: number;
+  user: number;
+  username?: string;
+  workspace: number;
+  role: WorkspaceRole;
+  granted_by?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WeeklyReport {
+  id: number;
+  brand: number;
+  workspace?: number;
+  period_start: string;
+  period_end: string;
+  data: Record<string, unknown>;
+  winners: Record<string, unknown>[];
+  losers: Record<string, unknown>[];
+  best_hooks: string[];
+  best_times: Record<string, unknown>[];
+  pillar_performance: Record<string, unknown>;
+  ab_test_results: Record<string, unknown>[];
+  recommendations: string[];
+  test_plan: string[];
+  generated_at: string;
+}
+
+export interface CompetitorProfile {
+  id: number;
+  brand: number;
+  platform: 'twitter' | 'linkedin' | 'facebook' | 'instagram';
+  handle_or_url: string;
+  last_crawled_at?: string;
+  created_at: string;
 }

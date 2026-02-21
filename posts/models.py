@@ -205,7 +205,7 @@ class Post(models.Model):
     @property
     def is_checklist_complete(self):
         """Check if all required checklist items are complete"""
-        required = ['caption', 'creative', 'platform_mapping']
+        required = ['caption', 'platform_mapping']
         return all(self.checklist_status.get(k, False) for k in required)
 
 
@@ -402,6 +402,10 @@ class ScheduledPostPlatform(models.Model):
     scheduled_at = models.DateTimeField()
     timezone = models.CharField(max_length=50, default='UTC')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    asset_variant = models.ForeignKey(
+        'ai_image.AssetPlatformVariant', on_delete=models.SET_NULL,
+        null=True, blank=True, help_text='Platform-specific resized creative asset',
+    )
     publish_result_json = models.JSONField(default=dict, blank=True)
     retry_count = models.IntegerField(default=0)
     max_retries = models.IntegerField(default=3)

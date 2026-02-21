@@ -485,81 +485,102 @@ export default function ConnectAccountsPage() {
       </section>
 
       {/* ACTIVE CONNECTIONS HUD */}
-      <section className="pt-24 border-t border-white/10 relative">
+      <section className="pt-12 border-t border-white/10 relative">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
-        <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-16">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
           <div className="text-center md:text-left">
-            <h2 className="text-5xl font-black text-text-primary tracking-tighter uppercase font-outfit">Active Node Swarm</h2>
-            <p className="text-text-secondary text-xl mt-3">Currently broadcasting via {accounts.length} authenticated API gateways.</p>
+            <h2 className="text-3xl font-black text-text-primary tracking-tighter uppercase font-outfit">Active Node Swarm</h2>
+            <p className="text-text-secondary text-sm mt-2">Currently broadcasting via {accounts.length} authenticated API gateways.</p>
           </div>
-          <div className="px-8 py-4 bg-dark-800 rounded-[2rem] border-2 border-primary/20 text-sm font-black text-primary flex items-center gap-6 shadow-[0_0_30px_rgba(var(--color-primary),0.1)]">
-            <div className="w-4 h-4 bg-primary rounded-full animate-ping" />
-            <span className="tracking-[0.3em]">SWARM_STRENGTH: {accounts.length}</span>
+          <div className="px-5 py-2.5 bg-dark-800 rounded-xl border border-primary/20 text-xs font-black text-primary flex items-center gap-3 shadow-[0_0_20px_rgba(var(--color-primary),0.08)]">
+            <div className="w-2.5 h-2.5 bg-primary rounded-full animate-ping" />
+            <span className="tracking-[0.2em]">SWARM_STRENGTH: {accounts.length}</span>
           </div>
         </div>
 
         {isLoading ? (
-          <div className="flex justify-center p-32"><Spinner size="lg" /></div>
+          <div className="flex justify-center p-20"><Spinner size="lg" /></div>
         ) : accounts.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="p-40 text-center rounded-[5rem] bg-dark-800/20 border-3 border-dashed border-white/5 group hover:border-primary/20 transition-all duration-1000"
+            className="p-16 text-center rounded-2xl bg-dark-800/20 border-2 border-dashed border-white/5 group hover:border-primary/20 transition-all duration-1000"
           >
-            <div className="w-32 h-32 bg-dark-700/50 rounded-full flex items-center justify-center mx-auto mb-10 shadow-inner relative">
-              <CpuChipIcon className="w-16 h-16 text-text-muted/20 group-hover:text-primary transition-all duration-500" />
+            <div className="w-20 h-20 bg-dark-700/50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner relative">
+              <CpuChipIcon className="w-10 h-10 text-text-muted/20 group-hover:text-primary transition-all duration-500" />
               <div className="absolute inset-0 rounded-full border-2 border-primary/0 group-hover:border-primary/20 group-hover:scale-125 transition-all duration-700" />
             </div>
-            <p className="text-text-secondary text-2xl font-black tracking-tighter">System awaiting directives. Zero active nodes.</p>
-            <p className="text-text-muted text-lg mt-4 font-medium">Initialize a platform module above to establish your first API bridge.</p>
+            <p className="text-text-secondary text-lg font-black tracking-tighter">System awaiting directives. Zero active nodes.</p>
+            <p className="text-text-muted text-sm mt-3 font-medium">Initialize a platform module above to establish your first API bridge.</p>
           </motion.div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
             <AnimatePresence>
               {accounts.map(account => (
                 <motion.div
                   key={account.id}
-                  initial={{ opacity: 0, y: 30 }}
+                  initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="group relative p-10 rounded-[4rem] bg-dark-800 border-2 border-white/5 hover:border-primary/40 transition-all shadow-2xl overflow-hidden"
+                  className="group relative rounded-xl bg-dark-800 border border-white/8 hover:border-primary/30 transition-all shadow-md overflow-hidden"
                 >
-                  <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 blur-3xl -mr-24 -mt-24 group-hover:bg-primary/15 transition-all duration-700" />
+                  {/* Top accent line */}
+                  <div className={clsx("h-1 w-full", platformColors[account.platform]?.bg || 'bg-primary')} />
 
-                  <div className="flex items-center justify-between mb-12 relative z-10">
-                    <div className="flex items-center gap-6">
-                      <div className={clsx("w-20 h-20 rounded-3xl flex items-center justify-center shadow-2xl transition-all duration-500 group-hover:scale-110", platformColors[account.platform]?.bg)}>
-                        <PlatformIcon platform={account.platform} className="text-white" size="lg" />
+                  <div className="p-5">
+                    {/* Row 1: Platform icon + account info */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={clsx("w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0", platformColors[account.platform]?.bg)}>
+                        <PlatformIcon platform={account.platform} className="text-white" size="sm" />
                       </div>
-                      <div>
-                        <h4 className="font-black text-text-primary text-2xl tracking-tighter">{account.account_name || 'System Endpoint'}</h4>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-                          <p className="text-[11px] text-text-muted font-black uppercase tracking-[0.2em]">{account.platform}</p>
-                        </div>
+                      <div className="flex-1 min-w-0 mr-2">
+                        <h4 className="font-semibold text-text-primary text-sm leading-tight truncate">{account.account_name || 'Unnamed Account'}</h4>
+                        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mt-0.5 flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-success inline-block animate-pulse" />
+                          {account.platform}
+                        </p>
                       </div>
+                      <span className={clsx(
+                        "px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-wide flex-shrink-0",
+                        account.status === 'active' ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
+                      )}>
+                        {account.status}
+                      </span>
                     </div>
-                    <div className={clsx(
-                      "px-5 py-2 rounded-2xl text-[10px] font-black uppercase border-2 shadow-lg",
-                      account.status === 'active' ? "bg-success/5 border-success/30 text-success" : "bg-danger/5 border-danger/30 text-danger shadow-danger/20"
-                    )}>
-                      {account.status}
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-5 mb-12 relative z-10">
-                    <Button variant="secondary" size="lg" className="flex-1 rounded-[2rem] h-16 text-xs font-black uppercase tracking-[0.2em] border-2 border-white/5 hover:border-primary/30" onClick={() => handleValidate(account.id)} isLoading={isValidating === account.id}>Validate Node</Button>
-                    <Button variant="ghost" size="lg" className="w-16 h-16 rounded-[2rem] bg-danger/5 hover:bg-danger/10 flex items-center justify-center transition-all border-2 border-danger/10 group-hover:border-danger/40" onClick={() => setDisconnectAccount(account)}>
-                      <TrashIcon className="w-7 h-7 text-danger opacity-40 group-hover:opacity-100 transition-opacity" />
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-text-muted font-black border-t-2 border-white/5 pt-8 relative z-10">
-                    <div className="flex items-center gap-3 uppercase tracking-widest">
-                      <ArrowPathIcon className="w-5 h-5 text-primary" /> Last Sync: {account.last_validated_at ? new Date(account.last_validated_at).toLocaleDateString() : 'SCANNING...'}
+                    {/* Row 2: Action buttons */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1 rounded-lg h-9 text-[10px] font-semibold uppercase tracking-wide"
+                        onClick={() => handleValidate(account.id)}
+                        isLoading={isValidating === account.id}
+                      >
+                        Validate Node
+                      </Button>
+                      <button
+                        className="w-9 h-9 rounded-lg bg-danger/8 hover:bg-danger/20 flex items-center justify-center transition-colors border border-transparent hover:border-danger/20 flex-shrink-0"
+                        onClick={() => setDisconnectAccount(account)}
+                      >
+                        <TrashIcon className="w-4 h-4 text-danger/40 hover:text-danger" />
+                      </button>
                     </div>
-                    {account.is_validated && <div className="flex items-center gap-2 text-success uppercase tracking-[0.2em] bg-success/10 px-3 py-1 rounded-lg"><ShieldCheckIcon className="w-4 h-4" /> Trusted</div>}
+
+                    {/* Row 3: Sync info */}
+                    <div className="flex items-center justify-between text-[10px] text-text-muted border-t border-white/5 pt-3">
+                      <span className="flex items-center gap-1.5">
+                        <ArrowPathIcon className="w-3 h-3" />
+                        Last Sync: {account.last_validated_at ? new Date(account.last_validated_at).toLocaleDateString() : 'Pending...'}
+                      </span>
+                      {account.is_validated && (
+                        <span className="flex items-center gap-1 text-success font-medium">
+                          <ShieldCheckIcon className="w-3 h-3" />
+                          Trusted
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               ))}
