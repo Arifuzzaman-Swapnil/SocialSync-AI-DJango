@@ -64,6 +64,8 @@ export function OverflowPage() {
   useEffect(() => {
     overflow.reset();
     localStorage.removeItem('overflow_selected_caption');
+    localStorage.removeItem('overflow_caption_groups');
+    localStorage.removeItem('overflow_has_upload');
     const init = async () => {
       try {
         const res = await api.get('/brands/');
@@ -197,7 +199,11 @@ export function OverflowPage() {
           <ArrowLeftIcon className="w-4 h-4" /> Previous
         </button>
         {overflow.currentStep < 6 ? (
-          <button onClick={goNext} className="btn-primary flex items-center gap-2">
+          <button
+            onClick={goNext}
+            disabled={overflow.currentStep === 4 && !overflow.generatedMediaUrl}
+            className="btn-primary flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             Next Step <ArrowRightIcon className="w-4 h-4" />
           </button>
         ) : (
@@ -1018,10 +1024,14 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
 // ═══════════════════════════════════════════════════════════
 function IdeasStep({ brandId }: { brandId: number | null }) {
   const overflow = useOverflowStore();
-  const [ideas, setIdeas] = useState<ContentIdea[]>([]);
+  // Restore from store if already generated (survives back/forward navigation)
+  const [ideas, setIdeas] = useState<ContentIdea[]>(() =>
+    overflow.ideasData.length > 0
+      ? overflow.ideasData.map((d) => ({ ...d, brand: 0, goal: '', language: '', persona: '', status: 'new' as const, batch_id: '', generation_run: 0, created_at: '', updated_at: '' }))
+      : []
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoTriggered, setAutoTriggered] = useState(false);
 
   const doGenerate = useCallback(async () => {
     if (!brandId) {
@@ -1053,13 +1063,12 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
     setLoading(false);
   }, [brandId, overflow.selectedTrendingTopics]);
 
-  // Auto-generate on mount
+  // Auto-generate on mount ONLY if no ideas exist yet
   useEffect(() => {
-    if (!autoTriggered && brandId && ideas.length === 0) {
-      setAutoTriggered(true);
+    if (brandId && ideas.length === 0 && overflow.ideasData.length === 0) {
       doGenerate();
     }
-  }, [brandId, autoTriggered, doGenerate]);
+  }, [brandId]);
 
   const topics = overflow.selectedTrendingTopics;
 
@@ -1127,7 +1136,14 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
 // ═══════════════════════════════════════════════════════════
 function CaptionsStep() {
   const overflow = useOverflowStore();
-  const [captionGroups, setCaptionGroups] = useState<Record<number, CaptionVariant[]>>({});
+  // Restore saved captions from localStorage so back/forward doesn't re-generate
+  const [captionGroups, setCaptionGroups] = useState<Record<number, CaptionVariant[]>>(() => {
+    try {
+      const saved = localStorage.getItem('overflow_caption_groups');
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return {};
+  });
   const [generatingId, setGeneratingId] = useState<number | null>(null);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -1242,8 +1258,13 @@ function CaptionsStep() {
     }));
   };
 
-  // Save selected caption texts to localStorage for CreatePostStep
+  // Persist caption groups to localStorage (survives back/forward navigation)
   useEffect(() => {
+    const hasData = Object.values(captionGroups).some((g) => g.length > 0);
+    if (hasData) {
+      localStorage.setItem('overflow_caption_groups', JSON.stringify(captionGroups));
+    }
+    // Also save selected caption texts for CreatePostStep
     const allSelected: string[] = [];
     for (const group of Object.values(captionGroups)) {
       group.filter((c) => c.selected).forEach((c) => allSelected.push(c.text));
@@ -1346,18 +1367,27 @@ function CaptionsStep() {
                   onClick={() => toggleCaption(ideaId, caption.id)}
                   className={`p-3 rounded-lg cursor-pointer transition-all text-sm ${
                     caption.selected
-                      ? 'bg-primary-500/10 border border-primary-500/30 ring-1 ring-primary-500/10'
-                      : 'bg-dark-700/30 border border-transparent hover:border-white/10'
+                      ? 'bg-primary-500/15 border-2 border-primary-500 ring-2 ring-primary-500/30 shadow-[0_0_12px_rgba(99,102,241,0.15)]'
+                      : 'bg-dark-700/30 border-2 border-transparent hover:border-white/10'
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
-                    <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
-                      caption.selected ? 'border-primary-500 bg-primary-500' : 'border-white/20'
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                      caption.selected ? 'border-primary-500 bg-primary-500' : 'border-white/25 bg-white/5'
                     }`}>
-                      {caption.selected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      {caption.selected && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <span className="text-[10px] text-text-muted font-medium">Caption {cIdx + 1}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-text-muted font-medium">Caption {cIdx + 1}</span>
+                        {caption.selected && (
+                          <span className="text-[9px] font-bold text-primary-400 bg-primary-500/20 px-1.5 py-0.5 rounded">SELECTED</span>
+                        )}
+                      </div>
                       <p className="text-text-secondary whitespace-pre-wrap leading-relaxed mt-0.5">{caption.text}</p>
                     </div>
                   </div>
@@ -1440,59 +1470,76 @@ function CaptionsStep() {
 // ═══════════════════════════════════════════════════════════
 function MediaStep() {
   const overflow = useOverflowStore();
+  const [mode, setMode] = useState<'upload' | 'generate'>('upload');
   const [prompt, setPrompt] = useState('');
   const [style, setStyle] = useState('modern');
   const [loading, setLoading] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(overflow.generatedMediaUrl);
   const [error, setError] = useState<string | null>(null);
-  const [productFile, setProductFile] = useState<File | null>(null);
-  const [productPreview, setProductPreview] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [previewPlatform, setPreviewPlatform] = useState<'instagram' | 'facebook' | 'twitter' | 'linkedin'>('instagram');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const needsMedia = overflow.selectedIdeaIds.some(
-    (id) => overflow.ideaMediaPreferences[id] && overflow.ideaMediaPreferences[id] !== 'none'
-  );
+  const toMediaUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    if (url.startsWith('/media/')) return url;
+    return `/media/${url}`;
+  };
 
-  // Build a smart prompt suggestion from selected ideas
+  const currentImage = uploadPreview || toMediaUrl(generatedImage);
+
+  // Get caption for preview
+  const getPreviewCaption = () => {
+    const saved = localStorage.getItem('overflow_selected_caption');
+    if (saved) return saved.split('\n\n---\n\n')[0]?.substring(0, 200) || '';
+    return 'Your caption will appear here...';
+  };
+
   const getIdeaSuggestion = () => {
     const idea = overflow.ideasData.find((i) => overflow.selectedIdeaIds.includes(i.id));
     return idea ? `${idea.title} — ${idea.hook}` : '';
   };
 
-  const handleProductUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setProductFile(file);
-      setProductPreview(URL.createObjectURL(file));
+      setUploadedFile(file);
+      const previewUrl = URL.createObjectURL(file);
+      setUploadPreview(previewUrl);
+      overflow.setGeneratedMediaUrl(previewUrl);
     }
   };
 
-  const removeProduct = () => {
-    setProductFile(null);
-    setProductPreview(null);
+  const removeMedia = () => {
+    setUploadedFile(null);
+    setUploadPreview(null);
+    setGeneratedImage(null);
+    overflow.setGeneratedMediaUrl('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  useEffect(() => {
+    if (uploadedFile) localStorage.setItem('overflow_has_upload', 'true');
+  }, [uploadedFile]);
 
   const handleGenerateImage = async () => {
     if (!prompt.trim()) return;
     setLoading(true);
     setError(null);
     try {
-      // Build a safe, descriptive prompt for the image
       const safePrompt = `Professional social media content image: ${prompt.trim()}. Clean, brand-appropriate, high quality, suitable for marketing.`;
-      const result = await imageService.generate({
-        prompt: safePrompt,
-        style,
-        enhance_prompt: true,
-      });
-      const imageUrl = result.generated_image || result.generated_image_with_logo || null;
+      const result = await imageService.generate({ prompt: safePrompt, style, enhance_prompt: true });
+      const rawUrl = result.generated_image || result.generated_image_with_logo || null;
+      const imageUrl = toMediaUrl(rawUrl);
       setGeneratedImage(imageUrl);
       if (imageUrl) overflow.setGeneratedMediaUrl(imageUrl);
       if (result.id) overflow.addMedia(result.id);
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Failed to generate image.';
       if (msg.toLowerCase().includes('safety')) {
-        setError('The prompt was flagged by the safety system. Try rephrasing — describe the image in terms of visual elements, colors, and composition rather than specific actions.');
+        setError('The prompt was flagged by the safety system. Try rephrasing.');
       } else {
         setError(msg);
       }
@@ -1500,117 +1547,260 @@ function MediaStep() {
     setLoading(false);
   };
 
-  if (!needsMedia) {
+  // Platform preview mockup
+  const PlatformPreview = ({ imgSrc }: { imgSrc: string }) => {
+    const captionText = getPreviewCaption();
+
+    if (previewPlatform === 'instagram') {
+      return (
+        <div className="bg-black rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto">
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-purple-500" />
+            <div>
+              <p className="text-xs font-semibold text-white">your_brand</p>
+              <p className="text-[10px] text-gray-400">Sponsored</p>
+            </div>
+          </div>
+          <img src={imgSrc} alt="Preview" className="w-full aspect-square object-cover" />
+          <div className="px-3 py-2.5 space-y-1.5">
+            <div className="flex items-center gap-4">
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" /></svg>
+              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+            </div>
+            <p className="text-[11px] text-white leading-relaxed line-clamp-3"><span className="font-semibold">your_brand</span> {captionText}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (previewPlatform === 'facebook') {
+      return (
+        <div className="bg-[#242526] rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto">
+          <div className="flex items-center gap-2.5 px-3 py-2.5">
+            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">B</div>
+            <div>
+              <p className="text-xs font-semibold text-white">Your Brand</p>
+              <p className="text-[10px] text-gray-400 flex items-center gap-1">Just now · <GlobeAltIcon className="w-2.5 h-2.5" /></p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-200 px-3 pb-2 line-clamp-3">{captionText}</p>
+          <img src={imgSrc} alt="Preview" className="w-full aspect-[1.91/1] object-cover" />
+          <div className="flex items-center justify-around py-2 border-t border-white/10">
+            <span className="text-xs text-gray-400 flex items-center gap-1">👍 Like</span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">💬 Comment</span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">↗ Share</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (previewPlatform === 'twitter') {
+      return (
+        <div className="bg-black rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto p-3">
+          <div className="flex gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-gray-700 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-white">Your Brand</span>
+                <span className="text-[10px] text-gray-500">@yourbrand · 1m</span>
+              </div>
+              <p className="text-xs text-gray-200 mt-1 line-clamp-3">{captionText}</p>
+              <img src={imgSrc} alt="Preview" className="w-full aspect-video object-cover rounded-xl mt-2 border border-white/10" />
+              <div className="flex items-center justify-between mt-2 text-gray-500">
+                <span className="text-[10px]">💬 12</span>
+                <span className="text-[10px]">🔁 8</span>
+                <span className="text-[10px]">❤ 42</span>
+                <span className="text-[10px]">📊 1.2K</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // LinkedIn
     return (
-      <div className="card p-12 text-center">
-        <PhotoIcon className="w-12 h-12 mx-auto text-text-secondary mb-3" />
-        <p className="text-text-secondary">No media needed</p>
-        <p className="text-xs text-text-muted mt-1">None of your selected ideas require media. Continue to the next step.</p>
+      <div className="bg-[#1B1F23] rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto">
+        <div className="flex items-center gap-2.5 px-3 py-2.5">
+          <div className="w-10 h-10 rounded-full bg-blue-700 flex items-center justify-center text-white text-xs font-bold">B</div>
+          <div>
+            <p className="text-xs font-semibold text-white">Your Brand</p>
+            <p className="text-[10px] text-gray-400">1,234 followers · 1h</p>
+          </div>
+        </div>
+        <p className="text-xs text-gray-200 px-3 pb-2 line-clamp-3">{captionText}</p>
+        <img src={imgSrc} alt="Preview" className="w-full aspect-[1.91/1] object-cover" />
+        <div className="flex items-center justify-around py-2 border-t border-white/10">
+          <span className="text-xs text-gray-400">👍 Like</span>
+          <span className="text-xs text-gray-400">💬 Comment</span>
+          <span className="text-xs text-gray-400">🔁 Repost</span>
+          <span className="text-xs text-gray-400">📩 Send</span>
+        </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-4">
       <div className="card p-6">
         <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
           <PhotoIcon className="w-5 h-5 text-pink-400" />
-          AI Media Generation
+          Media
         </h3>
-        <p className="text-sm text-text-secondary">Generate images for your content. Upload a product photo to incorporate it.</p>
+        <p className="text-sm text-text-secondary">Upload your own media or generate an AI image for your post.</p>
       </div>
 
-      <div className="card p-6 space-y-4">
-        {/* Product Image Upload */}
-        <div>
-          <label className="block text-sm font-medium mb-2">Product Image (optional)</label>
-          <p className="text-xs text-text-muted mb-2">Upload your product photo to create branded visuals around it.</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleProductUpload}
-            className="hidden"
-          />
-          {productPreview ? (
-            <div className="flex items-center gap-3">
-              <img src={productPreview} alt="Product" className="w-20 h-20 rounded-lg object-cover border border-white/10" />
-              <div>
-                <p className="text-xs text-text-secondary">{productFile?.name}</p>
-                <button onClick={removeProduct} className="text-xs text-red-400 hover:text-red-300 mt-1">Remove</button>
+      {/* Mode Toggle */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setMode('upload')}
+          className={`flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            mode === 'upload' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
+          }`}
+        >
+          <ArrowUpTrayIcon className="w-4 h-4" />
+          Upload Media
+        </button>
+        <button
+          onClick={() => setMode('generate')}
+          className={`flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+            mode === 'generate' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
+          }`}
+        >
+          <SparklesIcon className="w-4 h-4" />
+          AI Generate
+        </button>
+      </div>
+
+      {/* Upload Mode */}
+      {mode === 'upload' && (
+        <div className="card p-6 space-y-4">
+          <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
+          {uploadPreview ? (
+            <div className="space-y-3">
+              <img src={uploadPreview} alt="Upload" className="rounded-lg max-h-64 mx-auto border border-white/10" />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-text-secondary">{uploadedFile?.name}</p>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => fileInputRef.current?.click()} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
+                    <ArrowPathIcon className="w-3 h-3" /> Replace
+                  </button>
+                  <button onClick={removeMedia} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                    <TrashIcon className="w-3 h-3" /> Remove
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-3 rounded-lg border border-dashed border-white/20 hover:border-primary-500/50 transition-colors w-full justify-center"
+              className="flex flex-col items-center gap-3 px-6 py-10 rounded-lg border-2 border-dashed border-white/15 hover:border-primary-500/40 transition-colors w-full"
             >
-              <ArrowUpTrayIcon className="w-4 h-4 text-text-muted" />
-              <span className="text-sm text-text-muted">Click to upload product image</span>
+              <ArrowUpTrayIcon className="w-8 h-8 text-text-muted" />
+              <div className="text-center">
+                <p className="text-sm font-medium text-text-secondary">Click to upload image or video</p>
+                <p className="text-xs text-text-muted mt-1">JPG, PNG, GIF, MP4, MOV — max 50MB</p>
+              </div>
             </button>
           )}
         </div>
+      )}
 
-        {/* Image Prompt */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Image Description</label>
-          <textarea
-            className="input w-full"
-            rows={3}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder={getIdeaSuggestion() || 'Describe the image you want to generate...'}
-          />
-          <p className="text-xs text-text-muted mt-1">
-            Tip: Describe visual elements like colors, composition, and objects. Avoid text about actions or people's identities.
-          </p>
-        </div>
+      {/* Generate Mode */}
+      {mode === 'generate' && (
+        <div className="card p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Image Description</label>
+            <textarea
+              className="input w-full"
+              rows={3}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder={getIdeaSuggestion() || 'Describe the image you want to generate...'}
+            />
+          </div>
 
-        {/* Style */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Style</label>
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { value: 'modern', label: 'Modern' },
-              { value: 'minimalist', label: 'Minimalist' },
-              { value: 'vibrant', label: 'Vibrant' },
-              { value: 'professional', label: 'Professional' },
-              { value: 'artistic', label: 'Artistic' },
-              { value: 'flat_design', label: 'Flat Design' },
-            ].map((s) => (
-              <button
-                key={s.value}
-                onClick={() => setStyle(s.value)}
-                className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                  style === s.value
-                    ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
-                    : 'bg-white/5 text-text-muted hover:bg-white/10'
-                }`}
-              >
-                {s.label}
+          <div>
+            <label className="block text-sm font-medium mb-1">Style</label>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { value: 'modern', label: 'Modern' },
+                { value: 'minimalist', label: 'Minimalist' },
+                { value: 'vibrant', label: 'Vibrant' },
+                { value: 'professional', label: 'Professional' },
+                { value: 'artistic', label: 'Artistic' },
+                { value: 'flat_design', label: 'Flat Design' },
+              ].map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => setStyle(s.value)}
+                  className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                    style === s.value
+                      ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
+                      : 'bg-white/5 text-text-muted hover:bg-white/10'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button onClick={handleGenerateImage} disabled={loading || !prompt.trim()} className="btn-primary flex items-center gap-2">
+              {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <SparklesIcon className="w-4 h-4" />}
+              {loading ? 'Generating...' : generatedImage ? 'Re-generate' : 'Generate Image'}
+            </button>
+            {generatedImage && (
+              <button onClick={removeMedia} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                <TrashIcon className="w-3 h-3" /> Remove
               </button>
-            ))}
+            )}
           </div>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
         </div>
+      )}
 
-        <button onClick={handleGenerateImage} disabled={loading || !prompt.trim()} className="btn-primary flex items-center gap-2">
-          {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <SparklesIcon className="w-4 h-4" />}
-          {loading ? 'Generating...' : 'Generate Image'}
-        </button>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-            <p className="text-sm text-red-400">{error}</p>
+      {/* Social Media Platform Preview */}
+      {currentImage && (
+        <div className="card p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <GlobeAltIcon className="w-4 h-4 text-primary-400" />
+              Platform Preview
+            </h4>
+            <div className="flex gap-1.5">
+              {(['instagram', 'facebook', 'twitter', 'linkedin'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPreviewPlatform(p)}
+                  className={`text-[10px] px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
+                    previewPlatform === p
+                      ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
+                      : 'bg-white/5 text-text-muted hover:bg-white/10'
+                  }`}
+                >
+                  {p === 'twitter' ? 'X / Twitter' : p}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
+          <PlatformPreview imgSrc={currentImage} />
+        </div>
+      )}
 
-        {generatedImage && (
-          <div className="mt-4 text-center">
-            <img src={generatedImage} alt="Generated" className="rounded-lg max-h-72 mx-auto border border-white/10" />
-            <p className="text-xs text-green-400 mt-2">Image generated successfully! It will be attached to your post.</p>
-          </div>
-        )}
-      </div>
+      {/* Requirement notice */}
+      {!currentImage && (
+        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-center">
+          <p className="text-xs text-yellow-400">Please upload media or generate an AI image before proceeding.</p>
+        </div>
+      )}
     </div>
   );
 }

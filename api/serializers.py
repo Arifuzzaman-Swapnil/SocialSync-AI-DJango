@@ -178,9 +178,22 @@ class PostSerializer(serializers.ModelSerializer):
 
     def get_media_files(self, obj):
         try:
-            return json.loads(obj.media_files) if obj.media_files else []
+            files = json.loads(obj.media_files) if obj.media_files else []
         except (json.JSONDecodeError, TypeError):
             return []
+        request = self.context.get('request')
+        result = []
+        for f in files:
+            if not f:
+                continue
+            if f.startswith('http'):
+                result.append(f)
+            elif request:
+                from django.conf import settings
+                result.append(request.build_absolute_uri(f'{settings.MEDIA_URL}{f}'))
+            else:
+                result.append(f'/media/{f}')
+        return result
 
     def get_platform_results(self, obj):
         results = []
@@ -1418,9 +1431,22 @@ class PostDetailSerializer(serializers.ModelSerializer):
 
     def get_media_files(self, obj):
         try:
-            return json.loads(obj.media_files) if obj.media_files else []
+            files = json.loads(obj.media_files) if obj.media_files else []
         except (json.JSONDecodeError, TypeError):
             return []
+        request = self.context.get('request')
+        result = []
+        for f in files:
+            if not f:
+                continue
+            if f.startswith('http'):
+                result.append(f)
+            elif request:
+                from django.conf import settings
+                result.append(request.build_absolute_uri(f'{settings.MEDIA_URL}{f}'))
+            else:
+                result.append(f'/media/{f}')
+        return result
 
     def get_platform_results(self, obj):
         results = []

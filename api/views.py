@@ -375,7 +375,7 @@ class PostViewSet(viewsets.ModelViewSet):
             status='scheduled',
         )
 
-        return Response(PostSerializer(post).data, status=status.HTTP_201_CREATED)
+        return Response(PostSerializer(post, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         post = self.get_object()
@@ -397,7 +397,7 @@ class PostViewSet(viewsets.ModelViewSet):
             post.scheduled_time = serializer.validated_data['scheduled_time']
 
         post.save()
-        return Response(PostSerializer(post).data)
+        return Response(PostSerializer(post, context={'request': request}).data)
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
@@ -412,7 +412,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         post.status = 'cancelled'
         post.save()
-        return Response(PostSerializer(post).data)
+        return Response(PostSerializer(post, context={'request': request}).data)
 
 
 # ===================== PLATFORMS VIEWS =====================
@@ -1218,7 +1218,7 @@ def generate_image(request):
                 img_settings.gemini_images_generated += 1
             img_settings.save()
 
-            return Response(ImageGenerationSerializer(generation).data)
+            return Response(ImageGenerationSerializer(generation, context={'request': request}).data)
         else:
             generation.status = 'failed'
             generation.error_message = result.get('error', 'Unknown error')
@@ -2342,7 +2342,7 @@ class ContentIdeaViewSet(viewsets.ModelViewSet):
 
         return Response({
             'idea': ContentIdeaSerializer(idea).data,
-            'post': PostSerializer(post).data,
+            'post': PostSerializer(post, context={'request': request}).data,
         })
 
 
