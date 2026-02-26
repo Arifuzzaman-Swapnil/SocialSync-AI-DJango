@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   SparklesIcon, DocumentDuplicateIcon,
-  CheckIcon, BeakerIcon,
+  CheckIcon, BeakerIcon, PhotoIcon,
+  ChevronDownIcon, ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
 
@@ -19,6 +20,7 @@ interface Caption {
   is_selected: boolean;
   is_ab_test: boolean;
   ab_label: string | null;
+  image_prompt?: string;
 }
 
 interface Props {
@@ -52,6 +54,11 @@ export function CaptionEditor({ postId, onCaptionChange }: Props) {
   const [platform, setPlatform] = useState('all');
   const [count, setCount] = useState(3);
 
+  // Image prompt
+  const [expandedPrompt, setExpandedPrompt] = useState<number | null>(null);
+  const [generatingImage, setGeneratingImage] = useState<number | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<Record<number, string>>({});
+
   useEffect(() => {
     loadCaptions();
   }, [postId]);
@@ -75,7 +82,8 @@ export function CaptionEditor({ postId, onCaptionChange }: Props) {
         platforms: [platform],
         count,
       });
-      setCaptions(res.data);
+      const data = res.data?.captions || res.data;
+      setCaptions(Array.isArray(data) ? data : []);
       onCaptionChange?.();
     } catch (err) {
       console.error('Failed to generate captions:', err);
@@ -246,7 +254,80 @@ export function CaptionEditor({ postId, onCaptionChange }: Props) {
                     <DocumentDuplicateIcon className="w-3 h-3" />
                     Adapt
                   </button>
+
+                  {/* Image Prompt Toggle */}
+                  {caption.image_prompt && (
+                    <button
+                      onClick={() => setExpandedPrompt(expandedPrompt === caption.id ? null : caption.id)}
+                      className="text-xs flex items-center gap-1 px-2 py-1 rounded bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 ml-auto"
+                    >
+                      <PhotoIcon className="w-3 h-3" />
+                      Image Prompt
+                      {expandedPrompt === caption.id ? <ChevronUpIcon className="w-3 h-3" /> : <ChevronDownIcon className="w-3 h-3" />}
+                    </button>
+                  )}
                 </div>
+
+                {/* Image Prompt Section */}
+                {caption.image_prompt && expandedPrompt === caption.id && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mt-3 p-3 bg-purple-500/5 border border-purple-500/20 rounded-lg"
+                  >
+                    <p className="text-xs font-medium text-purple-400 mb-2">Suggested Image Prompt</p>
+                    <p className="text-sm text-text-secondary mb-3 select-all cursor-text bg-dark-700/50 rounded p-2 text-xs">
+                      {caption.image_prompt}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          setGeneratingImage(caption.id);
+                          try {
+                            const res = await api.post(`/drafts/${postId}/assets/generate/`, {
+                              prompt: caption.image_prompt,
+                            });
+                            if (res.data?.asset?.file_url || res.data?.file_url) {
+                              setGeneratedImages(prev => ({
+                                ...prev,
+                                [caption.id]: res.data?.asset?.file_url || res.data?.file_url,
+                              }));
+                            }
+                            onCaptionChange?.();
+                          } catch (err) {
+                            console.error('Image generation failed:', err);
+                          }
+                          setGeneratingImage(null);
+                        }}
+                        disabled={generatingImage === caption.id}
+                        className="btn-primary text-xs flex items-center gap-1.5"
+                      >
+                        {generatingImage === caption.id ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                        ) : (
+                          <SparklesIcon className="w-3 h-3" />
+                        )}
+                        {generatingImage === caption.id ? 'Generating...' : 'Generate Image'}
+                      </button>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(caption.image_prompt || '')}
+                        className="btn-secondary text-xs flex items-center gap-1.5"
+                      >
+                        <DocumentDuplicateIcon className="w-3 h-3" />
+                        Copy Prompt
+                      </button>
+                    </div>
+                    {generatedImages[caption.id] && (
+                      <div className="mt-3">
+                        <img
+                          src={generatedImages[caption.id]}
+                          alt="Generated"
+                          className="rounded-lg max-h-48 object-cover"
+                        />
+                      </div>
+                    )}
+                  </motion.div>
+                )}
               </motion.div>
             );
           })}

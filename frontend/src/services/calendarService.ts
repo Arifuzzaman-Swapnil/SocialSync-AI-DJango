@@ -25,6 +25,10 @@ export const calendarService = {
     const res = await api.get(`/brands/${brandId}/best-times/`, { params });
     return res.data;
   },
+  async computeRecommendedTimes(brandId: number, platforms?: string[]) {
+    const res = await api.post('/schedule/compute-times/', { brand_id: brandId, platforms: platforms || [] });
+    return res.data;
+  },
 };
 
 export default calendarService;

@@ -205,3 +205,126 @@ class ConflictCheckView(APIView):
             'conflicts': [],
             'message': 'No conflicts detected',
         })
+
+
+class ComputeRecommendedTimesView(APIView):
+    """Compute recommended posting times based on competitor analysis"""
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
+
+    def post(self, request):
+        brand_id = request.data.get('brand_id')
+        platforms_filter = request.data.get('platforms', [])
+
+        if not brand_id:
+            return Response({'error': 'brand_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            brand = Brand.objects.get(
+                id=brand_id,
+                workspace__owner=request.user,
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        from accounts.api_keys import get_openai_key
+        api_key = get_openai_key(request.user)
+        if not api_key:
+            return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from brands.models import CompetitorInsight
+        insights = CompetitorInsight.objects.filter(
+            competitor_profile__brand=brand
+        ).order_by('-engagement_score')[:30]
+        insight_texts = []
+        for ci in insights:
+            parts = ci.hook_text.split(' ||REC||')
+            text = parts[0][:150]
+            platform = ci.competitor_profile.platform if ci.competitor_profile else 'unknown'
+            insight_texts.append(f"[{platform}] {text} (engagement: {ci.engagement_score})")
+
+        try:
+            import openai
+            import json
+            client = openai.OpenAI(api_key=api_key)
+
+            prompt = f"""You are a social media scheduling analyst. Analyze competitor data and recommend optimal posting times.
+
+Brand: {brand.brand_name}
+Industry: {brand.industry}
+Region: {brand.target_region}
+{f'Target platforms: {", ".join(platforms_filter)}' if platforms_filter else 'Target platforms: twitter, linkedin, facebook, instagram'}
+
+Competitor Insights:
+{chr(10).join(insight_texts[:15]) if insight_texts else 'No competitor data yet — use industry best practices instead.'}
+
+Recommend the top 3-5 optimal posting time slots PER platform. Consider:
+- When competitors are most active/successful
+- Industry-standard best times for the region
+- Different content types may need different times
+
+Return a JSON object:
+{{"recommendations": [{{"platform": "twitter", "day_of_week": 0, "hour_utc": 14, "score": 0.85, "reason": "Brief reason"}}]}}
+
+Rules:
+- day_of_week: 0=Monday, 6=Sunday
+- hour_utc: 0-23 (UTC time)
+- score: 0.0-1.0 (confidence)
+- Include 3-5 slots per platform
+- Order by score descending"""
+
+            response = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.3,
+                max_tokens=2000,
+                response_format={'type': 'json_object'},
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            recs = result.get('recommendations', [])
+
+            # Delete old competitor_analysis entries for this brand
+            BestTimeSuggestion.objects.filter(
+                brand=brand, source='competitor_analysis'
+            ).delete()
+
+            created = []
+            for r in recs:
+                if not isinstance(r, dict):
+                    continue
+                platform = r.get('platform', '')
+                if platforms_filter and platform not in platforms_filter:
+                    continue
+                obj, _ = BestTimeSuggestion.objects.update_or_create(
+                    brand=brand,
+                    platform=platform,
+                    day_of_week=r.get('day_of_week', 0),
+                    hour_utc=r.get('hour_utc', 12),
+                    defaults={
+                        'score': min(float(r.get('score', 0.5)), 1.0),
+                        'source': 'competitor_analysis',
+                    },
+                )
+                created.append({
+                    'id': obj.id,
+                    'platform': obj.platform,
+                    'day_of_week': obj.day_of_week,
+                    'hour_utc': obj.hour_utc,
+                    'score': obj.score,
+                    'source': obj.source,
+                    'reason': r.get('reason', ''),
+                })
+
+            return Response({
+                'brand_id': brand.id,
+                'count': len(created),
+                'recommendations': created,
+            })
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Compute times failed: {e}", exc_info=True)
+            return Response(
+                {'error': f'Computing times failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -109,9 +109,10 @@ Rules:
 - Each variant must be meaningfully different (different hook, structure, or angle)
 - Match the requested tone
 - Make them engaging and platform-appropriate
+- For each caption, also generate a concise image prompt for DALL-E 3 that would create a perfect visual to accompany the caption
 
 Return JSON:
-{{"captions": [{{"body": "...", "cta_text": "..."}}]}}
+{{"captions": [{{"body": "...", "cta_text": "...", "image_prompt": "A concise DALL-E 3 image prompt..."}}]}}
 """
 
         try:
@@ -145,6 +146,7 @@ Return JSON:
                     body=cap_data.get('body', ''),
                     tone=tone,
                     cta_text=cap_data.get('cta_text', ''),
+                    image_prompt=cap_data.get('image_prompt', ''),
                     is_selected=(i == 0 and platform == platforms[0]),
                 )
                 captions_created.append(caption)

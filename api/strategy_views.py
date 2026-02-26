@@ -1101,3 +1101,323 @@ class IdeaHistoryView(APIView):
         } for i in ideas]
 
         return Response({'count': len(data), 'ideas': data})
+
+
+# ============================================================
+# V1.4 NEW VIEWS — Competitor Suggest, Pillar Generate, Trend Feedback
+# ============================================================
+
+
+class SuggestCompetitorsView(APIView):
+    """AI-suggest competitors based on brand DNA + industry + region"""
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
+
+    def post(self, request):
+        brand_id = request.data.get('brand_id')
+        count = request.data.get('count', 5)
+        if not brand_id:
+            return Response({'error': 'brand_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user), id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        from accounts.api_keys import get_openai_key
+        api_key = get_openai_key(request.user)
+        if not api_key:
+            return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        dna = brand.brand_dna or {}
+        existing = list(CompetitorProfile.objects.filter(brand=brand).values_list('handle_or_url', flat=True))
+
+        try:
+            import openai
+            client = openai.OpenAI(api_key=api_key)
+
+            prompt = f"""You are a competitive intelligence analyst. Suggest {count} real competitor companies/brands for this brand.
+
+Brand: {brand.brand_name}
+Industry: {brand.industry}
+Region: {brand.target_region}
+Target Audience: {dna.get('target_audience', 'general')}
+Products/Services: {dna.get('products_services', 'N/A')}
+Brand Values: {', '.join(dna.get('brand_values', [])) if dna.get('brand_values') else 'N/A'}
+
+Existing competitors (DO NOT suggest these): {', '.join(existing) if existing else 'None'}
+
+Return a JSON object:
+{{"competitors": [{{"name": "Company Name", "platform": "website", "handle_or_url": "https://example.com", "reason": "Brief reason why they are a competitor"}}]}}
+
+Rules:
+- Suggest REAL companies that actually exist
+- Include their actual website URL or social media handle
+- Focus on direct and indirect competitors in the same region/market
+- platform should be one of: website, twitter, linkedin, facebook, instagram"""
+
+            response = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.3,
+                max_tokens=1500,
+                response_format={'type': 'json_object'},
+            )
+
+            import json
+            result = json.loads(response.choices[0].message.content)
+            suggestions = result.get('competitors', [])
+
+            return Response({
+                'brand_id': brand.id,
+                'count': len(suggestions),
+                'suggestions': suggestions,
+            })
+
+        except Exception as e:
+            logger.error(f"Competitor suggestion failed: {e}", exc_info=True)
+            return Response(
+                {'error': f'Suggestion failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class GeneratePillarsView(APIView):
+    """AI-generate content pillars based on brand DNA + competitors + trends"""
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
+
+    def post(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user), id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        count = request.data.get('count', 5)
+        focus_areas = request.data.get('focus_areas', [])
+
+        from accounts.api_keys import get_openai_key
+        api_key = get_openai_key(request.user)
+        if not api_key:
+            return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        dna = brand.brand_dna or {}
+        existing_qs = ContentPillar.objects.filter(brand=brand)
+        existing_pillars = list(existing_qs.values_list('name', flat=True))
+        existing_pct_sum = sum(existing_qs.values_list('target_percentage', flat=True))
+        remaining_pct = max(100 - existing_pct_sum, 0)
+
+        # If existing pillars already fill 100%, rebalance all to make room
+        rebalance = existing_pct_sum >= 100 and len(existing_pillars) > 0
+
+        # Gather competitor insights
+        insights = CompetitorInsight.objects.filter(
+            competitor_profile__brand=brand
+        ).order_by('-engagement_score')[:15]
+        insight_texts = [ci.hook_text.split(' ||REC||')[0][:100] for ci in insights]
+
+        # Gather trending topics
+        trending = TrendingCache.objects.filter(
+            brand=brand, expires_at__gt=timezone.now()
+        ).order_by('-volume_score')[:10]
+        trending_texts = [t.topic for t in trending]
+
+        total_pillars = len(existing_pillars) + count
+
+        try:
+            import openai
+            import json
+            client = openai.OpenAI(api_key=api_key)
+
+            if rebalance:
+                pct_instruction = f"""Percentages for the NEW {count} pillars must sum to {round(100 * count / total_pillars)}.
+The existing {len(existing_pillars)} pillars will be rebalanced so ALL pillars together sum to exactly 100."""
+            elif remaining_pct > 0:
+                pct_instruction = f"Percentages for these {count} new pillars must sum to exactly {remaining_pct} (existing pillars use {existing_pct_sum}%)."
+            else:
+                pct_instruction = f"Percentages must sum to exactly 100."
+
+            prompt = f"""You are a content strategy expert. Generate {count} content pillars for this brand.
+
+Brand: {brand.brand_name}
+Industry: {brand.industry}
+Target Audience: {dna.get('target_audience', 'general')}
+Brand Voice: {dna.get('brand_voice', 'professional')}
+Brand Values: {', '.join(dna.get('brand_values', [])) if dna.get('brand_values') else 'N/A'}
+Products/Services: {dna.get('products_services', 'N/A')}
+
+Competitor Strategies: {'; '.join(insight_texts[:5]) if insight_texts else 'None analyzed yet'}
+Current Trending Topics: {', '.join(trending_texts[:5]) if trending_texts else 'None'}
+
+Existing pillars (DO NOT duplicate these): {', '.join(existing_pillars) if existing_pillars else 'None'}
+{f'Focus areas to emphasize: {", ".join(focus_areas)}' if focus_areas else ''}
+
+Return a JSON object:
+{{"pillars": [{{"name": "Pillar Name", "description": "1-2 sentence description", "target_percentage": 20, "color_code": "#hex"}}]}}
+
+Rules:
+- {pct_instruction}
+- Each pillar should be distinct and actionable
+- Use vibrant, distinct hex color codes for each pillar
+- Name should be concise (2-4 words)
+- Description should explain what content falls under this pillar"""
+
+            response = client.chat.completions.create(
+                model='gpt-4o-mini',
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.5,
+                max_tokens=1500,
+                response_format={'type': 'json_object'},
+            )
+
+            result = json.loads(response.choices[0].message.content)
+            pillars_data = result.get('pillars', [])
+
+            # Force-normalize percentages so new + existing = 100
+            new_pct_sum = sum(p.get('target_percentage', 0) for p in pillars_data) or 1
+            if rebalance:
+                # Rebalance existing pillars
+                target_existing = round(100 * len(existing_pillars) / total_pillars)
+                target_new = 100 - target_existing
+                for ep in existing_qs:
+                    ep.target_percentage = max(1, round(target_existing / len(existing_pillars)))
+                    ep.save(update_fields=['target_percentage'])
+                for p in pillars_data:
+                    p['target_percentage'] = max(1, round(p.get('target_percentage', 0) * target_new / new_pct_sum))
+            else:
+                available = remaining_pct if remaining_pct > 0 else 100
+                for p in pillars_data:
+                    p['target_percentage'] = max(1, round(p.get('target_percentage', 0) * available / new_pct_sum))
+
+            # Final adjustment to hit exactly 100%
+            all_existing_pct = sum(existing_qs.values_list('target_percentage', flat=True)) if rebalance else existing_pct_sum
+            total_new_pct = sum(p.get('target_percentage', 0) for p in pillars_data)
+            diff = 100 - all_existing_pct - total_new_pct
+            if diff != 0 and pillars_data:
+                pillars_data[0]['target_percentage'] = max(1, pillars_data[0].get('target_percentage', 0) + diff)
+
+            created_pillars = []
+            for p in pillars_data:
+                pillar = ContentPillar.objects.create(
+                    brand=brand,
+                    name=p.get('name', 'Untitled'),
+                    description=p.get('description', ''),
+                    target_percentage=p.get('target_percentage', 0),
+                    color_code=p.get('color_code', '#6B7280'),
+                )
+                created_pillars.append(pillar)
+
+            serializer = ContentPillarSerializer(created_pillars, many=True)
+            return Response({
+                'brand_id': brand.id,
+                'count': len(created_pillars),
+                'pillars': serializer.data,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"Pillar generation failed: {e}", exc_info=True)
+            return Response(
+                {'error': f'Pillar generation failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TrendFeedbackView(APIView):
+    """Submit or retrieve trend feedback for learning"""
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
+
+    def post(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user), id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        topic_text = request.data.get('topic_text', '').strip()
+        is_accepted = request.data.get('is_accepted')
+        source_trending_id = request.data.get('source_trending_id')
+
+        if not topic_text or is_accepted is None:
+            return Response(
+                {'error': 'topic_text and is_accepted are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from brands.models import TrendFeedback
+        feedback, created = TrendFeedback.objects.update_or_create(
+            brand=brand,
+            topic_text=topic_text,
+            defaults={
+                'is_accepted': is_accepted,
+                'source_trending_id': source_trending_id,
+            },
+        )
+
+        return Response({
+            'id': feedback.id,
+            'topic_text': feedback.topic_text,
+            'is_accepted': feedback.is_accepted,
+            'created': created,
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def get(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user), id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        from brands.models import TrendFeedback
+        feedback = TrendFeedback.objects.filter(brand=brand).order_by('-created_at')[:200]
+        data = [{
+            'id': f.id,
+            'topic_text': f.topic_text,
+            'is_accepted': f.is_accepted,
+            'source_trending_id': f.source_trending_id,
+            'created_at': f.created_at.isoformat(),
+        } for f in feedback]
+
+        return Response({'brand_id': brand.id, 'count': len(data), 'feedback': data})
+
+
+class ManualTrendView(APIView):
+    """Add a manual trending topic"""
+    permission_classes = [IsAuthenticated, IsCreatorOrAbove]
+
+    def post(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user), id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        topic = request.data.get('topic', '').strip()
+        relevance_explanation = request.data.get('relevance_explanation', '')
+
+        if not topic:
+            return Response({'error': 'topic is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        from datetime import timedelta
+        trend = TrendingCache.objects.create(
+            platform='manual',
+            topic=topic[:500],
+            volume_score=50,
+            region=brand.target_region or 'global',
+            brand=brand,
+            relevance_explanation=relevance_explanation[:500] if relevance_explanation else 'Manually added by user',
+            expires_at=timezone.now() + timedelta(hours=24),
+        )
+
+        return Response({
+            'id': trend.id,
+            'topic': trend.topic,
+            'platform': trend.platform,
+            'volume_score': trend.volume_score,
+            'relevance_explanation': trend.relevance_explanation,
+            'expires_at': trend.expires_at.isoformat(),
+        }, status=status.HTTP_201_CREATED)

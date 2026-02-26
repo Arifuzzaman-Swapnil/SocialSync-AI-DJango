@@ -56,6 +56,7 @@ router.register(r'banned-hashtags', hashtag_views.BannedHashtagViewSet, basename
 urlpatterns = [
     # Auth endpoints
     path('auth/register/', views.RegisterView.as_view(), name='api-register'),
+    path('auth/register-with-brand/', views.RegisterWithBrandView.as_view(), name='api-register-with-brand'),
     path('auth/login/', views.LoginView.as_view(), name='api-login'),
     path('auth/logout/', views.LogoutView.as_view(), name='api-logout'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='api-token-refresh'),
@@ -89,6 +90,7 @@ urlpatterns = [
 
     # AI Image endpoints
     path('ai-image/generate/', views.generate_image, name='api-generate-image'),
+    path('ai-image/refine-prompt/', views.refine_image_prompt, name='api-refine-image-prompt'),
     path('ai-image/history/', views.ImageGenerationHistoryView.as_view(), name='api-image-history'),
     path('ai-image/settings/', views.ImageSettingsView.as_view(), name='api-image-settings'),
 
@@ -153,6 +155,7 @@ urlpatterns = [
     # Brand DNA endpoints
     path('brands/<int:brand_id>/generate-dna/', views.GenerateBrandDNAView.as_view(), name='api-generate-brand-dna'),
     path('brands/<int:brand_id>/dna-status/', views.BrandDNAStatusView.as_view(), name='api-brand-dna-status'),
+    path('brands/<int:brand_id>/regenerate-dna-inputs/', views.RegenerateBrandDNAFromInputsView.as_view(), name='api-regenerate-dna-inputs'),
 
     # Analytics endpoints (V1.1)
     path('analytics/summary/', views.AnalyticsSummaryView.as_view(), name='api-analytics-summary'),
@@ -186,6 +189,13 @@ urlpatterns = [
     path('brands/<int:brand_id>/dna-history/', strategy_views.BrandDNAHistoryView.as_view(), name='api-dna-history'),
     path('brands/<int:brand_id>/dna-history/<int:history_id>/restore/', strategy_views.RestoreDNAView.as_view(), name='api-dna-restore'),
     path('ideas/history/', strategy_views.IdeaHistoryView.as_view(), name='api-idea-history'),
+
+    # V1.4 — Competitor Suggest, Pillar Generate, Trend Feedback, Manual Trends, Scheduling
+    path('competitors/suggest/', strategy_views.SuggestCompetitorsView.as_view(), name='api-suggest-competitors'),
+    path('brands/<int:brand_id>/pillars/generate/', strategy_views.GeneratePillarsView.as_view(), name='api-generate-pillars'),
+    path('brands/<int:brand_id>/trending/feedback/', strategy_views.TrendFeedbackView.as_view(), name='api-trend-feedback'),
+    path('brands/<int:brand_id>/trending/manual/', strategy_views.ManualTrendView.as_view(), name='api-manual-trend'),
+    path('schedule/compute-times/', scheduling_views.ComputeRecommendedTimesView.as_view(), name='api-compute-times'),
 
     # Draft Captions
     path('drafts/<int:post_id>/captions/', caption_views.DraftCaptionsView.as_view(), name='api-draft-captions'),

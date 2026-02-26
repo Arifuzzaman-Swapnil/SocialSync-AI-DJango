@@ -1175,6 +1175,7 @@ export interface PostCaptionV2 {
   is_selected: boolean;
   is_ab_test: boolean;
   ab_label: 'A' | 'B' | null;
+  image_prompt?: string;
   generation_prompt_hash: string;
   created_at: string;
   updated_at: string;
@@ -1325,8 +1326,9 @@ export interface BestTimeSuggestion {
   day_of_week: number;
   hour_utc: number;
   score: number;
-  source: 'own_data' | 'industry_default';
+  source: 'own_data' | 'industry_default' | 'competitor_analysis';
   computed_at: string;
+  reason?: string;
 }
 
 export interface AssetPlatformVariant {
@@ -1455,6 +1457,21 @@ export interface TrendingTopic {
   relevance_explanation?: string;
   expires_at: string;
   category?: string;
+}
+
+export interface TrendFeedback {
+  id: number;
+  topic_text: string;
+  is_accepted: boolean;
+  source_trending_id?: number;
+  created_at: string;
+}
+
+export interface CompetitorSuggestion {
+  name: string;
+  platform: string;
+  handle_or_url: string;
+  reason: string;
 }
 
 export interface IdeaHistoryItem {

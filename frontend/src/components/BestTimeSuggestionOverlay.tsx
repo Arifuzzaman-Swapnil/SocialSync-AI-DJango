@@ -4,14 +4,16 @@ import {
   ClockIcon,
   InformationCircleIcon,
   ArrowPathIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
+import calendarService from '../services/calendarService';
 
 interface TimeSlot {
   day_of_week: number;
   hour_utc: number;
   score: number;
-  source: 'own_data' | 'industry_default';
+  source: 'own_data' | 'industry_default' | 'competitor_analysis';
 }
 
 interface Props {
@@ -55,6 +57,7 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
     y: number;
   } | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState(platform || '');
+  const [computing, setComputing] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -140,6 +143,30 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
             <option value="facebook">Facebook</option>
             <option value="instagram">Instagram</option>
           </select>
+          <button
+            onClick={async () => {
+              setComputing(true);
+              try {
+                await calendarService.computeRecommendedTimes(
+                  brandId,
+                  selectedPlatform ? [selectedPlatform] : [],
+                );
+                await loadBestTimes();
+              } catch (err) {
+                console.error('Compute times failed:', err);
+              }
+              setComputing(false);
+            }}
+            disabled={computing}
+            className="text-xs flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition-colors"
+          >
+            {computing ? (
+              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-400" />
+            ) : (
+              <SparklesIcon className="w-3 h-3" />
+            )}
+            {computing ? 'Computing...' : 'Compute from Competitors'}
+          </button>
           <button
             onClick={loadBestTimes}
             className="p-1.5 rounded-lg hover:bg-white/5 text-text-secondary transition-colors"
@@ -232,6 +259,8 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
                         Source:{' '}
                         {tooltip.slot.source === 'own_data'
                           ? 'Your Data'
+                          : tooltip.slot.source === 'competitor_analysis'
+                          ? 'Competitor Analysis'
                           : 'Industry Default'}
                       </p>
                       <div
@@ -311,6 +340,10 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-primary-400" />
                   <span className="text-[10px] text-text-muted">Your data</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                  <span className="text-[10px] text-text-muted">Competitor</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />

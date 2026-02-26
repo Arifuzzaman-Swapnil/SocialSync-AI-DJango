@@ -91,6 +91,24 @@ export function StrategyHubPage() {
   const [dnaHistory, setDnaHistory] = useState<BrandDNAHistoryEntry[]>([]);
   const [showDnaHistory, setShowDnaHistory] = useState(false);
 
+  // DNA Edit Mode
+  const [dnaEditMode, setDnaEditMode] = useState(false);
+  const [dnaSaving, setDnaSaving] = useState(false);
+  const [dnaInputs, setDnaInputs] = useState<Record<string, any>>({
+    brand_name: '', tagline: '', industry: '', description: '',
+    products_services: [] as string[], target_audience: '',
+    unique_selling_points: [] as string[], brand_voice: '',
+    brand_values: [] as string[], color_theme: [] as string[],
+    content_themes: [] as string[], cta_style: '',
+    social_platforms: [] as string[], keywords: [] as string[],
+    competitor_positioning: '', website_url: '',
+  });
+
+  // Custom DNA fields
+  const [customFields, setCustomFields] = useState<Array<{ key: string; value: string; type: 'text' | 'list' }>>([]);
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'list'>('text');
+
   // Pillar form
   const [showPillarForm, setShowPillarForm] = useState(false);
   const [pillarForm, setPillarForm] = useState({ name: '', description: '', target_percentage: 25, color_code: '#6366F1' });
@@ -99,6 +117,20 @@ export function StrategyHubPage() {
   // Competitor form
   const [showCompForm, setShowCompForm] = useState(false);
   const [compForm, setCompForm] = useState({ platform: 'twitter', handle_or_url: '' });
+  const [suggestingCompetitors, setSuggestingCompetitors] = useState(false);
+  const [competitorSuggestions, setCompetitorSuggestions] = useState<Array<{ name: string; platform: string; handle_or_url: string; reason: string }>>([]);
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+
+  // Pillar generation
+  const [generatingPillars, setGeneratingPillars] = useState(false);
+  const [showPillarGenModal, setShowPillarGenModal] = useState(false);
+  const [pillarGenFocusAreas, setPillarGenFocusAreas] = useState('');
+  const [pillarGenCount, setPillarGenCount] = useState(5);
+
+  // Trend feedback
+  const [trendFeedback, setTrendFeedback] = useState<Record<string, boolean | null>>({});
+  const [manualTrendInput, setManualTrendInput] = useState('');
+  const [addingManualTrend, setAddingManualTrend] = useState(false);
 
   // Fetch user's primary brand on mount
   useEffect(() => {
@@ -158,6 +190,16 @@ export function StrategyHubPage() {
         const tData = await strategyService.getBrandTrending(brandId);
         setTrendingTopics(Array.isArray(tData) ? tData : tData.topics || []);
       } catch { setTrendingTopics([]); }
+
+      // Load trend feedback
+      try {
+        const fbData = await strategyService.getTrendFeedback(brandId);
+        const fbMap: Record<string, boolean | null> = {};
+        (fbData.feedback || []).forEach((f: { topic_text: string; is_accepted: boolean }) => {
+          fbMap[f.topic_text] = f.is_accepted;
+        });
+        setTrendFeedback(fbMap);
+      } catch { /* no feedback yet */ }
     } catch (err) {
       console.error('Failed to load strategy data:', err);
     }
@@ -293,6 +335,100 @@ export function StrategyHubPage() {
       }
       setShowDnaHistory(false);
     } catch { /* ignore */ }
+  };
+
+  const BUILTIN_DNA_KEYS = new Set([
+    'brand_name', 'tagline', 'industry', 'description', 'products_services',
+    'target_audience', 'unique_selling_points', 'brand_voice', 'brand_values',
+    'color_theme', 'content_themes', 'cta_style', 'social_platforms', 'keywords',
+    'competitor_positioning', 'website_url',
+  ]);
+
+  const handleEnterDnaEdit = () => {
+    if (dnaData) {
+      setDnaInputs({
+        brand_name: dnaData.brand_name || '',
+        tagline: dnaData.tagline || '',
+        industry: dnaData.industry || '',
+        description: dnaData.description || '',
+        products_services: Array.isArray(dnaData.products_services) ? dnaData.products_services : [],
+        target_audience: dnaData.target_audience || '',
+        unique_selling_points: Array.isArray(dnaData.unique_selling_points) ? dnaData.unique_selling_points : [],
+        brand_voice: dnaData.brand_voice || '',
+        brand_values: Array.isArray(dnaData.brand_values) ? dnaData.brand_values : [],
+        color_theme: Array.isArray(dnaData.color_theme) ? dnaData.color_theme : [],
+        content_themes: Array.isArray(dnaData.content_themes) ? dnaData.content_themes : [],
+        cta_style: dnaData.cta_style || '',
+        social_platforms: Array.isArray(dnaData.social_platforms) ? dnaData.social_platforms : [],
+        keywords: Array.isArray(dnaData.keywords) ? dnaData.keywords : [],
+        competitor_positioning: dnaData.competitor_positioning || '',
+        website_url: dnaData.website_url || '',
+      });
+      // Load custom fields from existing DNA data
+      const extras: Array<{ key: string; value: string; type: 'text' | 'list' }> = [];
+      Object.entries(dnaData).forEach(([key, val]) => {
+        if (!BUILTIN_DNA_KEYS.has(key) && val !== null && val !== undefined && val !== '') {
+          if (Array.isArray(val)) {
+            extras.push({ key, value: val.join(', '), type: 'list' });
+          } else {
+            extras.push({ key, value: String(val), type: 'text' });
+          }
+        }
+      });
+      setCustomFields(extras);
+    }
+    setDnaEditMode(true);
+  };
+
+  const handleSaveDna = async (useAi: boolean) => {
+    if (!brandId) return;
+    setDnaSaving(true);
+    setDnaError(null);
+    try {
+      // Merge custom fields into dnaInputs
+      const mergedInputs = { ...dnaInputs };
+      customFields.forEach((cf) => {
+        if (cf.key.trim()) {
+          if (cf.type === 'list') {
+            mergedInputs[cf.key.trim()] = cf.value.split(',').map((v: string) => v.trim()).filter(Boolean);
+          } else {
+            mergedInputs[cf.key.trim()] = cf.value;
+          }
+        }
+      });
+      const result = await strategyService.regenerateDNAFromInputs(brandId, { ...mergedInputs, use_ai: useAi });
+      if (result.brand_dna) {
+        setDnaData(result.brand_dna);
+        setDnaGeneratedAt(result.generated_at);
+      }
+      setDnaEditMode(false);
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Failed to save Brand DNA.';
+      setDnaError(msg);
+    }
+    setDnaSaving(false);
+  };
+
+  // Helper: update a text field in dnaInputs
+  const setDnaField = (field: string, value: string) => {
+    setDnaInputs(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Helper: add a chip to an array field
+  const addChip = (field: string, value: string) => {
+    if (!value.trim()) return;
+    setDnaInputs(prev => ({
+      ...prev,
+      [field]: [...(prev[field] || []), value.trim()],
+    }));
+  };
+
+  // Helper: remove a chip from an array field
+  const removeChip = (field: string, index: number) => {
+    setDnaInputs(prev => ({
+      ...prev,
+      [field]: (prev[field] || []).filter((_: string, i: number) => i !== index),
+    }));
   };
 
   const totalPercentage = pillars.reduce((sum, p) => sum + p.target_percentage, 0);
@@ -464,9 +600,29 @@ export function StrategyHubPage() {
           <div className="card p-4">
             <div className="flex justify-between text-sm mb-2">
               <span>Distribution</span>
-              <span className={totalPercentage === 100 ? 'text-green-400' : 'text-yellow-400'}>
-                {totalPercentage}% / 100%
-              </span>
+              <div className="flex items-center gap-3">
+                <span className={totalPercentage === 100 ? 'text-green-400' : totalPercentage > 100 ? 'text-red-400' : 'text-yellow-400'}>
+                  {totalPercentage}% / 100%
+                </span>
+                {totalPercentage !== 100 && pillars.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      const each = Math.floor(100 / pillars.length);
+                      const remainder = 100 - each * pillars.length;
+                      try {
+                        await Promise.all(pillars.map((p, idx) =>
+                          strategyService.updatePillar(p.id, { target_percentage: each + (idx === 0 ? remainder : 0) })
+                        ));
+                        loadData();
+                      } catch { /* ignore */ }
+                    }}
+                    className="text-xs text-primary-400 hover:text-primary-300 underline flex items-center gap-1"
+                  >
+                    <ArrowPathIcon className="w-3 h-3" />
+                    Rebalance
+                  </button>
+                )}
+              </div>
             </div>
             <div className="h-4 bg-dark-700 rounded-full overflow-hidden flex">
               {pillars.map((p) => (
@@ -509,6 +665,20 @@ export function StrategyHubPage() {
               </motion.div>
             ))}
 
+            {/* AI Generate Pillars Card */}
+            <button
+              onClick={() => setShowPillarGenModal(true)}
+              disabled={generatingPillars}
+              className="card p-4 border-2 border-dashed border-primary-500/30 hover:border-primary-500/50 transition-colors flex flex-col items-center justify-center gap-2 min-h-[150px]"
+            >
+              {generatingPillars ? (
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-400" />
+              ) : (
+                <SparklesIcon className="w-8 h-8 text-primary-400" />
+              )}
+              <span className="text-sm text-primary-400">{generatingPillars ? 'Generating...' : 'AI Generate Pillars'}</span>
+            </button>
+
             {/* Add Pillar Card */}
             <button onClick={() => { setEditingPillar(null); setPillarForm({ name: '', description: '', target_percentage: 25, color_code: '#6366F1' }); setShowPillarForm(true); }} className="card p-4 border-2 border-dashed border-white/10 hover:border-primary-500/50 transition-colors flex flex-col items-center justify-center gap-2 min-h-[150px]">
               <PlusIcon className="w-8 h-8 text-text-secondary" />
@@ -546,6 +716,63 @@ export function StrategyHubPage() {
               </div>
             </div>
           )}
+
+          {/* AI Generate Pillars Modal */}
+          {showPillarGenModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowPillarGenModal(false)}>
+              <div className="card p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <SparklesIcon className="w-5 h-5 text-primary-400" />
+                  AI Generate Pillars
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Number of Pillars: {pillarGenCount}</label>
+                    <input type="range" min="3" max="8" className="w-full" value={pillarGenCount} onChange={(e) => setPillarGenCount(Number(e.target.value))} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Focus Areas (optional)</label>
+                    <textarea
+                      className="input w-full"
+                      rows={2}
+                      value={pillarGenFocusAreas}
+                      onChange={(e) => setPillarGenFocusAreas(e.target.value)}
+                      placeholder="e.g. product showcase, educational content, behind the scenes"
+                    />
+                    <p className="text-xs text-text-muted mt-1">Comma-separated areas to emphasize</p>
+                  </div>
+                  <div className="flex gap-3 pt-2">
+                    <button onClick={() => setShowPillarGenModal(false)} className="btn-secondary flex-1">Cancel</button>
+                    <button
+                      disabled={generatingPillars}
+                      onClick={async () => {
+                        if (!brandId) return;
+                        setGeneratingPillars(true);
+                        try {
+                          const focusAreas = pillarGenFocusAreas.split(',').map(s => s.trim()).filter(Boolean);
+                          await strategyService.generatePillars(brandId, pillarGenCount, focusAreas);
+                          setShowPillarGenModal(false);
+                          setPillarGenFocusAreas('');
+                          loadData();
+                        } catch (err) {
+                          console.error('Pillar generation failed:', err);
+                        }
+                        setGeneratingPillars(false);
+                      }}
+                      className="btn-primary flex-1 flex items-center justify-center gap-2"
+                    >
+                      {generatingPillars ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                          Generating...
+                        </>
+                      ) : 'Generate'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -569,9 +796,34 @@ export function StrategyHubPage() {
                 </button>
               )}
             </div>
-            <button onClick={() => setShowCompForm(true)} className="btn-secondary flex items-center gap-2">
-              <PlusIcon className="w-4 h-4" /> Add Competitor
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!brandId) return;
+                  setSuggestingCompetitors(true);
+                  try {
+                    const result = await strategyService.suggestCompetitors(brandId);
+                    setCompetitorSuggestions(result.suggestions || []);
+                    setShowSuggestModal(true);
+                  } catch (err) {
+                    setAnalysisError('Failed to suggest competitors');
+                  }
+                  setSuggestingCompetitors(false);
+                }}
+                disabled={suggestingCompetitors}
+                className="btn-secondary flex items-center gap-2"
+              >
+                {suggestingCompetitors ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-400" />
+                ) : (
+                  <SparklesIcon className="w-4 h-4" />
+                )}
+                {suggestingCompetitors ? 'Suggesting...' : 'Suggest Competitors'}
+              </button>
+              <button onClick={() => setShowCompForm(true)} className="btn-secondary flex items-center gap-2">
+                <PlusIcon className="w-4 h-4" /> Add Competitor
+              </button>
+            </div>
           </div>
 
           {/* Error */}
@@ -720,6 +972,48 @@ export function StrategyHubPage() {
               </div>
             </div>
           )}
+
+          {/* Suggest Competitors Modal */}
+          {showSuggestModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSuggestModal(false)}>
+              <div className="card p-6 w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <SparklesIcon className="w-5 h-5 text-primary-400" />
+                  Suggested Competitors
+                </h3>
+                {competitorSuggestions.length === 0 ? (
+                  <p className="text-sm text-text-secondary">No suggestions available.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {competitorSuggestions.map((sug, idx) => (
+                      <div key={idx} className="bg-dark-700/30 rounded-lg p-3 flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{sug.name}</p>
+                          <p className="text-xs text-text-secondary mt-0.5">{sug.handle_or_url}</p>
+                          <p className="text-xs text-primary-400/70 mt-1">{sug.reason}</p>
+                          <span className="badge badge-primary text-xs mt-1 capitalize">{sug.platform}</span>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (!brandId) return;
+                            try {
+                              await strategyService.addCompetitor({ brand: brandId, platform: sug.platform, handle_or_url: sug.handle_or_url });
+                              setCompetitorSuggestions(competitorSuggestions.filter((_, i) => i !== idx));
+                              loadData();
+                            } catch { /* already exists or error */ }
+                          }}
+                          className="btn-primary text-xs px-3 py-1.5 flex-shrink-0"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button onClick={() => setShowSuggestModal(false)} className="btn-secondary w-full mt-4">Close</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -754,6 +1048,15 @@ export function StrategyHubPage() {
                 )}
                 {dnaLoading ? 'Generating...' : dnaData ? 'Reanalyze' : 'Generate DNA'}
               </button>
+              {dnaData && !dnaEditMode && (
+                <button
+                  onClick={handleEnterDnaEdit}
+                  className="btn-secondary flex items-center gap-2 px-4"
+                >
+                  <PencilIcon className="w-4 h-4" />
+                  Edit DNA
+                </button>
+              )}
             </div>
             {dnaGeneratedAt && (
               <div className="flex items-center justify-between mt-3">
@@ -776,12 +1079,277 @@ export function StrategyHubPage() {
             </div>
           )}
 
-          {/* DNA Results */}
-          {dnaData && (
+          {/* DNA Edit Mode */}
+          {dnaEditMode && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-              {/* Brand Identity Card */}
+              {/* Brand Identity Inputs */}
               <div className="card p-6">
                 <h3 className="text-lg font-semibold mb-4">Brand Identity</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Name</label>
+                    <input type="text" className="input w-full mt-1" value={dnaInputs.brand_name} onChange={(e) => setDnaField('brand_name', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Tagline</label>
+                    <input type="text" className="input w-full mt-1" value={dnaInputs.tagline} onChange={(e) => setDnaField('tagline', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Industry</label>
+                    <input type="text" className="input w-full mt-1" value={dnaInputs.industry} onChange={(e) => setDnaField('industry', e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Voice</label>
+                    <input type="text" className="input w-full mt-1" value={dnaInputs.brand_voice} onChange={(e) => setDnaField('brand_voice', e.target.value)} placeholder="e.g. professional, casual, friendly" />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Description</label>
+                  <textarea className="input w-full mt-1" rows={3} value={dnaInputs.description} onChange={(e) => setDnaField('description', e.target.value)} />
+                </div>
+                <div className="mt-4">
+                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Target Audience</label>
+                  <textarea className="input w-full mt-1" rows={2} value={dnaInputs.target_audience} onChange={(e) => setDnaField('target_audience', e.target.value)} />
+                </div>
+                <div className="mt-4">
+                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Competitor Positioning</label>
+                  <textarea className="input w-full mt-1" rows={2} value={dnaInputs.competitor_positioning} onChange={(e) => setDnaField('competitor_positioning', e.target.value)} />
+                </div>
+                <div className="mt-4">
+                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">CTA Style</label>
+                  <input type="text" className="input w-full mt-1" value={dnaInputs.cta_style} onChange={(e) => setDnaField('cta_style', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Chip-list fields */}
+              {[
+                { field: 'products_services', label: 'Products & Services' },
+                { field: 'unique_selling_points', label: 'Unique Selling Points' },
+                { field: 'brand_values', label: 'Brand Values' },
+              ].map(({ field, label }) => (
+                <div key={field} className="card p-6">
+                  <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">{label}</h3>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(dnaInputs[field] || []).map((item: string, idx: number) => (
+                      <span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm flex items-center gap-1.5">
+                        {item}
+                        <button onClick={() => removeChip(field, idx)} className="hover:text-red-400 text-xs ml-1">&times;</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      className="input flex-1"
+                      placeholder={`Add ${label.toLowerCase()}...`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addChip(field, (e.target as HTMLInputElement).value);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }}
+                    />
+                    <button
+                      className="btn-secondary px-3"
+                      onClick={(e) => {
+                        const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                        addChip(field, input.value);
+                        input.value = '';
+                      }}
+                    >
+                      <PlusIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {/* Content & Keywords chip fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { field: 'content_themes', label: 'Content Themes' },
+                  { field: 'keywords', label: 'Keywords' },
+                  { field: 'color_theme', label: 'Color Theme' },
+                  { field: 'social_platforms', label: 'Social Platforms' },
+                ].map(({ field, label }) => (
+                  <div key={field} className="card p-5">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">{label}</h4>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {(dnaInputs[field] || []).map((item: string, idx: number) => (
+                        <span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                          {item}
+                          <button onClick={() => removeChip(field, idx)} className="hover:text-red-400">&times;</button>
+                        </span>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      className="input w-full text-sm"
+                      placeholder={`Add ${label.toLowerCase()}, press Enter`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addChip(field, (e.target as HTMLInputElement).value);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Custom Fields */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-text-secondary flex items-center gap-2">
+                  <PlusIcon className="w-4 h-4" />
+                  Custom Fields
+                </h3>
+                <p className="text-xs text-text-muted mb-4">Add your own fields to Brand DNA — e.g. brand_story, tone_examples, hashtags, etc.</p>
+
+                {/* Existing custom fields */}
+                {customFields.map((cf, idx) => (
+                  <div key={idx} className="flex items-start gap-3 mb-3 bg-dark-700/50 rounded-lg p-3">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          className="input text-sm flex-1"
+                          placeholder="Field name (e.g. brand_story)"
+                          value={cf.key}
+                          onChange={(e) => {
+                            const updated = [...customFields];
+                            updated[idx] = { ...cf, key: e.target.value };
+                            setCustomFields(updated);
+                          }}
+                        />
+                        <select
+                          className="input text-xs w-24"
+                          value={cf.type}
+                          onChange={(e) => {
+                            const updated = [...customFields];
+                            updated[idx] = { ...cf, type: e.target.value as 'text' | 'list' };
+                            setCustomFields(updated);
+                          }}
+                        >
+                          <option value="text">Text</option>
+                          <option value="list">List</option>
+                        </select>
+                      </div>
+                      {cf.type === 'text' ? (
+                        <textarea
+                          className="input w-full text-sm"
+                          rows={2}
+                          placeholder="Value..."
+                          value={cf.value}
+                          onChange={(e) => {
+                            const updated = [...customFields];
+                            updated[idx] = { ...cf, value: e.target.value };
+                            setCustomFields(updated);
+                          }}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          className="input w-full text-sm"
+                          placeholder="Comma-separated values (e.g. item1, item2, item3)"
+                          value={cf.value}
+                          onChange={(e) => {
+                            const updated = [...customFields];
+                            updated[idx] = { ...cf, value: e.target.value };
+                            setCustomFields(updated);
+                          }}
+                        />
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
+                      className="p-1.5 rounded hover:bg-red-500/10 text-text-secondary hover:text-red-400 transition-colors mt-1"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add new custom field */}
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="text"
+                    className="input flex-1 text-sm"
+                    placeholder="New field name..."
+                    value={newFieldKey}
+                    onChange={(e) => setNewFieldKey(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newFieldKey.trim()) {
+                        e.preventDefault();
+                        setCustomFields([...customFields, { key: newFieldKey.trim().replace(/\s+/g, '_').toLowerCase(), value: '', type: newFieldType }]);
+                        setNewFieldKey('');
+                      }
+                    }}
+                  />
+                  <select
+                    className="input text-xs w-24"
+                    value={newFieldType}
+                    onChange={(e) => setNewFieldType(e.target.value as 'text' | 'list')}
+                  >
+                    <option value="text">Text</option>
+                    <option value="list">List</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      if (newFieldKey.trim()) {
+                        setCustomFields([...customFields, { key: newFieldKey.trim().replace(/\s+/g, '_').toLowerCase(), value: '', type: newFieldType }]);
+                        setNewFieldKey('');
+                      }
+                    }}
+                    className="btn-secondary px-3 flex items-center gap-1.5 text-sm"
+                  >
+                    <PlusIcon className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {/* Website URL */}
+              <div className="card p-5">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Website URL</label>
+                <input type="url" className="input w-full mt-1" value={dnaInputs.website_url} onChange={(e) => setDnaField('website_url', e.target.value)} placeholder="https://..." />
+              </div>
+
+              {/* Save Buttons */}
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setDnaEditMode(false)} className="btn-secondary px-6" disabled={dnaSaving}>Cancel</button>
+                <button onClick={() => handleSaveDna(false)} className="btn-primary px-6 flex items-center gap-2" disabled={dnaSaving}>
+                  {dnaSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <CheckCircleIcon className="w-4 h-4" />}
+                  Save DNA
+                </button>
+                <button onClick={() => handleSaveDna(true)} className="btn-primary px-6 flex items-center gap-2 bg-gradient-to-r from-primary to-secondary" disabled={dnaSaving}>
+                  {dnaSaving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <SparklesIcon className="w-4 h-4" />}
+                  Save & Enhance with AI
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {/* DNA Results (View Mode) */}
+          {dnaData && !dnaEditMode && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+              {/* Edit Bar */}
+              <div className="flex items-center justify-between bg-dark-700/50 border border-white/10 rounded-lg px-4 py-3">
+                <p className="text-sm text-text-secondary">
+                  Click on any section below to edit, or use the edit button
+                </p>
+                <button
+                  onClick={handleEnterDnaEdit}
+                  className="btn-primary flex items-center gap-2 px-5 py-2"
+                >
+                  <PencilIcon className="w-4 h-4" />
+                  Edit Brand DNA
+                </button>
+              </div>
+
+              {/* Brand Identity Card */}
+              <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={handleEnterDnaEdit}>
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <PencilIcon className="w-4 h-4 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {dnaData.brand_name && (
                     <div>
@@ -836,8 +1404,8 @@ export function StrategyHubPage() {
 
               {/* Products/Services */}
               {dnaData.products_services && dnaData.products_services.length > 0 && (
-                <div className="card p-6">
-                  <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Products & Services</h3>
+                <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={handleEnterDnaEdit}>
+                  <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
                   <div className="flex flex-wrap gap-2">
                     {dnaData.products_services.map((item: string, idx: number) => (
                       <span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm">{item}</span>
@@ -847,10 +1415,10 @@ export function StrategyHubPage() {
               )}
 
               {/* USP + Values + Keywords Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={handleEnterDnaEdit}>
                 {dnaData.unique_selling_points && dnaData.unique_selling_points.length > 0 && (
-                  <div className="card p-5">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Unique Selling Points</h4>
+                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Unique Selling Points <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
                     <ul className="space-y-2">
                       {dnaData.unique_selling_points.map((item: string, idx: number) => (
                         <li key={idx} className="text-sm flex items-start gap-2">
@@ -861,8 +1429,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.brand_values && dnaData.brand_values.length > 0 && (
-                  <div className="card p-5">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Brand Values</h4>
+                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
                     <ul className="space-y-2">
                       {dnaData.brand_values.map((item: string, idx: number) => (
                         <li key={idx} className="text-sm flex items-start gap-2">
@@ -873,8 +1441,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.content_themes && dnaData.content_themes.length > 0 && (
-                  <div className="card p-5">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Content Themes</h4>
+                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
                     <ul className="space-y-2">
                       {dnaData.content_themes.map((item: string, idx: number) => (
                         <li key={idx} className="text-sm flex items-start gap-2">
@@ -887,10 +1455,10 @@ export function StrategyHubPage() {
               </div>
 
               {/* Keywords + Colors + Social */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={handleEnterDnaEdit}>
                 {dnaData.keywords && dnaData.keywords.length > 0 && (
-                  <div className="card p-5">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Keywords</h4>
+                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Keywords <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
                     <div className="flex flex-wrap gap-1.5">
                       {dnaData.keywords.map((kw: string, idx: number) => (
                         <span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>
@@ -899,8 +1467,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.color_theme && dnaData.color_theme.length > 0 && (
-                  <div className="card p-5">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Color Theme</h4>
+                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Color Theme <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
                     <div className="flex flex-wrap gap-2">
                       {dnaData.color_theme.map((color: string, idx: number) => (
                         <span key={idx} className="flex items-center gap-1.5 text-sm">
@@ -912,8 +1480,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.social_platforms && dnaData.social_platforms.length > 0 && (
-                  <div className="card p-5">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Social Platforms</h4>
+                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Social Platforms <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
                     <div className="flex flex-wrap gap-2">
                       {dnaData.social_platforms.map((p: string, idx: number) => (
                         <span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>
@@ -922,6 +1490,40 @@ export function StrategyHubPage() {
                   </div>
                 )}
               </div>
+
+              {/* Custom Fields Display */}
+              {(() => {
+                const customEntries = Object.entries(dnaData).filter(
+                  ([key]) => !BUILTIN_DNA_KEYS.has(key) && dnaData[key] !== null && dnaData[key] !== undefined && dnaData[key] !== ''
+                );
+                if (customEntries.length === 0) return null;
+                return (
+                  <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={handleEnterDnaEdit}>
+                    <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-text-secondary flex items-center justify-between">
+                      Custom Fields
+                      <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {customEntries.map(([key, val]) => (
+                        <div key={key}>
+                          <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">
+                            {key.replace(/_/g, ' ')}
+                          </label>
+                          {Array.isArray(val) ? (
+                            <div className="flex flex-wrap gap-1.5 mt-1">
+                              {val.map((item: string, idx: number) => (
+                                <span key={idx} className="bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded text-xs">{item}</span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm mt-1">{String(val)}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Website Link */}
               {dnaData.website_url && (
@@ -1057,8 +1659,104 @@ export function StrategyHubPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Feedback Buttons */}
+                    <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                      <button
+                        onClick={async () => {
+                          if (!brandId) return;
+                          const newState = trendFeedback[topic.topic] === true ? null : true;
+                          setTrendFeedback(prev => ({ ...prev, [topic.topic]: newState }));
+                          if (newState !== null) {
+                            await strategyService.submitTrendFeedback(brandId, topic.topic, true, topic.id);
+                          }
+                        }}
+                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                          trendFeedback[topic.topic] === true
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                            : 'text-text-muted hover:text-green-400 hover:bg-green-500/10'
+                        }`}
+                      >
+                        <CheckCircleIcon className="w-3.5 h-3.5" />
+                        Like
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!brandId) return;
+                          const newState = trendFeedback[topic.topic] === false ? null : false;
+                          setTrendFeedback(prev => ({ ...prev, [topic.topic]: newState }));
+                          if (newState !== null) {
+                            await strategyService.submitTrendFeedback(brandId, topic.topic, false, topic.id);
+                          }
+                        }}
+                        className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                          trendFeedback[topic.topic] === false
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30 line-through'
+                            : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'
+                        }`}
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        Dislike
+                      </button>
+                    </div>
                   </motion.div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Add Manual Trend */}
+          {!trendingLoading && (
+            <div className="card p-4">
+              <h4 className="text-sm font-semibold mb-3">Add Your Own Topic</h4>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  className="input flex-1"
+                  value={manualTrendInput}
+                  onChange={(e) => setManualTrendInput(e.target.value)}
+                  placeholder="Enter a topic you want to track..."
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && manualTrendInput.trim()) {
+                      e.preventDefault();
+                      (async () => {
+                        if (!brandId) return;
+                        setAddingManualTrend(true);
+                        try {
+                          const result = await strategyService.addManualTrend(brandId, manualTrendInput.trim());
+                          setTrendingTopics(prev => [{ ...result, category: 'manual' }, ...prev]);
+                          setManualTrendInput('');
+                        } catch (err) {
+                          console.error('Failed to add manual trend:', err);
+                        }
+                        setAddingManualTrend(false);
+                      })();
+                    }
+                  }}
+                />
+                <button
+                  onClick={async () => {
+                    if (!brandId || !manualTrendInput.trim()) return;
+                    setAddingManualTrend(true);
+                    try {
+                      const result = await strategyService.addManualTrend(brandId, manualTrendInput.trim());
+                      setTrendingTopics(prev => [{ ...result, category: 'manual' }, ...prev]);
+                      setManualTrendInput('');
+                    } catch (err) {
+                      console.error('Failed to add manual trend:', err);
+                    }
+                    setAddingManualTrend(false);
+                  }}
+                  disabled={addingManualTrend || !manualTrendInput.trim()}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  {addingManualTrend ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <PlusIcon className="w-4 h-4" />
+                  )}
+                  Add
+                </button>
               </div>
             </div>
           )}

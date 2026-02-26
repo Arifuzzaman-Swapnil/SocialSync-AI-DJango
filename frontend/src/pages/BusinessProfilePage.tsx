@@ -639,15 +639,32 @@ export function BusinessProfilePage() {
                         </h4>
                         {brand.brand_dna && Object.keys(brand.brand_dna).length > 0 ? (
                           <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/10">
-                            <div className="flex items-center gap-2 text-green-400 text-sm mb-1">
-                              <span className="w-2 h-2 rounded-full bg-green-400" /> Generated
-                              {brand.brand_dna_generated_at && <span className="text-text-muted ml-1">on {new Date(brand.brand_dna_generated_at).toLocaleDateString()}</span>}
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2 text-green-400 text-sm">
+                                <span className="w-2 h-2 rounded-full bg-green-400" /> Generated
+                                {brand.brand_dna_generated_at && <span className="text-text-muted ml-1">on {new Date(brand.brand_dna_generated_at).toLocaleDateString()}</span>}
+                              </div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigate('/strategy'); }}
+                                className="text-xs text-primary hover:underline flex items-center gap-1"
+                              >
+                                <BeakerIcon className="w-3.5 h-3.5" />
+                                Edit & Regenerate DNA
+                              </button>
                             </div>
                             <p className="text-xs text-text-muted">Source: {brand.brand_dna_source || 'onboarding'}</p>
                           </div>
                         ) : (
                           <div className="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/10">
-                            <p className="text-sm text-yellow-400">Not generated yet</p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-yellow-400">Not generated yet</p>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigate('/strategy'); }}
+                                className="text-xs text-primary hover:underline"
+                              >
+                                Generate in Strategy Hub
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

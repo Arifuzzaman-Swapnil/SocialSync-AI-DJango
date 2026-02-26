@@ -11,6 +11,17 @@ interface IdeaData {
   content_format: string;
 }
 
+export interface SelectedCaption {
+  id: string;
+  ideaId: number;
+  text: string;
+}
+
+export interface CaptionMediaEntry {
+  mediaUrl: string | null;
+  mediaId: number | null;
+}
+
 interface OverflowState {
   currentStep: number;
   subStep: number;
@@ -35,6 +46,10 @@ interface OverflowState {
   generatedMediaUrl: string | null;
   createdPostId: number | null;
 
+  // Multi-post: per-caption data
+  selectedCaptions: SelectedCaption[];
+  captionMediaMap: Record<string, CaptionMediaEntry>;
+
   isCompleted: boolean;
   isSkipped: boolean;
 
@@ -58,6 +73,8 @@ interface OverflowState {
   addMedia: (mediaId: number) => void;
   setGeneratedMediaUrl: (url: string) => void;
   setCreatedPost: (postId: number) => void;
+  setSelectedCaptions: (captions: SelectedCaption[]) => void;
+  setCaptionMedia: (captionId: string, mediaUrl: string | null, mediaId: number | null) => void;
   complete: () => void;
   skip: () => void;
   reset: () => void;
@@ -84,6 +101,8 @@ export const useOverflowStore = create<OverflowState>()(
       generatedMediaIds: [],
       generatedMediaUrl: null,
       createdPostId: null,
+      selectedCaptions: [],
+      captionMediaMap: {},
       isCompleted: false,
       isSkipped: false,
 
@@ -144,6 +163,15 @@ export const useOverflowStore = create<OverflowState>()(
       setGeneratedMediaUrl: (url) => set({ generatedMediaUrl: url }),
       setCreatedPost: (postId) => set({ createdPostId: postId }),
 
+      setSelectedCaptions: (captions) => set({ selectedCaptions: captions }),
+      setCaptionMedia: (captionId, mediaUrl, mediaId) => {
+        const map = { ...get().captionMediaMap, [captionId]: { mediaUrl, mediaId } };
+        // Also keep generatedMediaUrl in sync (first caption's media)
+        const first = get().selectedCaptions[0];
+        const firstUrl = first ? (map[first.id]?.mediaUrl || null) : null;
+        set({ captionMediaMap: map, generatedMediaUrl: firstUrl });
+      },
+
       complete: () => {
         set({ isCompleted: true });
         get().saveToServer();
@@ -161,7 +189,8 @@ export const useOverflowStore = create<OverflowState>()(
         selectedTrendingTopics: [], brandContext: null,
         ideasData: [], selectedIdeaIds: [], ideaMediaPreferences: {},
         selectedCaptionIds: [], generatedMediaIds: [], generatedMediaUrl: null,
-        createdPostId: null, isCompleted: false, isSkipped: false,
+        createdPostId: null, selectedCaptions: [], captionMediaMap: {},
+        isCompleted: false, isSkipped: false,
       }),
 
       loadFromServer: async () => {
@@ -217,6 +246,8 @@ export const useOverflowStore = create<OverflowState>()(
         ideaMediaPreferences: state.ideaMediaPreferences,
         selectedCaptionIds: state.selectedCaptionIds,
         generatedMediaUrl: state.generatedMediaUrl,
+        selectedCaptions: state.selectedCaptions,
+        captionMediaMap: state.captionMediaMap,
         isCompleted: state.isCompleted,
         isSkipped: state.isSkipped,
       }),

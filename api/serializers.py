@@ -121,6 +121,136 @@ class RegisterSerializer(serializers.Serializer):
         return user
 
 
+class RegisterWithBrandSerializer(serializers.Serializer):
+    """Extended registration that also creates Workspace + Brand + initial DNA"""
+    # User fields (same as RegisterSerializer)
+    username = serializers.CharField(min_length=3, max_length=150)
+    email = serializers.EmailField()
+    password = serializers.CharField(min_length=6, write_only=True)
+    password_confirm = serializers.CharField(write_only=True)
+    phone = serializers.CharField(required=False, allow_blank=True)
+    company = serializers.CharField(required=False, allow_blank=True)
+
+    # Brand fields
+    brand_name = serializers.CharField(max_length=200)
+    industry = serializers.CharField(max_length=200)
+    target_region = serializers.CharField(max_length=200)
+    website_url = serializers.URLField(required=False, allow_blank=True)
+    voice_tone = serializers.CharField(max_length=100, required=False, default='professional')
+    products_services = serializers.CharField(required=False, allow_blank=True,
+        help_text='Comma-separated list of products/services')
+    competitors = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list,
+        help_text='List of competitor objects with platform and handle_or_url')
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already exists")
+        return value
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email already exists")
+        return value
+
+    def validate(self, data):
+        if data['password'] != data['password_confirm']:
+            raise serializers.ValidationError({"password_confirm": "Passwords do not match"})
+        return data
+
+    def create(self, validated_data):
+        from brands.models import Workspace, Brand, BrandDNAHistory
+        from onboarding.models import OnboardingProgress
+        from django.db import transaction
+        from django.utils import timezone
+
+        with transaction.atomic():
+            # 1. Create User + Profile
+            user = User.objects.create_user(
+                username=validated_data['username'],
+                email=validated_data['email'],
+                password=validated_data['password'],
+            )
+            profile, _ = UserProfile.objects.get_or_create(user=user)
+            profile.phone = validated_data.get('phone', '')
+            profile.company = validated_data.get('company', '')
+            profile.is_approved = True
+            profile.save()
+
+            # 2. Create default Workspace
+            workspace = Workspace.objects.create(
+                owner=user,
+                name=f"{validated_data['brand_name']} Workspace",
+                timezone='UTC',
+                default_language='en',
+            )
+
+            # 3. Create Brand
+            products_raw = validated_data.get('products_services', '')
+            products_list = [p.strip() for p in products_raw.split(',') if p.strip()] if products_raw else []
+
+            voice = validated_data.get('voice_tone', 'professional') or 'professional'
+            website = validated_data.get('website_url', '') or ''
+
+            brand = Brand.objects.create(
+                workspace=workspace,
+                user=user,
+                brand_name=validated_data['brand_name'],
+                industry=validated_data['industry'],
+                target_region=validated_data['target_region'],
+                website_url=website,
+                voice_tone=voice,
+                is_primary=True,
+            )
+
+            # 4. Generate structured DNA immediately
+            from api.views import build_structured_dna
+            dna_data = build_structured_dna(
+                brand_name=brand.brand_name,
+                industry=brand.industry,
+                target_region=brand.target_region,
+                voice_tone=brand.voice_tone,
+                products_services=products_list,
+                website_url=brand.website_url or '',
+            )
+            brand.brand_dna = dna_data
+            brand.brand_dna_generated_at = timezone.now()
+            brand.brand_dna_source = 'structured'
+            brand.save(update_fields=['brand_dna', 'brand_dna_generated_at', 'brand_dna_source'])
+
+            # 5. Save to DNA history
+            BrandDNAHistory.objects.create(
+                brand=brand,
+                dna_data=dna_data,
+                website_url=brand.website_url or '',
+                source='structured',
+                is_active=True,
+            )
+
+            # 6. Create competitors if provided
+            competitors_data = validated_data.get('competitors', [])
+            from brands.models import CompetitorProfile
+            for comp in competitors_data:
+                platform = comp.get('platform', 'website')
+                handle_or_url = comp.get('handle_or_url', '')
+                if handle_or_url:
+                    CompetitorProfile.objects.create(
+                        brand=brand,
+                        platform=platform,
+                        handle_or_url=handle_or_url,
+                    )
+
+            # 7. Mark onboarding steps 1 & 2 as completed (workspace + brand created)
+            try:
+                onboarding = OnboardingProgress.objects.get(user=user)
+                onboarding.mark_step_completed(1)
+                onboarding.mark_step_completed(2)
+            except OnboardingProgress.DoesNotExist:
+                pass
+
+        return user, workspace, brand
+
+
 class LoginSerializer(serializers.Serializer):
     """Serializer for user login"""
     username = serializers.CharField()
@@ -1180,7 +1310,7 @@ class PostCaptionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'post', 'platform', 'variant_number', 'body',
             'cta_text', 'tone', 'char_count', 'is_selected',
-            'is_ab_test', 'ab_label', 'char_status', 'is_within_limit',
+            'is_ab_test', 'ab_label', 'image_prompt', 'char_status', 'is_within_limit',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'char_count', 'created_at', 'updated_at']

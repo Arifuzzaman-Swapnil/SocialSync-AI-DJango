@@ -75,7 +75,7 @@ class Brand(models.Model):
     brand_dna_generated_at = models.DateTimeField(null=True, blank=True)
     brand_dna_source = models.CharField(
         max_length=20, blank=True,
-        choices=[('website', 'Website Crawl'), ('pdf', 'Brand Guide PDF'), ('manual', 'Manual')]
+        choices=[('website', 'Website Crawl'), ('pdf', 'Brand Guide PDF'), ('manual', 'Manual'), ('structured', 'Structured Input')]
     )
 
     is_primary = models.BooleanField(default=True)
@@ -437,6 +437,7 @@ class TrendingCache(models.Model):
         ('twitter', 'Twitter/X'),
         ('linkedin', 'LinkedIn'),
         ('google', 'Google Trends'),
+        ('manual', 'Manual'),
     ]
 
     platform = models.CharField(max_length=20, choices=PLATFORM_CHOICES)
@@ -460,6 +461,25 @@ class TrendingCache(models.Model):
     @property
     def is_expired(self):
         return timezone.now() > self.expires_at
+
+
+class TrendFeedback(models.Model):
+    """User feedback on trending topics for learning-based future generation"""
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='trend_feedback')
+    topic_text = models.CharField(max_length=500)
+    is_accepted = models.BooleanField()
+    source_trending_id = models.IntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'trend_feedback'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['brand', 'is_accepted'])]
+        unique_together = ['brand', 'topic_text']
+
+    def __str__(self):
+        status = 'accepted' if self.is_accepted else 'rejected'
+        return f"{self.topic_text[:50]} ({status}) - {self.brand.brand_name}"
 
 
 class ApprovalLog(models.Model):
@@ -507,6 +527,7 @@ class BestTimeSuggestion(models.Model):
     SOURCE_CHOICES = [
         ('own_data', 'Own Analytics Data'),
         ('industry_default', 'Industry Default'),
+        ('competitor_analysis', 'Competitor Analysis'),
     ]
 
     PLATFORM_CHOICES = [
@@ -579,10 +600,10 @@ class BrandDNAHistory(models.Model):
 
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='dna_history')
     dna_data = models.JSONField(default=dict)
-    website_url = models.URLField(max_length=2000)
+    website_url = models.URLField(max_length=2000, blank=True, default='')
     source = models.CharField(
         max_length=20,
-        choices=[('website', 'Website'), ('pdf', 'PDF'), ('manual', 'Manual')],
+        choices=[('website', 'Website'), ('pdf', 'PDF'), ('manual', 'Manual'), ('structured', 'Structured Input')],
         default='website'
     )
     is_active = models.BooleanField(default=True)

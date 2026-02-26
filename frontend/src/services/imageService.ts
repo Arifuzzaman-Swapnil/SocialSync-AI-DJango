@@ -24,7 +24,29 @@ export interface GenerateImageRequest {
   camera_angle?: string;
 }
 
+export interface RefinePromptRequest {
+  brand_name?: string;
+  industry?: string;
+  description?: string;
+  target_audience?: string;
+  ideas?: string[];
+  topics?: string[];
+  caption_snippet?: string;
+  user_prompt: string;
+  style?: string;
+}
+
+export interface RefinePromptResponse {
+  refined_prompt: string;
+}
+
 export const imageService = {
+  // Prompt refinement (link prompt)
+  async refinePrompt(data: RefinePromptRequest): Promise<RefinePromptResponse> {
+    const response = await api.post<RefinePromptResponse>('/ai-image/refine-prompt/', data);
+    return response.data;
+  },
+
   // Generation
   async generate(data: GenerateImageRequest): Promise<ImageGeneration> {
     const response = await api.post<ImageGeneration>('/ai-image/generate/', data);

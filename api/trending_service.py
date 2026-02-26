@@ -277,6 +277,17 @@ def generate_trending_for_brand(brand_id, user):
         ).order_by('-engagement_score')[:10]
         insight_texts = [ci.hook_text.split(' ||REC||')[0][:100] for ci in competitor_insights]
 
+        # V1.4 — Incorporate trend feedback for learning
+        from brands.models import TrendFeedback
+        feedback_qs = TrendFeedback.objects.filter(brand=brand)
+        accepted_topics = list(feedback_qs.filter(is_accepted=True).values_list('topic_text', flat=True)[:20])
+        rejected_topics = list(feedback_qs.filter(is_accepted=False).values_list('topic_text', flat=True)[:20])
+        feedback_context = ''
+        if accepted_topics:
+            feedback_context += f"\n\n═══ USER FEEDBACK — ACCEPTED TOPICS (generate MORE like these) ═══\n{chr(10).join(f'- {t}' for t in accepted_topics)}"
+        if rejected_topics:
+            feedback_context += f"\n\n═══ USER FEEDBACK — REJECTED TOPICS (AVOID these and similar topics) ═══\n{chr(10).join(f'- {t}' for t in rejected_topics)}"
+
         trend_list = json.dumps([t['topic'] for t in all_trends], indent=2) if all_trends else 'No Google Trends data available'
 
         prompt = f"""You are a social media trend analyst. Today's date is {today_str}.
@@ -298,6 +309,7 @@ Competitor Strategies: {'; '.join(insight_texts[:5]) if insight_texts else 'None
 
 ═══ GOOGLE TRENDS DATA ═══
 {trend_list}
+{feedback_context}
 
 ═══ INSTRUCTIONS ═══
 Generate exactly 15 trending topics. Your response MUST include:

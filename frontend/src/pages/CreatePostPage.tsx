@@ -38,6 +38,7 @@ import type { PlatformType } from '../types';
 import { authFetch } from '../services/api';
 import api from '../services/api';
 import { postService } from '../services';
+import calendarService from '../services/calendarService';
 
 const platforms: { id: PlatformType; maxChars: number }[] = [
   { id: 'facebook', maxChars: 63206 },
@@ -100,6 +101,7 @@ export function CreatePostPage() {
   const [selectedBrand, setSelectedBrand] = useState<number | ''>('');
   const [selectedPillar, setSelectedPillar] = useState<number | ''>('');
   const [selectedGoal, setSelectedGoal] = useState<string>('');
+  const [recommendedTimes, setRecommendedTimes] = useState<Array<{ day_of_week: number; hour_utc: number; score: number; platform: string; reason?: string }>>([]);
 
   const {
     register,
@@ -165,6 +167,15 @@ export function CreatePostPage() {
         const res = await api.get('/brands/');
         const data = Array.isArray(res.data) ? res.data : res.data.results || [];
         setBrands(data);
+        // Auto-select primary brand and load best times
+        if (data.length > 0) {
+          const primary = data.find((b: { is_primary: boolean }) => b.is_primary) || data[0];
+          if (!selectedBrand) setSelectedBrand(primary.id);
+          try {
+            const times = await calendarService.getBestTimes(primary.id);
+            setRecommendedTimes(Array.isArray(times) ? times : []);
+          } catch { /* no best times */ }
+        }
       } catch (err) {
         console.error('Failed to fetch brands:', err);
       }
@@ -844,6 +855,52 @@ export function CreatePostPage() {
                     Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
                   </p>
                 </div>
+
+                {/* Recommended Times */}
+                {recommendedTimes.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-text-secondary mb-2">Recommended Times</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recommendedTimes.slice(0, 6).map((t, i) => {
+                        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                        const dayName = days[t.day_of_week] || 'Mon';
+                        const hour12 = t.hour_utc % 12 || 12;
+                        const ampm = t.hour_utc < 12 ? 'AM' : 'PM';
+                        const label = `${dayName} ${hour12}:00 ${ampm}`;
+                        const isCompetitor = (t as { source?: string }).source === 'competitor_analysis';
+
+                        // Calculate the next date for this day_of_week
+                        const now = new Date();
+                        const currentDay = now.getDay() === 0 ? 6 : now.getDay() - 1; // Convert Sun=0 to Mon=0
+                        let daysToAdd = t.day_of_week - currentDay;
+                        if (daysToAdd < 0) daysToAdd += 7;
+                        if (daysToAdd === 0 && t.hour_utc <= now.getUTCHours()) daysToAdd = 7;
+                        const targetDate = new Date(now);
+                        targetDate.setDate(targetDate.getDate() + daysToAdd);
+
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              setValue('scheduled_date', format(targetDate, 'yyyy-MM-dd'));
+                              const hourStr = String(t.hour_utc).padStart(2, '0');
+                              setValue('scheduled_time', `${hourStr}:00`);
+                            }}
+                            className={`text-[10px] px-2 py-1 rounded-full border transition-colors ${
+                              isCompetitor
+                                ? 'border-purple-500/30 bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
+                                : 'border-white/10 bg-dark-700 text-text-secondary hover:bg-dark-600'
+                            }`}
+                            title={t.reason || `Score: ${(t.score * 100).toFixed(0)}%`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </Card>
 

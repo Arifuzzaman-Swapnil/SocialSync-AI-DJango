@@ -84,6 +84,11 @@ export const strategyService = {
     return res.data;
   },
 
+  async regenerateDNAFromInputs(brandId: number, inputs: Record<string, unknown>) {
+    const res = await api.post(`/brands/${brandId}/regenerate-dna-inputs/`, inputs);
+    return res.data;
+  },
+
   // V1.3 — DNA History
   async getDNAHistory(brandId: number) {
     const res = await api.get(`/brands/${brandId}/dna-history/`);
@@ -121,6 +126,44 @@ export const strategyService = {
   // V1.3 — Idea History
   async getIdeaHistory(params?: { brand_id?: number; status?: string; platform?: string; search?: string }) {
     const res = await api.get('/ideas/history/', { params });
+    return res.data;
+  },
+
+  // V1.4 — Competitor Suggestions
+  async suggestCompetitors(brandId: number, count?: number) {
+    const res = await api.post('/competitors/suggest/', { brand_id: brandId, count: count || 5 });
+    return res.data;
+  },
+
+  // V1.4 — Pillar Generation
+  async generatePillars(brandId: number, count?: number, focusAreas?: string[]) {
+    const res = await api.post(`/brands/${brandId}/pillars/generate/`, {
+      count: count || 5,
+      focus_areas: focusAreas || [],
+    });
+    return res.data;
+  },
+
+  // V1.4 — Trend Feedback
+  async submitTrendFeedback(brandId: number, topicText: string, isAccepted: boolean, sourceTrendingId?: number) {
+    const res = await api.post(`/brands/${brandId}/trending/feedback/`, {
+      topic_text: topicText,
+      is_accepted: isAccepted,
+      source_trending_id: sourceTrendingId,
+    });
+    return res.data;
+  },
+  async getTrendFeedback(brandId: number) {
+    const res = await api.get(`/brands/${brandId}/trending/feedback/`);
+    return res.data;
+  },
+
+  // V1.4 — Manual Trends
+  async addManualTrend(brandId: number, topic: string, explanation?: string) {
+    const res = await api.post(`/brands/${brandId}/trending/manual/`, {
+      topic,
+      relevance_explanation: explanation,
+    });
     return res.data;
   },
 };

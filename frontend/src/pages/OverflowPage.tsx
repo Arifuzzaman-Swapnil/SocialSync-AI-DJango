@@ -18,6 +18,10 @@ import {
   ArrowPathIcon,
   ArrowUpTrayIcon,
   ClockIcon,
+  PencilIcon,
+  HandThumbUpIcon,
+  HandThumbDownIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { useOverflowStore } from '../store';
 import strategyService from '../services/strategyService';
@@ -201,7 +205,10 @@ export function OverflowPage() {
         {overflow.currentStep < 6 ? (
           <button
             onClick={goNext}
-            disabled={overflow.currentStep === 4 && !overflow.generatedMediaUrl}
+            disabled={overflow.currentStep === 4 && (
+              overflow.selectedCaptions.length === 0 ||
+              !overflow.selectedCaptions.every((c) => overflow.captionMediaMap[c.id]?.mediaUrl)
+            )}
             className="btn-primary flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next Step <ArrowRightIcon className="w-4 h-4" />
@@ -272,6 +279,21 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
   const [dnaData, setDnaData] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dnaInputs, setDnaInputs] = useState<Record<string, any>>({});
+  const [customFields, setCustomFields] = useState<Array<{ key: string; value: string; type: 'text' | 'list' }>>([]);
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldType, setNewFieldType] = useState<'text' | 'list'>('text');
+
+  const BUILTIN_KEYS = new Set([
+    'brand_name', 'tagline', 'industry', 'description', 'products_services',
+    'target_audience', 'unique_selling_points', 'brand_voice', 'brand_values',
+    'color_theme', 'content_themes', 'cta_style', 'social_platforms', 'keywords',
+    'competitor_positioning', 'website_url',
+  ]);
+
   useEffect(() => {
     if (!brandId) return;
     strategyService.getDNAStatus(brandId).then((res) => {
@@ -299,6 +321,61 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
     setLoading(false);
   };
 
+  const enterEditMode = () => {
+    if (!dnaData) return;
+    setDnaInputs({
+      brand_name: dnaData.brand_name || '', tagline: dnaData.tagline || '',
+      industry: dnaData.industry || '', description: dnaData.description || '',
+      products_services: Array.isArray(dnaData.products_services) ? dnaData.products_services : [],
+      target_audience: dnaData.target_audience || '',
+      unique_selling_points: Array.isArray(dnaData.unique_selling_points) ? dnaData.unique_selling_points : [],
+      brand_voice: dnaData.brand_voice || '',
+      brand_values: Array.isArray(dnaData.brand_values) ? dnaData.brand_values : [],
+      color_theme: Array.isArray(dnaData.color_theme) ? dnaData.color_theme : [],
+      content_themes: Array.isArray(dnaData.content_themes) ? dnaData.content_themes : [],
+      cta_style: dnaData.cta_style || '',
+      social_platforms: Array.isArray(dnaData.social_platforms) ? dnaData.social_platforms : [],
+      keywords: Array.isArray(dnaData.keywords) ? dnaData.keywords : [],
+      competitor_positioning: dnaData.competitor_positioning || '',
+      website_url: dnaData.website_url || '',
+    });
+    const extras: Array<{ key: string; value: string; type: 'text' | 'list' }> = [];
+    Object.entries(dnaData).forEach(([key, val]) => {
+      if (!BUILTIN_KEYS.has(key) && val !== null && val !== undefined && val !== '') {
+        extras.push({ key, value: Array.isArray(val) ? val.join(', ') : String(val), type: Array.isArray(val) ? 'list' : 'text' });
+      }
+    });
+    setCustomFields(extras);
+    setEditMode(true);
+  };
+
+  const handleSave = async (useAi: boolean) => {
+    if (!brandId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const merged = { ...dnaInputs };
+      customFields.forEach((cf) => {
+        if (cf.key.trim()) {
+          merged[cf.key.trim()] = cf.type === 'list'
+            ? cf.value.split(',').map((v: string) => v.trim()).filter(Boolean)
+            : cf.value;
+        }
+      });
+      const result = await strategyService.regenerateDNAFromInputs(brandId, { ...merged, use_ai: useAi });
+      if (result.brand_dna) { setDnaData(result.brand_dna); }
+      setEditMode(false);
+      overflow.markDNAComplete();
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Failed to save DNA.');
+    }
+    setSaving(false);
+  };
+
+  const setField = (f: string, v: string) => setDnaInputs((p) => ({ ...p, [f]: v }));
+  const addChip = (f: string, v: string) => { if (!v.trim()) return; setDnaInputs((p) => ({ ...p, [f]: [...(p[f] || []), v.trim()] })); };
+  const removeChip = (f: string, idx: number) => setDnaInputs((p) => ({ ...p, [f]: (p[f] || []).filter((_: string, i: number) => i !== idx) }));
+
   return (
     <div className="space-y-4">
       {/* URL Input + Generate */}
@@ -320,7 +397,6 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
       </div>
 
-      {/* Loading state */}
       {loading && (
         <div className="card p-12 text-center">
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
@@ -329,166 +405,235 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         </div>
       )}
 
-      {/* Full DNA Results — same depth as StrategyHub */}
-      {dnaData && !loading && (
+      {/* === EDIT MODE === */}
+      {editMode && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          {/* Brand Identity Card */}
           <div className="card p-6">
             <h3 className="text-lg font-semibold mb-4">Brand Identity</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {dnaData.brand_name && (
-                <div>
-                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Name</label>
-                  <p className="text-sm mt-1">{dnaData.brand_name}</p>
+              {[
+                { f: 'brand_name', l: 'Brand Name' }, { f: 'tagline', l: 'Tagline' },
+                { f: 'industry', l: 'Industry' }, { f: 'brand_voice', l: 'Brand Voice' },
+              ].map(({ f, l }) => (
+                <div key={f}>
+                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">{l}</label>
+                  <input type="text" className="input w-full mt-1" value={dnaInputs[f] || ''} onChange={(e) => setField(f, e.target.value)} />
                 </div>
-              )}
-              {dnaData.tagline && (
-                <div>
-                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Tagline</label>
-                  <p className="text-sm mt-1 italic">"{dnaData.tagline}"</p>
-                </div>
-              )}
-              {dnaData.industry && (
-                <div>
-                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Industry</label>
-                  <p className="text-sm mt-1">{dnaData.industry}</p>
-                </div>
-              )}
-              {dnaData.brand_voice && (
-                <div>
-                  <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Voice</label>
-                  <p className="text-sm mt-1">{dnaData.brand_voice}</p>
-                </div>
-              )}
+              ))}
             </div>
-            {dnaData.description && (
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Description</label>
-                <p className="text-sm mt-1">{dnaData.description}</p>
+            {[
+              { f: 'description', l: 'Description', rows: 3 }, { f: 'target_audience', l: 'Target Audience', rows: 2 },
+              { f: 'competitor_positioning', l: 'Competitor Positioning', rows: 2 },
+            ].map(({ f, l, rows }) => (
+              <div key={f} className="mt-4">
+                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">{l}</label>
+                <textarea className="input w-full mt-1" rows={rows} value={dnaInputs[f] || ''} onChange={(e) => setField(f, e.target.value)} />
               </div>
-            )}
-            {dnaData.target_audience && (
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Target Audience</label>
-                <p className="text-sm mt-1">{dnaData.target_audience}</p>
+            ))}
+            <div className="mt-4">
+              <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">CTA Style</label>
+              <input type="text" className="input w-full mt-1" value={dnaInputs.cta_style || ''} onChange={(e) => setField('cta_style', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Chip fields */}
+          {[
+            { field: 'products_services', label: 'Products & Services' },
+            { field: 'unique_selling_points', label: 'Unique Selling Points' },
+            { field: 'brand_values', label: 'Brand Values' },
+          ].map(({ field, label }) => (
+            <div key={field} className="card p-6">
+              <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">{label}</h3>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(dnaInputs[field] || []).map((item: string, idx: number) => (
+                  <span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm flex items-center gap-1.5">
+                    {item}
+                    <button onClick={() => removeChip(field, idx)} className="hover:text-red-400 text-xs ml-1">&times;</button>
+                  </span>
+                ))}
               </div>
-            )}
-            {dnaData.competitor_positioning && (
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Competitor Positioning</label>
-                <p className="text-sm mt-1">{dnaData.competitor_positioning}</p>
+              <div className="flex gap-2">
+                <input type="text" className="input flex-1" placeholder={`Add ${label.toLowerCase()}...`}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addChip(field, (e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
+                />
+                <button className="btn-secondary px-3" onClick={(e) => { const input = (e.currentTarget.previousElementSibling as HTMLInputElement); addChip(field, input.value); input.value = ''; }}>
+                  <PlusIcon className="w-4 h-4" />
+                </button>
               </div>
-            )}
-            {dnaData.cta_style && (
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">CTA Style</label>
-                <p className="text-sm mt-1">{dnaData.cta_style}</p>
+            </div>
+          ))}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { field: 'content_themes', label: 'Content Themes' }, { field: 'keywords', label: 'Keywords' },
+              { field: 'color_theme', label: 'Color Theme' }, { field: 'social_platforms', label: 'Social Platforms' },
+            ].map(({ field, label }) => (
+              <div key={field} className="card p-5">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">{label}</h4>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {(dnaInputs[field] || []).map((item: string, idx: number) => (
+                    <span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                      {item} <button onClick={() => removeChip(field, idx)} className="hover:text-red-400">&times;</button>
+                    </span>
+                  ))}
+                </div>
+                <input type="text" className="input w-full text-sm" placeholder={`Add ${label.toLowerCase()}, press Enter`}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addChip(field, (e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
+                />
               </div>
-            )}
+            ))}
+          </div>
+
+          {/* Custom Fields */}
+          <div className="card p-6">
+            <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center gap-2">
+              <PlusIcon className="w-4 h-4" /> Custom Fields
+            </h3>
+            {customFields.map((cf, idx) => (
+              <div key={idx} className="flex items-start gap-3 mb-3 bg-dark-700/50 rounded-lg p-3">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input type="text" className="input text-sm flex-1" placeholder="Field name" value={cf.key}
+                      onChange={(e) => { const u = [...customFields]; u[idx] = { ...cf, key: e.target.value }; setCustomFields(u); }} />
+                    <select className="input text-xs w-24" value={cf.type}
+                      onChange={(e) => { const u = [...customFields]; u[idx] = { ...cf, type: e.target.value as 'text' | 'list' }; setCustomFields(u); }}>
+                      <option value="text">Text</option><option value="list">List</option>
+                    </select>
+                  </div>
+                  {cf.type === 'text' ? (
+                    <textarea className="input w-full text-sm" rows={2} placeholder="Value..." value={cf.value}
+                      onChange={(e) => { const u = [...customFields]; u[idx] = { ...cf, value: e.target.value }; setCustomFields(u); }} />
+                  ) : (
+                    <input type="text" className="input w-full text-sm" placeholder="Comma-separated values" value={cf.value}
+                      onChange={(e) => { const u = [...customFields]; u[idx] = { ...cf, value: e.target.value }; setCustomFields(u); }} />
+                  )}
+                </div>
+                <button onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))} className="p-1.5 rounded hover:bg-red-500/10 text-text-muted hover:text-red-400 mt-1">
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 mt-2">
+              <input type="text" className="input flex-1 text-sm" placeholder="New field name..." value={newFieldKey}
+                onChange={(e) => setNewFieldKey(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && newFieldKey.trim()) { e.preventDefault(); setCustomFields([...customFields, { key: newFieldKey.trim().replace(/\s+/g, '_').toLowerCase(), value: '', type: newFieldType }]); setNewFieldKey(''); } }}
+              />
+              <select className="input text-xs w-24" value={newFieldType} onChange={(e) => setNewFieldType(e.target.value as 'text' | 'list')}>
+                <option value="text">Text</option><option value="list">List</option>
+              </select>
+              <button onClick={() => { if (newFieldKey.trim()) { setCustomFields([...customFields, { key: newFieldKey.trim().replace(/\s+/g, '_').toLowerCase(), value: '', type: newFieldType }]); setNewFieldKey(''); } }}
+                className="btn-secondary px-3 flex items-center gap-1.5 text-sm"><PlusIcon className="w-4 h-4" /> Add</button>
+            </div>
+          </div>
+
+          {/* Website URL */}
+          <div className="card p-5">
+            <label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Website URL</label>
+            <input type="url" className="input w-full mt-1" value={dnaInputs.website_url || ''} onChange={(e) => setField('website_url', e.target.value)} />
+          </div>
+
+          {/* Save Buttons */}
+          <div className="flex gap-3 justify-end">
+            <button onClick={() => setEditMode(false)} className="btn-secondary px-6" disabled={saving}>Cancel</button>
+            <button onClick={() => handleSave(false)} className="btn-primary px-6 flex items-center gap-2" disabled={saving}>
+              {saving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <CheckCircleIcon className="w-4 h-4" />}
+              Save DNA
+            </button>
+            <button onClick={() => handleSave(true)} className="btn-primary px-6 flex items-center gap-2 bg-gradient-to-r from-primary to-secondary" disabled={saving}>
+              {saving ? <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> : <SparklesIcon className="w-4 h-4" />}
+              Save & Enhance with AI
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* === VIEW MODE === */}
+      {dnaData && !loading && !editMode && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+          {/* Edit Bar */}
+          <div className="flex items-center justify-between bg-dark-700/50 border border-white/10 rounded-lg px-4 py-3">
+            <p className="text-sm text-text-secondary">Click any section to edit, or use the edit button</p>
+            <button onClick={enterEditMode} className="btn-primary flex items-center gap-2 px-5 py-2">
+              <PencilIcon className="w-4 h-4" /> Edit Brand DNA
+            </button>
+          </div>
+
+          {/* Brand Identity Card */}
+          <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={enterEditMode}>
+            <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <PencilIcon className="w-4 h-4 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {dnaData.brand_name && (<div><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Name</label><p className="text-sm mt-1">{dnaData.brand_name}</p></div>)}
+              {dnaData.tagline && (<div><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Tagline</label><p className="text-sm mt-1 italic">"{dnaData.tagline}"</p></div>)}
+              {dnaData.industry && (<div><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Industry</label><p className="text-sm mt-1">{dnaData.industry}</p></div>)}
+              {dnaData.brand_voice && (<div><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Voice</label><p className="text-sm mt-1">{dnaData.brand_voice}</p></div>)}
+            </div>
+            {dnaData.description && (<div className="mt-4 pt-4 border-t border-white/10"><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Description</label><p className="text-sm mt-1">{dnaData.description}</p></div>)}
+            {dnaData.target_audience && (<div className="mt-4 pt-4 border-t border-white/10"><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Target Audience</label><p className="text-sm mt-1">{dnaData.target_audience}</p></div>)}
+            {dnaData.competitor_positioning && (<div className="mt-4 pt-4 border-t border-white/10"><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Competitor Positioning</label><p className="text-sm mt-1">{dnaData.competitor_positioning}</p></div>)}
+            {dnaData.cta_style && (<div className="mt-4 pt-4 border-t border-white/10"><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">CTA Style</label><p className="text-sm mt-1">{dnaData.cta_style}</p></div>)}
           </div>
 
           {/* Products & Services */}
-          {dnaData.products_services && dnaData.products_services.length > 0 && (
-            <div className="card p-6">
-              <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Products & Services</h3>
-              <div className="flex flex-wrap gap-2">
-                {dnaData.products_services.map((item: string, idx: number) => (
-                  <span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm">{item}</span>
-                ))}
-              </div>
+          {dnaData.products_services?.length > 0 && (
+            <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={enterEditMode}>
+              <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+              <div className="flex flex-wrap gap-2">{dnaData.products_services.map((item: string, idx: number) => (<span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm">{item}</span>))}</div>
             </div>
           )}
 
           {/* USP + Values + Content Themes */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {dnaData.unique_selling_points && dnaData.unique_selling_points.length > 0 && (
-              <div className="card p-5">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Unique Selling Points</h4>
-                <ul className="space-y-2">
-                  {dnaData.unique_selling_points.map((item: string, idx: number) => (
-                    <li key={idx} className="text-sm flex items-start gap-2">
-                      <span className="text-green-400 mt-0.5">&#10003;</span> {item}
-                    </li>
-                  ))}
-                </ul>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={enterEditMode}>
+            {dnaData.unique_selling_points?.length > 0 && (
+              <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">USPs <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                <ul className="space-y-2">{dnaData.unique_selling_points.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-green-400 mt-0.5">&#10003;</span> {item}</li>))}</ul>
               </div>
             )}
-            {dnaData.brand_values && dnaData.brand_values.length > 0 && (
-              <div className="card p-5">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Brand Values</h4>
-                <ul className="space-y-2">
-                  {dnaData.brand_values.map((item: string, idx: number) => (
-                    <li key={idx} className="text-sm flex items-start gap-2">
-                      <span className="text-primary-400 mt-0.5">&#9679;</span> {item}
-                    </li>
-                  ))}
-                </ul>
+            {dnaData.brand_values?.length > 0 && (
+              <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                <ul className="space-y-2">{dnaData.brand_values.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-primary-400 mt-0.5">&#9679;</span> {item}</li>))}</ul>
               </div>
             )}
-            {dnaData.content_themes && dnaData.content_themes.length > 0 && (
-              <div className="card p-5">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Content Themes</h4>
-                <ul className="space-y-2">
-                  {dnaData.content_themes.map((item: string, idx: number) => (
-                    <li key={idx} className="text-sm flex items-start gap-2">
-                      <span className="text-yellow-400 mt-0.5">&#9733;</span> {item}
-                    </li>
-                  ))}
-                </ul>
+            {dnaData.content_themes?.length > 0 && (
+              <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                <ul className="space-y-2">{dnaData.content_themes.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-yellow-400 mt-0.5">&#9733;</span> {item}</li>))}</ul>
               </div>
             )}
           </div>
 
           {/* Keywords + Colors + Social */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {dnaData.keywords && dnaData.keywords.length > 0 && (
-              <div className="card p-5">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Keywords</h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {dnaData.keywords.map((kw: string, idx: number) => (
-                    <span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {dnaData.color_theme && dnaData.color_theme.length > 0 && (
-              <div className="card p-5">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Color Theme</h4>
-                <div className="flex flex-wrap gap-2">
-                  {dnaData.color_theme.map((color: string, idx: number) => (
-                    <span key={idx} className="flex items-center gap-1.5 text-sm">
-                      <span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: color.toLowerCase() }} />
-                      {color}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {dnaData.social_platforms && dnaData.social_platforms.length > 0 && (
-              <div className="card p-5">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Social Platforms</h4>
-                <div className="flex flex-wrap gap-2">
-                  {dnaData.social_platforms.map((p: string, idx: number) => (
-                    <span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={enterEditMode}>
+            {dnaData.keywords?.length > 0 && (<div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Keywords</h4><div className="flex flex-wrap gap-1.5">{dnaData.keywords.map((kw: string, idx: number) => (<span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>))}</div></div>)}
+            {dnaData.color_theme?.length > 0 && (<div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Color Theme</h4><div className="flex flex-wrap gap-2">{dnaData.color_theme.map((c: string, idx: number) => (<span key={idx} className="flex items-center gap-1.5 text-sm"><span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c.toLowerCase() }} />{c}</span>))}</div></div>)}
+            {dnaData.social_platforms?.length > 0 && (<div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Social Platforms</h4><div className="flex flex-wrap gap-2">{dnaData.social_platforms.map((p: string, idx: number) => (<span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>))}</div></div>)}
           </div>
 
-          {/* Website Link */}
+          {/* Custom Fields */}
+          {(() => {
+            const extras = Object.entries(dnaData).filter(([k]) => !BUILTIN_KEYS.has(k) && dnaData[k] != null && dnaData[k] !== '');
+            if (!extras.length) return null;
+            return (
+              <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={enterEditMode}>
+                <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-text-secondary flex items-center justify-between">Custom Fields <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {extras.map(([key, val]) => (<div key={key}><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">{key.replace(/_/g, ' ')}</label>
+                    {Array.isArray(val) ? (<div className="flex flex-wrap gap-1.5 mt-1">{val.map((v: string, i: number) => (<span key={i} className="bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded text-xs">{v}</span>))}</div>) : (<p className="text-sm mt-1">{String(val)}</p>)}
+                  </div>))}
+                </div>
+              </div>
+            );
+          })()}
+
           {dnaData.website_url && (
             <div className="text-center">
-              <a href={dnaData.website_url} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-primary-400 hover:underline">
-                {dnaData.website_url}
-              </a>
+              <a href={dnaData.website_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-primary-400 hover:underline">{dnaData.website_url}</a>
             </div>
           )}
         </motion.div>
       )}
 
-      {/* Empty State */}
       {!dnaData && !loading && (
         <div className="card p-12 text-center">
           <BeakerIcon className="w-12 h-12 mx-auto text-text-secondary mb-3" />
@@ -507,6 +652,14 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', target_percentage: 25, color_code: '#6366F1' });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', description: '', target_percentage: 25, color_code: '#6366F1' });
+
+  // AI generate state
+  const [generating, setGenerating] = useState(false);
+  const [focusAreas, setFocusAreas] = useState('');
+  const [genCount, setGenCount] = useState(5);
+  const [showGenPanel, setShowGenPanel] = useState(false);
 
   const load = useCallback(async () => {
     if (!brandId) { setLoading(false); return; }
@@ -534,6 +687,42 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
     try { await strategyService.deletePillar(id); load(); } catch { /* ignore */ }
   };
 
+  const handleUpdate = async () => {
+    if (!editingId || !editForm.name.trim()) return;
+    try {
+      await strategyService.updatePillar(editingId, editForm);
+      setEditingId(null);
+      load();
+    } catch { /* ignore */ }
+  };
+
+  const handleAIGenerate = async () => {
+    if (!brandId) return;
+    setGenerating(true);
+    try {
+      const areas = focusAreas.split(',').map((a) => a.trim()).filter(Boolean);
+      await strategyService.generatePillars(brandId, genCount, areas);
+      setShowGenPanel(false);
+      setFocusAreas('');
+      await load();
+    } catch { /* ignore */ }
+    setGenerating(false);
+  };
+
+  const totalPct = pillars.reduce((s, p) => s + p.target_percentage, 0);
+
+  const handleRebalance = async () => {
+    if (pillars.length === 0) return;
+    const each = Math.floor(100 / pillars.length);
+    const remainder = 100 - each * pillars.length;
+    try {
+      await Promise.all(pillars.map((p, idx) =>
+        strategyService.updatePillar(p.id, { target_percentage: each + (idx === 0 ? remainder : 0) })
+      ));
+      await load();
+    } catch { /* ignore */ }
+  };
+
   return (
     <div className="card p-6 space-y-4">
       <div className="flex items-center justify-between">
@@ -541,28 +730,102 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
           <div className="w-5 h-5 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
           Content Pillars
         </h3>
-        <button onClick={() => setShowForm(true)} className="btn-secondary text-sm flex items-center gap-1.5">
-          <PlusIcon className="w-4 h-4" /> Add Pillar
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowGenPanel(!showGenPanel)} className="btn-primary text-sm flex items-center gap-1.5">
+            {generating ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <SparklesIcon className="w-4 h-4" />}
+            AI Generate
+          </button>
+          <button onClick={() => setShowForm(true)} className="btn-secondary text-sm flex items-center gap-1.5">
+            <PlusIcon className="w-4 h-4" /> Add Manual
+          </button>
+        </div>
       </div>
+      <p className="text-sm text-text-secondary">
+        AI-generate pillars from your brand DNA, competitors & trends — or add them manually. You can edit each pillar after generation.
+      </p>
+
+      {/* Percentage indicator */}
+      {pillars.length > 0 && (
+        <div className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${
+          totalPct === 100 ? 'bg-green-500/10 border border-green-500/20' :
+          totalPct > 100 ? 'bg-red-500/10 border border-red-500/20' :
+          'bg-yellow-500/10 border border-yellow-500/20'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className={`text-sm font-semibold ${totalPct === 100 ? 'text-green-400' : totalPct > 100 ? 'text-red-400' : 'text-yellow-400'}`}>
+              Total: {totalPct}%
+            </span>
+            <span className="text-xs text-text-muted">
+              {totalPct === 100 ? 'Balanced' : totalPct > 100 ? `${totalPct - 100}% over` : `${100 - totalPct}% remaining`}
+            </span>
+          </div>
+          {totalPct !== 100 && (
+            <button onClick={handleRebalance} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1 underline">
+              <ArrowPathIcon className="w-3.5 h-3.5" />
+              Rebalance to 100%
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* AI Generate Panel */}
+      {showGenPanel && (
+        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4 space-y-3">
+          <h4 className="text-sm font-semibold text-purple-400">AI Pillar Generation</h4>
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-text-secondary whitespace-nowrap">Count: {genCount}</label>
+            <input type="range" min="3" max="8" value={genCount} onChange={(e) => setGenCount(Number(e.target.value))} className="flex-1" />
+          </div>
+          <input type="text" className="input w-full text-sm" placeholder="Focus areas (optional, comma-separated, e.g. product showcase, education)" value={focusAreas} onChange={(e) => setFocusAreas(e.target.value)} />
+          <div className="flex gap-2">
+            <button onClick={() => setShowGenPanel(false)} className="btn-secondary flex-1 text-sm">Cancel</button>
+            <button onClick={handleAIGenerate} disabled={generating} className="btn-primary flex-1 text-sm flex items-center justify-center gap-1.5">
+              {generating ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <SparklesIcon className="w-4 h-4" />}
+              {generating ? 'Generating...' : 'Generate Pillars'}
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {loading ? (
         <div className="text-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500 mx-auto" /></div>
       ) : pillars.length === 0 ? (
-        <p className="text-sm text-text-secondary text-center py-6">No pillars yet. Add at least one content pillar.</p>
+        <p className="text-sm text-text-secondary text-center py-6">No pillars yet. Use AI Generate or add manually.</p>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="space-y-2">
           {pillars.map((p) => (
-            <div key={p.id} className="bg-dark-700/30 rounded-lg p-3 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color_code }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{p.name}</p>
-                <p className="text-xs text-text-muted">{p.target_percentage}%</p>
+            editingId === p.id ? (
+              <div key={p.id} className="bg-dark-700/30 rounded-lg p-4 space-y-3">
+                <input type="text" className="input w-full" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                <input type="text" className="input w-full" placeholder="Description" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+                <div className="flex items-center gap-3">
+                  <label className="text-sm text-text-secondary">Target: {editForm.target_percentage}%</label>
+                  <input type="range" min="5" max="80" className="flex-1" value={editForm.target_percentage} onChange={(e) => setEditForm({ ...editForm, target_percentage: Number(e.target.value) })} />
+                  <input type="color" className="w-8 h-8 rounded cursor-pointer" value={editForm.color_code} onChange={(e) => setEditForm({ ...editForm, color_code: e.target.value })} />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingId(null)} className="btn-secondary flex-1 text-sm">Cancel</button>
+                  <button onClick={handleUpdate} className="btn-primary flex-1 text-sm">Save</button>
+                </div>
               </div>
-              <button onClick={() => handleDelete(p.id)} className="p-1 text-text-muted hover:text-red-400">
-                <TrashIcon className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            ) : (
+              <div key={p.id} className="bg-dark-700/30 rounded-lg p-3 flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color_code }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{p.name}</p>
+                  <p className="text-xs text-text-muted">{p.description || 'No description'} &middot; {p.target_percentage}%</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => { setEditingId(p.id); setEditForm({ name: p.name, description: p.description || '', target_percentage: p.target_percentage, color_code: p.color_code }); }}
+                    className="p-1.5 text-text-muted hover:text-primary-400 transition-colors">
+                    <PencilIcon className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => handleDelete(p.id)} className="p-1.5 text-text-muted hover:text-red-400 transition-colors">
+                    <TrashIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )
           ))}
         </div>
       )}
@@ -811,7 +1074,14 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
   const [elapsed, setElapsed] = useState(0);
   const [autoTriggered, setAutoTriggered] = useState(false);
 
-  // Load cached trending data on mount
+  // Feedback state (topic_text -> true=liked, false=disliked, null=no feedback)
+  const [feedback, setFeedback] = useState<Record<string, boolean | null>>({});
+
+  // Custom topic input
+  const [customTopic, setCustomTopic] = useState('');
+  const [addingCustom, setAddingCustom] = useState(false);
+
+  // Load cached trending data + existing feedback on mount
   useEffect(() => {
     if (!brandId) return;
     let cancelled = false;
@@ -831,6 +1101,15 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
         doGenerate(brandId);
       }
     });
+    // Load existing feedback
+    strategyService.getTrendFeedback(brandId).then((data) => {
+      if (cancelled) return;
+      const fbMap: Record<string, boolean | null> = {};
+      (data.feedback || data || []).forEach((f: { topic_text: string; is_accepted: boolean }) => {
+        fbMap[f.topic_text] = f.is_accepted;
+      });
+      setFeedback(fbMap);
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [brandId]);
 
@@ -852,11 +1131,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
       if (arr.length > 0) markTrendingComplete();
       else setError('No trending topics found. Try again.');
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.detail ||
-        err?.message ||
-        'Failed to generate trending topics.';
+      const msg = err?.response?.data?.error || err?.response?.data?.detail || err?.message || 'Failed to generate trending topics.';
       setError(msg);
     } finally {
       setLoading(false);
@@ -864,11 +1139,40 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
   };
 
   const handleGenerate = () => {
-    if (!brandId) {
-      setError('No brand selected. Please complete the Brand DNA step first.');
-      return;
-    }
+    if (!brandId) { setError('No brand selected. Please complete the Brand DNA step first.'); return; }
     doGenerate(brandId);
+  };
+
+  const handleFeedback = async (topicText: string, isAccepted: boolean, topicId?: number) => {
+    if (!brandId) return;
+    // Toggle: if already same feedback, remove it
+    const current = feedback[topicText];
+    const newVal = current === isAccepted ? null : isAccepted;
+    setFeedback((prev) => ({ ...prev, [topicText]: newVal }));
+    try {
+      if (newVal !== null) {
+        await strategyService.submitTrendFeedback(brandId, topicText, newVal, topicId);
+      } else {
+        // Re-submit opposite to "undo" (API uses update_or_create)
+        await strategyService.submitTrendFeedback(brandId, topicText, !isAccepted, topicId);
+        setFeedback((prev) => ({ ...prev, [topicText]: null }));
+      }
+    } catch { /* ignore */ }
+  };
+
+  const handleAddCustomTopic = async () => {
+    if (!brandId || !customTopic.trim()) return;
+    setAddingCustom(true);
+    try {
+      await strategyService.addManualTrend(brandId, customTopic.trim());
+      // Reload topics
+      const data = await strategyService.getBrandTrending(brandId);
+      const arr = Array.isArray(data) ? data : data.topics || [];
+      setTopics(arr);
+      setCustomTopic('');
+      markTrendingComplete();
+    } catch { /* ignore */ }
+    setAddingCustom(false);
   };
 
   return (
@@ -884,7 +1188,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
         </button>
       </div>
       <p className="text-sm text-text-secondary">
-        Discover Google Trends topics relevant to your brand — powered by real-time data & AI analysis.
+        Discover trending topics relevant to your brand. Like/dislike topics to teach AI your preferences — disliked topics won't appear in future generations. Add your own custom topics too.
       </p>
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
@@ -900,13 +1204,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
             <FireIcon className="absolute inset-0 m-auto w-6 h-6 text-orange-400 animate-pulse" />
           </div>
           <p className="text-sm text-text-secondary mt-4 font-medium">
-            {elapsed < 5
-              ? 'Querying Google Trends...'
-              : elapsed < 15
-              ? 'Analyzing trend relevance with AI...'
-              : elapsed < 30
-              ? 'Almost done — ranking topics for your brand...'
-              : 'Taking a bit longer than usual... hang tight!'}
+            {elapsed < 5 ? 'Querying Google Trends...' : elapsed < 15 ? 'Analyzing trend relevance with AI...' : elapsed < 30 ? 'Almost done — ranking topics for your brand...' : 'Taking a bit longer than usual... hang tight!'}
           </p>
           <p className="text-xs text-text-muted mt-1">{elapsed}s elapsed</p>
         </div>
@@ -917,50 +1215,41 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-text-muted">{topics.length} trending topics found</p>
-              <p className="text-xs text-primary-400/70 mt-0.5">Click topics to select them for idea generation</p>
+              <p className="text-xs text-primary-400/70 mt-0.5">Select topics for ideas &middot; Like/dislike to train AI</p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  if (selectedTrendingTopics.length === topics.length) {
-                    setSelectedTrendingTopics([]);
-                  } else {
-                    setSelectedTrendingTopics(topics.map((t) => t.topic));
-                  }
-                }}
-                className="text-xs text-primary-400 hover:text-primary-300 underline"
-              >
+              <button onClick={() => { selectedTrendingTopics.length === topics.length ? setSelectedTrendingTopics([]) : setSelectedTrendingTopics(topics.map((t) => t.topic)); }}
+                className="text-xs text-primary-400 hover:text-primary-300 underline">
                 {selectedTrendingTopics.length === topics.length ? 'Deselect All' : 'Select All'}
               </button>
-              <p className="text-xs text-primary-400 font-medium">
-                {selectedTrendingTopics.length} selected
-              </p>
+              <p className="text-xs text-primary-400 font-medium">{selectedTrendingTopics.length} selected</p>
             </div>
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             {topics.map((t, idx) => {
               const isSelected = selectedTrendingTopics.includes(t.topic);
+              const fb = feedback[t.topic];
+              const isDisliked = fb === false;
               return (
                 <div
                   key={t.id || idx}
-                  onClick={() => toggleTrendingTopic(t.topic)}
-                  className={`rounded-lg p-4 cursor-pointer transition-all ${
-                    isSelected
-                      ? 'bg-primary-500/10 border border-primary-500/40 ring-1 ring-primary-500/20'
-                      : t.category === 'seasonal' || t.category === 'cultural'
-                      ? 'bg-gradient-to-br from-orange-500/10 to-dark-700/30 border border-orange-500/10 hover:border-primary-500/30'
-                      : 'bg-dark-700/30 border border-transparent hover:border-white/10'
+                  className={`rounded-lg p-4 transition-all ${
+                    isDisliked ? 'opacity-50 bg-red-500/5 border border-red-500/20' :
+                    fb === true ? 'bg-green-500/5 border border-green-500/20' :
+                    isSelected ? 'bg-primary-500/10 border border-primary-500/40 ring-1 ring-primary-500/20' :
+                    t.category === 'seasonal' || t.category === 'cultural' ? 'bg-gradient-to-br from-orange-500/10 to-dark-700/30 border border-orange-500/10 hover:border-primary-500/30' :
+                    'bg-dark-700/30 border border-transparent hover:border-white/10'
                   }`}
                 >
                   <div className="flex items-start gap-2.5">
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-colors ${
+                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 mt-0.5 cursor-pointer transition-colors ${
                       isSelected ? 'border-primary-500 bg-primary-500' : 'border-white/20'
-                    }`}>
+                    }`} onClick={() => toggleTrendingTopic(t.topic)}>
                       {isSelected && <CheckCircleIcon className="w-3.5 h-3.5 text-white" />}
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => toggleTrendingTopic(t.topic)}>
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium">{t.topic}</span>
+                        <span className={`text-sm font-medium ${isDisliked ? 'line-through text-text-muted' : ''}`}>{t.topic}</span>
                         <div className="flex items-center gap-1.5 shrink-0">
                           {t.category && (
                             <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium capitalize ${
@@ -969,42 +1258,59 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
                               t.category === 'viral' ? 'bg-cyan-500/20 text-cyan-400' :
                               t.category === 'evergreen' ? 'bg-green-500/20 text-green-400' :
                               'bg-blue-500/20 text-blue-400'
-                            }`}>
-                              {t.category}
-                            </span>
+                            }`}>{t.category}</span>
                           )}
                           {t.volume_score != null && (
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                              t.volume_score >= 80 ? 'bg-red-500/20 text-red-400' :
-                              t.volume_score >= 50 ? 'bg-orange-500/20 text-orange-400' :
-                              'bg-yellow-500/20 text-yellow-400'
-                            }`}>
-                              {t.volume_score >= 80 ? 'Hot' : t.volume_score >= 50 ? 'Rising' : 'Emerging'}
-                            </span>
+                              t.volume_score >= 80 ? 'bg-red-500/20 text-red-400' : t.volume_score >= 50 ? 'bg-orange-500/20 text-orange-400' : 'bg-yellow-500/20 text-yellow-400'
+                            }`}>{t.volume_score >= 80 ? 'Hot' : t.volume_score >= 50 ? 'Rising' : 'Emerging'}</span>
                           )}
                         </div>
                       </div>
-                      {t.relevance_explanation && (
-                        <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">{t.relevance_explanation}</p>
-                      )}
+                      {t.relevance_explanation && <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">{t.relevance_explanation}</p>}
                       {t.volume_score != null && (
-                        <div className="mt-2">
-                          <div className="h-1 bg-dark-600 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${
-                                t.volume_score >= 80 ? 'bg-red-500' : t.volume_score >= 50 ? 'bg-orange-500' : 'bg-yellow-500'
-                              }`}
-                              style={{ width: `${Math.min(t.volume_score, 100)}%` }}
-                            />
-                          </div>
-                        </div>
+                        <div className="mt-2"><div className="h-1 bg-dark-600 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${t.volume_score >= 80 ? 'bg-red-500' : t.volume_score >= 50 ? 'bg-orange-500' : 'bg-yellow-500'}`} style={{ width: `${Math.min(t.volume_score, 100)}%` }} /></div></div>
                       )}
+                    </div>
+                    {/* Feedback buttons */}
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button onClick={(e) => { e.stopPropagation(); handleFeedback(t.topic, true, t.id); }}
+                        className={`p-1.5 rounded transition-colors ${fb === true ? 'bg-green-500/20 text-green-400' : 'text-text-muted hover:text-green-400 hover:bg-green-500/10'}`}
+                        title="Like — more like this">
+                        <HandThumbUpIcon className="w-4 h-4" />
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); handleFeedback(t.topic, false, t.id); }}
+                        className={`p-1.5 rounded transition-colors ${fb === false ? 'bg-red-500/20 text-red-400' : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'}`}
+                        title="Dislike — won't show again">
+                        <HandThumbDownIcon className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 </div>
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* Add Custom Topic */}
+      {!loading && (
+        <div className="bg-dark-700/30 border border-white/10 rounded-lg p-4">
+          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <PlusIcon className="w-4 h-4 text-primary-400" />
+            Add Your Own Topic
+          </h4>
+          <div className="flex gap-2">
+            <input type="text" className="input flex-1 text-sm" placeholder="Enter a topic you want to create content about..." value={customTopic}
+              onChange={(e) => setCustomTopic(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomTopic(); } }}
+            />
+            <button onClick={handleAddCustomTopic} disabled={addingCustom || !customTopic.trim()} className="btn-primary text-sm flex items-center gap-1.5 px-4">
+              {addingCustom ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <PlusIcon className="w-4 h-4" />}
+              Add
+            </button>
+          </div>
+          <p className="text-xs text-text-muted mt-2">Custom topics will appear alongside AI-generated trends</p>
         </div>
       )}
 
@@ -1266,12 +1572,18 @@ function CaptionsStep() {
     }
     // Also save selected caption texts for CreatePostStep
     const allSelected: string[] = [];
+    const selectedCaptionObjs: Array<{ id: string; ideaId: number; text: string }> = [];
     for (const group of Object.values(captionGroups)) {
-      group.filter((c) => c.selected).forEach((c) => allSelected.push(c.text));
+      group.filter((c) => c.selected).forEach((c) => {
+        allSelected.push(c.text);
+        selectedCaptionObjs.push({ id: c.id, ideaId: c.ideaId, text: c.text });
+      });
     }
     if (allSelected.length > 0) {
       localStorage.setItem('overflow_selected_caption', allSelected.join('\n\n---\n\n'));
     }
+    // Push to store for MediaStep/CreatePostStep
+    overflow.setSelectedCaptions(selectedCaptionObjs);
   }, [captionGroups]);
 
   if (overflow.selectedIdeaIds.length === 0) {
@@ -1466,20 +1778,21 @@ function CaptionsStep() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STEP 4 — Media
+// STEP 4 — Media (per-caption accordion)
 // ═══════════════════════════════════════════════════════════
 function MediaStep() {
   const overflow = useOverflowStore();
-  const [mode, setMode] = useState<'upload' | 'generate'>('upload');
-  const [prompt, setPrompt] = useState('');
-  const [style, setStyle] = useState('modern');
-  const [loading, setLoading] = useState(false);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(overflow.generatedMediaUrl);
-  const [error, setError] = useState<string | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
-  const [previewPlatform, setPreviewPlatform] = useState<'instagram' | 'facebook' | 'twitter' | 'linkedin'>('instagram');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [modes, setModes] = useState<Record<string, 'upload' | 'generate'>>({});
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [styles, setStyles] = useState<Record<string, string>>({});
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+  const [refiningMap, setRefiningMap] = useState<Record<string, boolean>>({});
+  const [errorMap, setErrorMap] = useState<Record<string, string | null>>({});
+  const [refinedPrompts, setRefinedPrompts] = useState<Record<string, string | null>>({});
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const captions = overflow.selectedCaptions;
 
   const toMediaUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
@@ -1488,317 +1801,340 @@ function MediaStep() {
     return `/media/${url}`;
   };
 
-  const currentImage = uploadPreview || toMediaUrl(generatedImage);
+  // Auto-expand first caption without media
+  useEffect(() => {
+    if (!expandedId && captions.length > 0) {
+      const first = captions.find((c) => !overflow.captionMediaMap[c.id]?.mediaUrl);
+      setExpandedId(first?.id || captions[0].id);
+    }
+  }, [captions]);
 
-  // Get caption for preview
-  const getPreviewCaption = () => {
-    const saved = localStorage.getItem('overflow_selected_caption');
-    if (saved) return saved.split('\n\n---\n\n')[0]?.substring(0, 200) || '';
-    return 'Your caption will appear here...';
+  const getIdea = (ideaId: number) => overflow.ideasData.find((i) => i.id === ideaId);
+
+  const gatherContext = (captionText: string) => {
+    const bc = overflow.brandContext;
+    return {
+      brand_name: bc?.brand_name || '',
+      industry: bc?.industry || '',
+      description: bc?.description || '',
+      target_audience: bc?.target_audience || '',
+      ideas: overflow.ideasData.filter((i) => overflow.selectedIdeaIds.includes(i.id)).map((i) => `${i.title} (${i.angle})`),
+      topics: overflow.selectedTrendingTopics.slice(0, 5),
+      caption_snippet: captionText.substring(0, 200),
+    };
   };
 
-  const getIdeaSuggestion = () => {
-    const idea = overflow.ideasData.find((i) => overflow.selectedIdeaIds.includes(i.id));
-    return idea ? `${idea.title} — ${idea.hook}` : '';
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (captionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setUploadedFile(file);
       const previewUrl = URL.createObjectURL(file);
-      setUploadPreview(previewUrl);
-      overflow.setGeneratedMediaUrl(previewUrl);
+      overflow.setCaptionMedia(captionId, previewUrl, null);
     }
   };
 
-  const removeMedia = () => {
-    setUploadedFile(null);
-    setUploadPreview(null);
-    setGeneratedImage(null);
-    overflow.setGeneratedMediaUrl('');
-    if (fileInputRef.current) fileInputRef.current.value = '';
+  const handleRemoveMedia = (captionId: string) => {
+    overflow.setCaptionMedia(captionId, null, null);
   };
 
-  useEffect(() => {
-    if (uploadedFile) localStorage.setItem('overflow_has_upload', 'true');
-  }, [uploadedFile]);
+  const handleGenerate = async (captionId: string) => {
+    const userPrompt = prompts[captionId]?.trim();
+    if (!userPrompt) return;
+    const style = styles[captionId] || 'modern';
+    const caption = captions.find((c) => c.id === captionId);
 
-  const handleGenerateImage = async () => {
-    if (!prompt.trim()) return;
-    setLoading(true);
-    setError(null);
+    setLoadingMap((p) => ({ ...p, [captionId]: true }));
+    setRefiningMap((p) => ({ ...p, [captionId]: true }));
+    setErrorMap((p) => ({ ...p, [captionId]: null }));
+
     try {
-      const safePrompt = `Professional social media content image: ${prompt.trim()}. Clean, brand-appropriate, high quality, suitable for marketing.`;
-      const result = await imageService.generate({ prompt: safePrompt, style, enhance_prompt: true });
+      // Step 1: Refine prompt via link prompt
+      const ctx = gatherContext(caption?.text || '');
+      const refineResult = await imageService.refinePrompt({ ...ctx, user_prompt: userPrompt, style });
+      const finalPrompt = refineResult.refined_prompt;
+      setRefinedPrompts((p) => ({ ...p, [captionId]: finalPrompt }));
+      setRefiningMap((p) => ({ ...p, [captionId]: false }));
+
+      // Step 2: Generate image
+      const result = await imageService.generate({ prompt: finalPrompt, style, enhance_prompt: true });
       const rawUrl = result.generated_image || result.generated_image_with_logo || null;
       const imageUrl = toMediaUrl(rawUrl);
-      setGeneratedImage(imageUrl);
-      if (imageUrl) overflow.setGeneratedMediaUrl(imageUrl);
+      overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
       if (result.id) overflow.addMedia(result.id);
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Failed to generate image.';
-      if (msg.toLowerCase().includes('safety')) {
-        setError('The prompt was flagged by the safety system. Try rephrasing.');
-      } else {
-        setError(msg);
-      }
+      setErrorMap((p) => ({ ...p, [captionId]: msg.toLowerCase().includes('safety') ? 'Prompt flagged by safety system. Try rephrasing.' : msg }));
     }
-    setLoading(false);
+    setRefiningMap((p) => ({ ...p, [captionId]: false }));
+    setLoadingMap((p) => ({ ...p, [captionId]: false }));
   };
 
-  // Platform preview mockup
-  const PlatformPreview = ({ imgSrc }: { imgSrc: string }) => {
-    const captionText = getPreviewCaption();
-
-    if (previewPlatform === 'instagram') {
-      return (
-        <div className="bg-black rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto">
-          <div className="flex items-center gap-2 px-3 py-2.5">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-purple-500" />
-            <div>
-              <p className="text-xs font-semibold text-white">your_brand</p>
-              <p className="text-[10px] text-gray-400">Sponsored</p>
-            </div>
-          </div>
-          <img src={imgSrc} alt="Preview" className="w-full aspect-square object-cover" />
-          <div className="px-3 py-2.5 space-y-1.5">
-            <div className="flex items-center gap-4">
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" /></svg>
-              <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
-            </div>
-            <p className="text-[11px] text-white leading-relaxed line-clamp-3"><span className="font-semibold">your_brand</span> {captionText}</p>
-          </div>
-        </div>
-      );
+  const handleRegenerateRefined = async (captionId: string, editedPrompt: string) => {
+    const style = styles[captionId] || 'modern';
+    setLoadingMap((p) => ({ ...p, [captionId]: true }));
+    setErrorMap((p) => ({ ...p, [captionId]: null }));
+    try {
+      const result = await imageService.generate({ prompt: editedPrompt, style, enhance_prompt: true });
+      const rawUrl = result.generated_image || result.generated_image_with_logo || null;
+      const imageUrl = toMediaUrl(rawUrl);
+      overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
+      if (result.id) overflow.addMedia(result.id);
+    } catch (err: any) {
+      setErrorMap((p) => ({ ...p, [captionId]: err?.response?.data?.error || err?.message || 'Failed to generate.' }));
     }
+    setLoadingMap((p) => ({ ...p, [captionId]: false }));
+  };
 
-    if (previewPlatform === 'facebook') {
-      return (
-        <div className="bg-[#242526] rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto">
-          <div className="flex items-center gap-2.5 px-3 py-2.5">
-            <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">B</div>
-            <div>
-              <p className="text-xs font-semibold text-white">Your Brand</p>
-              <p className="text-[10px] text-gray-400 flex items-center gap-1">Just now · <GlobeAltIcon className="w-2.5 h-2.5" /></p>
-            </div>
-          </div>
-          <p className="text-xs text-gray-200 px-3 pb-2 line-clamp-3">{captionText}</p>
-          <img src={imgSrc} alt="Preview" className="w-full aspect-[1.91/1] object-cover" />
-          <div className="flex items-center justify-around py-2 border-t border-white/10">
-            <span className="text-xs text-gray-400 flex items-center gap-1">👍 Like</span>
-            <span className="text-xs text-gray-400 flex items-center gap-1">💬 Comment</span>
-            <span className="text-xs text-gray-400 flex items-center gap-1">↗ Share</span>
-          </div>
-        </div>
-      );
-    }
+  const doneCount = captions.filter((c) => overflow.captionMediaMap[c.id]?.mediaUrl).length;
+  const STYLE_OPTIONS = [
+    { value: 'modern', label: 'Modern' },
+    { value: 'minimalist', label: 'Minimalist' },
+    { value: 'vibrant', label: 'Vibrant' },
+    { value: 'professional', label: 'Professional' },
+    { value: 'artistic', label: 'Artistic' },
+    { value: 'flat_design', label: 'Flat Design' },
+  ];
 
-    if (previewPlatform === 'twitter') {
-      return (
-        <div className="bg-black rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto p-3">
-          <div className="flex gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-gray-700 flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-white">Your Brand</span>
-                <span className="text-[10px] text-gray-500">@yourbrand · 1m</span>
-              </div>
-              <p className="text-xs text-gray-200 mt-1 line-clamp-3">{captionText}</p>
-              <img src={imgSrc} alt="Preview" className="w-full aspect-video object-cover rounded-xl mt-2 border border-white/10" />
-              <div className="flex items-center justify-between mt-2 text-gray-500">
-                <span className="text-[10px]">💬 12</span>
-                <span className="text-[10px]">🔁 8</span>
-                <span className="text-[10px]">❤ 42</span>
-                <span className="text-[10px]">📊 1.2K</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // LinkedIn
+  if (captions.length === 0) {
     return (
-      <div className="bg-[#1B1F23] rounded-xl overflow-hidden border border-white/10 max-w-sm mx-auto">
-        <div className="flex items-center gap-2.5 px-3 py-2.5">
-          <div className="w-10 h-10 rounded-full bg-blue-700 flex items-center justify-center text-white text-xs font-bold">B</div>
-          <div>
-            <p className="text-xs font-semibold text-white">Your Brand</p>
-            <p className="text-[10px] text-gray-400">1,234 followers · 1h</p>
-          </div>
-        </div>
-        <p className="text-xs text-gray-200 px-3 pb-2 line-clamp-3">{captionText}</p>
-        <img src={imgSrc} alt="Preview" className="w-full aspect-[1.91/1] object-cover" />
-        <div className="flex items-center justify-around py-2 border-t border-white/10">
-          <span className="text-xs text-gray-400">👍 Like</span>
-          <span className="text-xs text-gray-400">💬 Comment</span>
-          <span className="text-xs text-gray-400">🔁 Repost</span>
-          <span className="text-xs text-gray-400">📩 Send</span>
-        </div>
+      <div className="card p-12 text-center">
+        <PhotoIcon className="w-12 h-12 mx-auto text-text-muted mb-3" />
+        <p className="text-sm text-text-secondary">No captions selected. Go back to the Captions step and select at least one.</p>
       </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-4">
       <div className="card p-6">
-        <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2 mb-1">
           <PhotoIcon className="w-5 h-5 text-pink-400" />
           Media
         </h3>
-        <p className="text-sm text-text-secondary">Upload your own media or generate an AI image for your post.</p>
+        <p className="text-sm text-text-secondary">
+          Generate or upload an image for each of your <span className="text-primary-400 font-medium">{captions.length}</span> selected caption{captions.length > 1 ? 's' : ''}.
+          <span className="ml-2 text-green-400">{doneCount}/{captions.length} done</span>
+        </p>
       </div>
 
-      {/* Mode Toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setMode('upload')}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-            mode === 'upload' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
-          }`}
-        >
-          <ArrowUpTrayIcon className="w-4 h-4" />
-          Upload Media
-        </button>
-        <button
-          onClick={() => setMode('generate')}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
-            mode === 'generate' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
-          }`}
-        >
-          <SparklesIcon className="w-4 h-4" />
-          AI Generate
-        </button>
-      </div>
+      {/* Accordion per caption */}
+      {captions.map((cap, idx) => {
+        const isExpanded = expandedId === cap.id;
+        const media = overflow.captionMediaMap[cap.id];
+        const mediaUrl = toMediaUrl(media?.mediaUrl);
+        const idea = getIdea(cap.ideaId);
+        const mode = modes[cap.id] || 'generate';
+        const isLoading = loadingMap[cap.id] || false;
+        const isRefining = refiningMap[cap.id] || false;
+        const error = errorMap[cap.id] || null;
+        const refined = refinedPrompts[cap.id] || null;
 
-      {/* Upload Mode */}
-      {mode === 'upload' && (
-        <div className="card p-6 space-y-4">
-          <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleFileUpload} className="hidden" />
-          {uploadPreview ? (
-            <div className="space-y-3">
-              <img src={uploadPreview} alt="Upload" className="rounded-lg max-h-64 mx-auto border border-white/10" />
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-text-secondary">{uploadedFile?.name}</p>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => fileInputRef.current?.click()} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
-                    <ArrowPathIcon className="w-3 h-3" /> Replace
+        return (
+          <div key={cap.id} className="card overflow-hidden">
+            {/* Accordion Header */}
+            <button
+              onClick={() => setExpandedId(isExpanded ? null : cap.id)}
+              className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-colors text-left"
+            >
+              {/* Thumbnail / status */}
+              <div className={`w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center border ${
+                mediaUrl ? 'border-green-500/30' : 'border-white/10 bg-white/5'
+              }`}>
+                {mediaUrl ? (
+                  <img src={mediaUrl} alt="" className="w-full h-full rounded-lg object-cover" />
+                ) : (
+                  <PhotoIcon className="w-5 h-5 text-text-muted" />
+                )}
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">Post {idx + 1}</span>
+                  {idea && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/10 text-primary-400 truncate">{idea.title}</span>}
+                  {mediaUrl ? (
+                    <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0" />
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400">Needs media</span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary mt-0.5 truncate">{cap.text.substring(0, 80)}...</p>
+              </div>
+
+              <ChevronDownIcon className={`w-4 h-4 text-text-muted transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Accordion Body */}
+            {isExpanded && (
+              <div className="border-t border-white/10 p-4 space-y-4">
+                {/* Caption preview */}
+                <div className="bg-white/5 rounded-lg p-3">
+                  <p className="text-[10px] text-text-muted mb-1 font-medium uppercase">Caption</p>
+                  <p className="text-xs text-text-secondary line-clamp-4">{cap.text}</p>
+                </div>
+
+                {/* Mode toggle */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setModes((p) => ({ ...p, [cap.id]: 'upload' }))}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                      mode === 'upload' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
+                    }`}
+                  >
+                    <ArrowUpTrayIcon className="w-3.5 h-3.5" /> Upload
                   </button>
-                  <button onClick={removeMedia} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                    <TrashIcon className="w-3 h-3" /> Remove
+                  <button
+                    onClick={() => setModes((p) => ({ ...p, [cap.id]: 'generate' }))}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                      mode === 'generate' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
+                    }`}
+                  >
+                    <SparklesIcon className="w-3.5 h-3.5" /> AI Generate
                   </button>
                 </div>
+
+                {/* Upload mode */}
+                {mode === 'upload' && (
+                  <div>
+                    <input
+                      ref={(el) => { fileRefs.current[cap.id] = el; }}
+                      type="file"
+                      accept="image/*,video/*"
+                      onChange={(e) => handleFileUpload(cap.id, e)}
+                      className="hidden"
+                    />
+                    {mediaUrl ? (
+                      <div className="space-y-2">
+                        <img src={mediaUrl} alt="" className="rounded-lg max-h-48 mx-auto border border-white/10" />
+                        <div className="flex items-center justify-center gap-3">
+                          <button onClick={() => fileRefs.current[cap.id]?.click()} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
+                            <ArrowPathIcon className="w-3 h-3" /> Replace
+                          </button>
+                          <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                            <TrashIcon className="w-3 h-3" /> Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => fileRefs.current[cap.id]?.click()}
+                        className="flex flex-col items-center gap-2 px-4 py-8 rounded-lg border-2 border-dashed border-white/15 hover:border-primary-500/40 transition-colors w-full"
+                      >
+                        <ArrowUpTrayIcon className="w-6 h-6 text-text-muted" />
+                        <p className="text-xs text-text-muted">Click to upload</p>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Generate mode */}
+                {mode === 'generate' && (
+                  <div className="space-y-3">
+                    {/* Current image preview */}
+                    {mediaUrl && (
+                      <div className="space-y-2">
+                        <img src={mediaUrl} alt="" className="rounded-lg max-h-48 mx-auto border border-white/10" />
+                        <div className="flex items-center justify-center">
+                          <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                            <TrashIcon className="w-3 h-3" /> Remove
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium">Image Description</label>
+                        <button
+                          onClick={() => {
+                            const parts: string[] = [];
+                            if (idea) { parts.push(idea.title); if (idea.hook) parts.push(idea.hook); }
+                            if (overflow.selectedTrendingTopics.length > 0) parts.push(`themed around ${overflow.selectedTrendingTopics[0]}`);
+                            if (overflow.brandContext) parts.push(`for ${overflow.brandContext.brand_name}`);
+                            if (parts.length > 0) setPrompts((p) => ({ ...p, [cap.id]: parts.join(' — ') }));
+                          }}
+                          className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                        >
+                          <SparklesIcon className="w-2.5 h-2.5" /> Auto-fill
+                        </button>
+                      </div>
+                      <textarea
+                        className="input w-full text-xs"
+                        rows={2}
+                        value={prompts[cap.id] || ''}
+                        onChange={(e) => setPrompts((p) => ({ ...p, [cap.id]: e.target.value }))}
+                        placeholder={idea ? `${idea.title} — ${idea.hook}` : 'Describe the image...'}
+                      />
+                    </div>
+
+                    {/* Style selector */}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {STYLE_OPTIONS.map((s) => (
+                        <button
+                          key={s.value}
+                          onClick={() => setStyles((p) => ({ ...p, [cap.id]: s.value }))}
+                          className={`text-[10px] px-2.5 py-1 rounded-lg transition-colors ${
+                            (styles[cap.id] || 'modern') === s.value
+                              ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
+                              : 'bg-white/5 text-text-muted hover:bg-white/10'
+                          }`}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Generate button */}
+                    <button
+                      onClick={() => handleGenerate(cap.id)}
+                      disabled={isLoading || !(prompts[cap.id]?.trim())}
+                      className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
+                    >
+                      {(isLoading || isRefining) ? (
+                        <div className="animate-spin h-3.5 w-3.5 border-b-2 border-white rounded-full" />
+                      ) : (
+                        <SparklesIcon className="w-3.5 h-3.5" />
+                      )}
+                      {isRefining ? 'Refining...' : isLoading ? 'Generating...' : mediaUrl ? 'Re-generate' : 'Generate'}
+                    </button>
+
+                    {/* Refined prompt */}
+                    {refined && (
+                      <div className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2 space-y-1.5">
+                        <p className="text-[10px] font-medium text-green-400 flex items-center gap-1">
+                          <SparklesIcon className="w-2.5 h-2.5" /> Refined Prompt
+                        </p>
+                        <textarea
+                          className="input w-full text-[11px]"
+                          rows={2}
+                          value={refined}
+                          onChange={(e) => setRefinedPrompts((p) => ({ ...p, [cap.id]: e.target.value }))}
+                        />
+                        <button
+                          onClick={() => handleRegenerateRefined(cap.id, refined)}
+                          disabled={isLoading}
+                          className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                        >
+                          <ArrowPathIcon className="w-2.5 h-2.5" /> Re-generate with edited prompt
+                        </button>
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                        <p className="text-xs text-red-400">{error}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-          ) : (
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center gap-3 px-6 py-10 rounded-lg border-2 border-dashed border-white/15 hover:border-primary-500/40 transition-colors w-full"
-            >
-              <ArrowUpTrayIcon className="w-8 h-8 text-text-muted" />
-              <div className="text-center">
-                <p className="text-sm font-medium text-text-secondary">Click to upload image or video</p>
-                <p className="text-xs text-text-muted mt-1">JPG, PNG, GIF, MP4, MOV — max 50MB</p>
-              </div>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Generate Mode */}
-      {mode === 'generate' && (
-        <div className="card p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Image Description</label>
-            <textarea
-              className="input w-full"
-              rows={3}
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder={getIdeaSuggestion() || 'Describe the image you want to generate...'}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Style</label>
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { value: 'modern', label: 'Modern' },
-                { value: 'minimalist', label: 'Minimalist' },
-                { value: 'vibrant', label: 'Vibrant' },
-                { value: 'professional', label: 'Professional' },
-                { value: 'artistic', label: 'Artistic' },
-                { value: 'flat_design', label: 'Flat Design' },
-              ].map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => setStyle(s.value)}
-                  className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
-                    style === s.value
-                      ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
-                      : 'bg-white/5 text-text-muted hover:bg-white/10'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button onClick={handleGenerateImage} disabled={loading || !prompt.trim()} className="btn-primary flex items-center gap-2">
-              {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <SparklesIcon className="w-4 h-4" />}
-              {loading ? 'Generating...' : generatedImage ? 'Re-generate' : 'Generate Image'}
-            </button>
-            {generatedImage && (
-              <button onClick={removeMedia} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                <TrashIcon className="w-3 h-3" /> Remove
-              </button>
             )}
           </div>
+        );
+      })}
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-              <p className="text-sm text-red-400">{error}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Social Media Platform Preview */}
-      {currentImage && (
-        <div className="card p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <GlobeAltIcon className="w-4 h-4 text-primary-400" />
-              Platform Preview
-            </h4>
-            <div className="flex gap-1.5">
-              {(['instagram', 'facebook', 'twitter', 'linkedin'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPreviewPlatform(p)}
-                  className={`text-[10px] px-2.5 py-1 rounded-md font-medium transition-colors capitalize ${
-                    previewPlatform === p
-                      ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
-                      : 'bg-white/5 text-text-muted hover:bg-white/10'
-                  }`}
-                >
-                  {p === 'twitter' ? 'X / Twitter' : p}
-                </button>
-              ))}
-            </div>
-          </div>
-          <PlatformPreview imgSrc={currentImage} />
-        </div>
-      )}
-
-      {/* Requirement notice */}
-      {!currentImage && (
+      {/* Progress notice */}
+      {doneCount < captions.length && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-center">
-          <p className="text-xs text-yellow-400">Please upload media or generate an AI image before proceeding.</p>
+          <p className="text-xs text-yellow-400">{captions.length - doneCount} caption{captions.length - doneCount > 1 ? 's' : ''} still need media before you can proceed.</p>
         </div>
       )}
     </div>
@@ -1806,34 +2142,40 @@ function MediaStep() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// STEP 5 — Create Post
+// STEP 5 — Create Posts (multi-post accordion)
 // ═══════════════════════════════════════════════════════════
 function CreatePostStep({ brandId }: { brandId: number | null }) {
   const overflow = useOverflowStore();
-  const [caption, setCaption] = useState('');
+  const captions = overflow.selectedCaptions;
+
+  // Shared settings
   const [platforms, setPlatforms] = useState<PlatformType[]>(['instagram']);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledHour, setScheduledHour] = useState('10');
   const [scheduledMinute, setScheduledMinute] = useState('00');
   const [scheduledAmPm, setScheduledAmPm] = useState<'AM' | 'PM'>('AM');
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Load saved caption from captions step
+  // Per-caption state
+  const [postCaptions, setPostCaptions] = useState<Record<string, string>>({});
+  const [createdPosts, setCreatedPosts] = useState<Record<string, number>>({});
+  const [postLoading, setPostLoading] = useState<Record<string, boolean>>({});
+  const [postErrors, setPostErrors] = useState<Record<string, string | null>>({});
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  const [creatingAll, setCreatingAll] = useState(false);
+
+  // Init captions text + date
   useEffect(() => {
-    const saved = localStorage.getItem('overflow_selected_caption');
-    if (saved) setCaption(saved);
-    // Set default date to tomorrow
+    const initial: Record<string, string> = {};
+    captions.forEach((c) => { initial[c.id] = c.text; });
+    setPostCaptions(initial);
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     setScheduledDate(tomorrow.toISOString().split('T')[0]);
+    if (captions.length > 0) setExpandedPost(captions[0].id);
   }, []);
 
   const togglePlatform = (p: PlatformType) => {
-    setPlatforms((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
-    );
+    setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
   };
 
   const getScheduledISO = (): string => {
@@ -1846,53 +2188,71 @@ function CreatePostStep({ brandId }: { brandId: number | null }) {
     return dt.toISOString();
   };
 
-  const handleCreate = async () => {
-    if (!caption.trim() || platforms.length === 0 || !scheduledDate) {
-      setError('Please fill in caption, select platforms, and set a schedule time.');
+  const toMediaUrl = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    if (url.startsWith('http') || url.startsWith('blob:')) return url;
+    if (url.startsWith('/media/')) return url;
+    return `/media/${url}`;
+  };
+
+  const handleCreatePost = async (captionId: string) => {
+    const captionText = postCaptions[captionId]?.trim();
+    if (!captionText || platforms.length === 0 || !scheduledDate) {
+      setPostErrors((p) => ({ ...p, [captionId]: 'Fill in caption, platforms, and schedule.' }));
       return;
     }
-    setLoading(true);
-    setError(null);
+    setPostLoading((p) => ({ ...p, [captionId]: true }));
+    setPostErrors((p) => ({ ...p, [captionId]: null }));
+
     try {
-      // If a generated image exists, fetch it as a File to attach
       const mediaFiles: File[] = [];
-      const mediaUrl = overflow.generatedMediaUrl;
+      const mediaUrl = toMediaUrl(overflow.captionMediaMap[captionId]?.mediaUrl);
       if (mediaUrl) {
         try {
           const res = await fetch(mediaUrl);
           const blob = await res.blob();
           const ext = mediaUrl.split('.').pop()?.split('?')[0] || 'png';
           mediaFiles.push(new File([blob], `generated-image.${ext}`, { type: blob.type || 'image/png' }));
-        } catch { /* skip if fetch fails */ }
+        } catch { /* skip */ }
       }
 
       const post = await postService.create({
-        caption,
+        caption: captionText,
         media_files: mediaFiles,
         platforms,
         scheduled_time: getScheduledISO(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         ...(brandId ? { brand: brandId } : {}),
       });
-      overflow.setCreatedPost(post.id);
-      overflow.saveToServer();
-      setSuccess(true);
-      localStorage.removeItem('overflow_selected_caption');
+      setCreatedPosts((p) => ({ ...p, [captionId]: post.id }));
     } catch (err: any) {
-      setError(err?.response?.data?.error || err?.message || 'Failed to create post.');
+      setPostErrors((p) => ({ ...p, [captionId]: err?.response?.data?.error || err?.message || 'Failed to create post.' }));
     }
-    setLoading(false);
+    setPostLoading((p) => ({ ...p, [captionId]: false }));
   };
 
-  // Minimum date = today
-  const todayStr = new Date().toISOString().split('T')[0];
+  const handleCreateAll = async () => {
+    setCreatingAll(true);
+    for (const cap of captions) {
+      if (createdPosts[cap.id]) continue;
+      await handleCreatePost(cap.id);
+    }
+    setCreatingAll(false);
+    overflow.saveToServer();
+    localStorage.removeItem('overflow_selected_caption');
+  };
 
-  if (success) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const createdCount = Object.keys(createdPosts).length;
+  const allCreated = createdCount === captions.length;
+  const getIdea = (ideaId: number) => overflow.ideasData.find((i) => i.id === ideaId);
+
+  if (allCreated) {
     return (
       <div className="card p-12 text-center">
         <CheckCircleIcon className="w-16 h-16 mx-auto text-green-400 mb-4" />
-        <h3 className="text-xl font-bold text-green-400">Post Created!</h3>
-        <p className="text-sm text-text-secondary mt-2">Your post has been scheduled. Continue to see it on the Calendar.</p>
+        <h3 className="text-xl font-bold text-green-400">{captions.length} Post{captions.length > 1 ? 's' : ''} Created!</h3>
+        <p className="text-sm text-text-secondary mt-2">All posts have been scheduled. Continue to see them on the Calendar.</p>
       </div>
     );
   }
@@ -1900,44 +2260,29 @@ function CreatePostStep({ brandId }: { brandId: number | null }) {
   return (
     <div className="space-y-4">
       <div className="card p-6">
-        <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+        <h3 className="text-lg font-semibold flex items-center gap-2 mb-1">
           <SparklesIcon className="w-5 h-5 text-primary-400" />
-          Create Post
+          Create Posts
         </h3>
-        <p className="text-sm text-text-secondary">Review your caption, pick platforms, and schedule.</p>
+        <p className="text-sm text-text-secondary">
+          Review and schedule <span className="text-primary-400 font-medium">{captions.length}</span> post{captions.length > 1 ? 's' : ''}.
+          <span className="ml-2 text-green-400">{createdCount}/{captions.length} created</span>
+        </p>
       </div>
 
-      <div className="card p-6 space-y-5">
-        {/* Caption */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Caption</label>
-          <textarea
-            className="input w-full"
-            rows={6}
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            placeholder="Your post caption..."
-          />
-          <p className="text-xs text-text-muted mt-1">{caption.length} characters</p>
-        </div>
-
-        {/* Media preview */}
-        {overflow.generatedMediaUrl && (
-          <div>
-            <label className="block text-sm font-medium mb-2">Attached Media</label>
-            <img src={overflow.generatedMediaUrl} alt="Post media" className="rounded-lg max-h-40 border border-white/10" />
-          </div>
-        )}
+      {/* Shared Settings */}
+      <div className="card p-5 space-y-4">
+        <p className="text-xs font-medium text-text-muted uppercase tracking-wide">Shared Settings (applies to all posts)</p>
 
         {/* Platforms */}
         <div>
-          <label className="block text-sm font-medium mb-2">Platforms</label>
+          <label className="block text-xs font-medium mb-1.5">Platforms</label>
           <div className="flex gap-2 flex-wrap">
             {(['instagram', 'facebook', 'twitter', 'linkedin'] as PlatformType[]).map((p) => (
               <button
                 key={p}
                 onClick={() => togglePlatform(p)}
-                className={`px-4 py-2 rounded-lg text-sm capitalize transition-colors ${
+                className={`px-3 py-1.5 rounded-lg text-xs capitalize transition-colors ${
                   platforms.includes(p)
                     ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
                     : 'bg-white/5 text-text-muted hover:bg-white/10'
@@ -1949,73 +2294,133 @@ function CreatePostStep({ brandId }: { brandId: number | null }) {
           </div>
         </div>
 
-        {/* Schedule Date & Time */}
+        {/* Schedule */}
         <div>
-          <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-            <ClockIcon className="w-4 h-4" />
-            Schedule Date & Time
+          <label className="block text-xs font-medium mb-1.5 flex items-center gap-1.5">
+            <ClockIcon className="w-3.5 h-3.5" /> Schedule
           </label>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {/* Date */}
-            <div className="col-span-2 sm:col-span-1">
-              <label className="text-xs text-text-muted mb-1 block">Date</label>
-              <input
-                type="date"
-                className="input w-full"
-                value={scheduledDate}
-                min={todayStr}
-                onChange={(e) => setScheduledDate(e.target.value)}
-              />
-            </div>
-            {/* Hour */}
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">Hour</label>
-              <select className="input w-full" value={scheduledHour} onChange={(e) => setScheduledHour(e.target.value)}>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                  <option key={h} value={String(h)}>{h}</option>
-                ))}
-              </select>
-            </div>
-            {/* Minute */}
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">Minute</label>
-              <select className="input w-full" value={scheduledMinute} onChange={(e) => setScheduledMinute(e.target.value)}>
-                {['00', '15', '30', '45'].map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            {/* AM/PM */}
-            <div>
-              <label className="text-xs text-text-muted mb-1 block">AM/PM</label>
-              <select className="input w-full" value={scheduledAmPm} onChange={(e) => setScheduledAmPm(e.target.value as 'AM' | 'PM')}>
-                <option value="AM">AM</option>
-                <option value="PM">PM</option>
-              </select>
-            </div>
+          <div className="grid grid-cols-4 gap-2">
+            <input type="date" className="input text-xs" value={scheduledDate} min={todayStr} onChange={(e) => setScheduledDate(e.target.value)} />
+            <select className="input text-xs" value={scheduledHour} onChange={(e) => setScheduledHour(e.target.value)}>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => <option key={h} value={String(h)}>{h}</option>)}
+            </select>
+            <select className="input text-xs" value={scheduledMinute} onChange={(e) => setScheduledMinute(e.target.value)}>
+              {['00', '15', '30', '45'].map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select className="input text-xs" value={scheduledAmPm} onChange={(e) => setScheduledAmPm(e.target.value as 'AM' | 'PM')}>
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
           </div>
-          {scheduledDate && (
-            <p className="text-xs text-text-muted mt-2">
-              Scheduled for: {new Date(`${scheduledDate}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at {scheduledHour}:{scheduledMinute} {scheduledAmPm}
-            </p>
-          )}
         </div>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
-            <p className="text-sm text-red-400">{error}</p>
-          </div>
-        )}
-
-        <button
-          onClick={handleCreate}
-          disabled={loading || !caption.trim() || platforms.length === 0 || !scheduledDate}
-          className="btn-primary w-full py-3 flex items-center justify-center gap-2 text-base"
-        >
-          {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowRightIcon className="w-5 h-5" />}
-          {loading ? 'Creating Post...' : 'Create & Schedule Post'}
-        </button>
       </div>
+
+      {/* Per-caption accordion */}
+      {captions.map((cap, idx) => {
+        const isExpanded = expandedPost === cap.id;
+        const isCreated = !!createdPosts[cap.id];
+        const isLoading = postLoading[cap.id] || false;
+        const error = postErrors[cap.id] || null;
+        const media = overflow.captionMediaMap[cap.id];
+        const mediaUrl = toMediaUrl(media?.mediaUrl);
+        const idea = getIdea(cap.ideaId);
+
+        return (
+          <div key={cap.id} className={`card overflow-hidden ${isCreated ? 'ring-1 ring-green-500/30' : ''}`}>
+            {/* Header */}
+            <button
+              onClick={() => setExpandedPost(isExpanded ? null : cap.id)}
+              className="w-full flex items-center gap-3 p-4 hover:bg-white/5 transition-colors text-left"
+            >
+              {mediaUrl ? (
+                <img src={mediaUrl} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0 border border-white/10" />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 border border-white/10">
+                  <PhotoIcon className="w-4 h-4 text-text-muted" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">Post {idx + 1}</span>
+                  {idea && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary-500/10 text-primary-400 truncate">{idea.title}</span>}
+                  {isCreated ? (
+                    <CheckCircleIcon className="w-4 h-4 text-green-400 flex-shrink-0" />
+                  ) : (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400">Pending</span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary mt-0.5 truncate">{(postCaptions[cap.id] || cap.text).substring(0, 80)}...</p>
+              </div>
+              <ChevronDownIcon className={`w-4 h-4 text-text-muted transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Body */}
+            {isExpanded && (
+              <div className="border-t border-white/10 p-4 space-y-4">
+                {/* Editable caption */}
+                <div>
+                  <label className="text-xs font-medium mb-1 block">Caption</label>
+                  <textarea
+                    className="input w-full text-xs"
+                    rows={4}
+                    value={postCaptions[cap.id] || ''}
+                    onChange={(e) => setPostCaptions((p) => ({ ...p, [cap.id]: e.target.value }))}
+                    disabled={isCreated}
+                  />
+                  <p className="text-[10px] text-text-muted mt-0.5">{(postCaptions[cap.id] || '').length} characters</p>
+                </div>
+
+                {/* Media preview */}
+                {mediaUrl && (
+                  <div>
+                    <label className="text-xs font-medium mb-1 block">Media</label>
+                    <img src={mediaUrl} alt="" className="rounded-lg max-h-32 border border-white/10" />
+                  </div>
+                )}
+
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                    <p className="text-xs text-red-400">{error}</p>
+                  </div>
+                )}
+
+                {!isCreated && (
+                  <button
+                    onClick={() => handleCreatePost(cap.id)}
+                    disabled={isLoading || !(postCaptions[cap.id]?.trim()) || platforms.length === 0 || !scheduledDate}
+                    className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
+                  >
+                    {isLoading ? <div className="animate-spin h-3.5 w-3.5 border-b-2 border-white rounded-full" /> : <ArrowRightIcon className="w-3.5 h-3.5" />}
+                    {isLoading ? 'Creating...' : 'Create This Post'}
+                  </button>
+                )}
+
+                {isCreated && (
+                  <p className="text-xs text-green-400 flex items-center gap-1">
+                    <CheckCircleIcon className="w-4 h-4" /> Post created and scheduled!
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Create All button */}
+      {!allCreated && (
+        <button
+          onClick={handleCreateAll}
+          disabled={creatingAll || platforms.length === 0 || !scheduledDate}
+          className="btn-primary w-full py-3 flex items-center justify-center gap-2 text-sm"
+        >
+          {creatingAll ? (
+            <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" />
+          ) : (
+            <SparklesIcon className="w-4 h-4" />
+          )}
+          {creatingAll ? 'Creating all posts...' : `Create All ${captions.length - createdCount} Posts`}
+        </button>
+      )}
     </div>
   );
 }

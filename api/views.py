@@ -41,6 +41,7 @@ from .serializers import (
     UserProfileDetailSerializer,
     UpdateProfileSerializer,
     RegisterSerializer,
+    RegisterWithBrandSerializer,
     LoginSerializer,
     PostSerializer,
     CreatePostSerializer,
@@ -125,6 +126,108 @@ class RegisterView(generics.CreateAPIView):
         return Response({
             'message': 'Registration successful. You can now log in.',
             'user': UserSerializer(user).data
+        }, status=status.HTTP_201_CREATED)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class RegisterWithBrandView(APIView):
+    """Register user + create Workspace + Brand + structured DNA in one call"""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = RegisterWithBrandSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user, workspace, brand = serializer.save()
+
+        # Best-effort AI enhancement if website_url + server OPENAI_API_KEY exist
+        ai_enhanced = False
+        if brand.website_url:
+            try:
+                from django.conf import settings as django_settings
+                server_key = getattr(django_settings, 'OPENAI_API_KEY', '')
+                if server_key:
+                    from api.strategy_views import _crawl_site_pages, _fetch_page_content
+                    try:
+                        pages = _crawl_site_pages(brand.website_url, max_pages=3)
+                        if pages:
+                            combined_content = ''
+                            for p in pages:
+                                combined_content += f"\n--- {p.get('url', '')} ---\n{p.get('content', '')}\n"
+                            page_data = {
+                                'success': True,
+                                'title': pages[0].get('title', ''),
+                                'description': pages[0].get('description', ''),
+                                'content': combined_content[:6000],
+                            }
+                        else:
+                            page_data = _fetch_page_content(brand.website_url)
+                    except Exception:
+                        page_data = _fetch_page_content(brand.website_url)
+
+                    if page_data.get('success'):
+                        client = openai.OpenAI(api_key=server_key)
+                        existing_dna = json.dumps(brand.brand_dna, indent=2)
+                        prompt = f"""Enhance this existing Brand DNA using the website content below.
+Keep all existing values but fill in gaps and improve descriptions.
+
+EXISTING DNA:
+{existing_dna}
+
+WEBSITE: {brand.website_url}
+TITLE: {page_data.get('title', '')}
+CONTENT:
+{page_data.get('content', '')}
+
+Return the enhanced Brand DNA as a single JSON object with the same 15 fields.
+Only return valid JSON, no other text."""
+
+                        resp = client.chat.completions.create(
+                            model='gpt-4o-mini',
+                            messages=[
+                                {'role': 'system', 'content': 'You are a brand strategist. Enhance the brand DNA using website data. Return only valid JSON.'},
+                                {'role': 'user', 'content': prompt},
+                            ],
+                            temperature=0.3,
+                            max_tokens=2500,
+                        )
+                        raw = resp.choices[0].message.content.strip()
+                        if raw.startswith('```'):
+                            raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
+                            if raw.endswith('```'):
+                                raw = raw[:-3]
+                            raw = raw.strip()
+                        enhanced_dna = json.loads(raw)
+                        enhanced_dna['website_url'] = brand.website_url
+                        brand.brand_dna = enhanced_dna
+                        brand.brand_dna_source = 'website'
+                        brand.brand_dna_generated_at = timezone.now()
+                        brand.save(update_fields=['brand_dna', 'brand_dna_source', 'brand_dna_generated_at'])
+
+                        from brands.models import BrandDNAHistory
+                        BrandDNAHistory.objects.filter(brand=brand).update(is_active=False)
+                        BrandDNAHistory.objects.create(
+                            brand=brand, dna_data=enhanced_dna,
+                            website_url=brand.website_url, source='website', is_active=True,
+                        )
+                        ai_enhanced = True
+            except Exception:
+                pass  # AI enhancement is best-effort; structured DNA is already saved
+
+        # Generate JWT tokens so user is logged in immediately
+        refresh = RefreshToken.for_user(user)
+
+        return Response({
+            'message': 'Registration successful!',
+            'user': UserSerializer(user).data,
+            'workspace_id': workspace.id,
+            'brand_id': brand.id,
+            'brand_dna': brand.brand_dna,
+            'ai_enhanced': ai_enhanced,
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            },
         }, status=status.HTTP_201_CREATED)
 
 
@@ -1011,6 +1114,98 @@ class ImagePromptTemplateViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user, is_global=False)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def refine_image_prompt(request):
+    """Use GPT-4o-mini to refine raw context into a focused image generation prompt."""
+    try:
+        api_key = get_openai_key(request.user)
+        if not api_key:
+            return Response(
+                {'error': 'No OpenAI API key configured. Please add one in Settings.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        brand_name = request.data.get('brand_name', '')
+        industry = request.data.get('industry', '')
+        description = request.data.get('description', '')
+        target_audience = request.data.get('target_audience', '')
+        ideas = request.data.get('ideas', [])
+        topics = request.data.get('topics', [])
+        caption_snippet = request.data.get('caption_snippet', '')
+        user_prompt = request.data.get('user_prompt', '')
+        style = request.data.get('style', '')
+
+        if not user_prompt:
+            return Response(
+                {'error': 'user_prompt is required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        system_message = (
+            "You are an expert at crafting concise image generation prompts for social media posts. "
+            "Your job is to take messy raw context and the user's direction, then output ONE clean, "
+            "focused image prompt (2-3 sentences max).\n\n"
+            "CRITICAL RULES:\n"
+            "1. ADAPT to the industry. A SaaS brand needs abstract/conceptual visuals (dashboards, "
+            "clean UI mockups, workspace scenes, abstract tech graphics). A fashion brand needs "
+            "lifestyle/product shots. A food brand needs appetizing plating. NEVER default to "
+            "fashion-show or runway imagery unless the brand is literally a fashion brand.\n"
+            "2. Focus on what the user asked for in their direction — that is the PRIMARY intent. "
+            "Use the brand context only to set the right tone, color palette, and mood.\n"
+            "3. Keep it simple and literal. Describe a single clear scene. No collages, no split "
+            "screens, no multiple concepts crammed together.\n"
+            "4. Do NOT request text/words/logos in the image. Do NOT add people unless the user "
+            "or context specifically calls for them.\n"
+            "5. Return ONLY the refined prompt. No explanations, no labels, no quotation marks."
+        )
+
+        context_parts = []
+        if brand_name:
+            context_parts.append(f"Brand: {brand_name}")
+        if industry:
+            context_parts.append(f"Industry: {industry}")
+        if description:
+            context_parts.append(f"Brand description: {description}")
+        if target_audience:
+            context_parts.append(f"Target audience: {target_audience}")
+        if ideas:
+            context_parts.append(f"Content ideas being used: {', '.join(ideas[:3])}")
+        if topics:
+            context_parts.append(f"Trending topics for context: {', '.join(topics[:3])}")
+        if caption_snippet:
+            context_parts.append(f"Caption snippet: {caption_snippet[:150]}")
+        if style:
+            context_parts.append(f"Preferred visual style: {style}")
+
+        user_message = (
+            f"Brand context:\n" + "\n".join(context_parts) + "\n\n"
+            f"User's image direction: {user_prompt}\n\n"
+            "Generate a clean, focused image prompt that matches this brand's industry and the user's direction."
+        )
+
+        client = openai.OpenAI(api_key=api_key)
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        refined_prompt = response.choices[0].message.content.strip()
+
+        return Response({'refined_prompt': refined_prompt})
+
+    except Exception as e:
+        logger.error(f"Prompt refinement failed: {e}")
+        return Response(
+            {'error': f'Prompt refinement failed: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @api_view(['POST'])
@@ -2637,6 +2832,31 @@ def regenerate_voice(request, generation_id):
 
 # ===================== BRAND DNA VIEWS =====================
 
+
+def build_structured_dna(brand_name, industry, target_region, voice_tone='professional',
+                         products_services=None, website_url=''):
+    """Build a 15-field DNA JSON from structured inputs (no AI call, instant)."""
+    products = products_services or []
+    return {
+        'brand_name': brand_name,
+        'tagline': '',
+        'industry': industry,
+        'description': f'{brand_name} is a {industry} brand targeting {target_region}.',
+        'products_services': products,
+        'target_audience': f'Audiences in {target_region} interested in {industry}',
+        'unique_selling_points': [],
+        'brand_voice': voice_tone,
+        'brand_values': [],
+        'color_theme': [],
+        'content_themes': [industry.lower()] if industry else [],
+        'cta_style': 'Learn more',
+        'social_platforms': [],
+        'keywords': [kw for kw in [brand_name.lower(), industry.lower()] if kw],
+        'competitor_positioning': '',
+        'website_url': website_url,
+    }
+
+
 class GenerateBrandDNAView(APIView):
     """Generate Brand DNA by reading the brand's website with AI"""
     permission_classes = [IsAuthenticated]
@@ -2801,6 +3021,137 @@ class BrandDNAStatusView(APIView):
             'brand_dna_generated_at': brand.brand_dna_generated_at,
             'brand_dna_source': brand.brand_dna_source or '',
             'total_chunks': chunk_count,
+        })
+
+
+class RegenerateBrandDNAFromInputsView(APIView):
+    """Accept all 15 DNA fields as editable inputs, optionally AI-enhance them."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user),
+                id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        use_ai = data.get('use_ai', False)
+
+        # Build the DNA from inputs (15 built-in fields)
+        BUILTIN_KEYS = {
+            'brand_name', 'tagline', 'industry', 'description', 'products_services',
+            'target_audience', 'unique_selling_points', 'brand_voice', 'brand_values',
+            'color_theme', 'content_themes', 'cta_style', 'social_platforms', 'keywords',
+            'competitor_positioning', 'website_url',
+        }
+        SKIP_KEYS = {'use_ai', 'target_region', 'csrfmiddlewaretoken'}
+
+        dna_data = {
+            'brand_name': data.get('brand_name', brand.brand_name or ''),
+            'tagline': data.get('tagline', ''),
+            'industry': data.get('industry', brand.industry or ''),
+            'description': data.get('description', ''),
+            'products_services': data.get('products_services', []),
+            'target_audience': data.get('target_audience', ''),
+            'unique_selling_points': data.get('unique_selling_points', []),
+            'brand_voice': data.get('brand_voice', brand.voice_tone or 'professional'),
+            'brand_values': data.get('brand_values', []),
+            'color_theme': data.get('color_theme', []),
+            'content_themes': data.get('content_themes', []),
+            'cta_style': data.get('cta_style', ''),
+            'social_platforms': data.get('social_platforms', []),
+            'keywords': data.get('keywords', []),
+            'competitor_positioning': data.get('competitor_positioning', ''),
+            'website_url': data.get('website_url', brand.website_url or ''),
+        }
+
+        # Include any custom fields from the request
+        for key, val in data.items():
+            if key not in BUILTIN_KEYS and key not in SKIP_KEYS:
+                dna_data[key] = val
+
+        # Update the Brand model fields too
+        brand.brand_name = dna_data['brand_name'] or brand.brand_name
+        brand.industry = dna_data['industry'] or brand.industry
+        brand.voice_tone = dna_data['brand_voice'] or brand.voice_tone
+        brand.website_url = dna_data['website_url'] or brand.website_url
+        if data.get('target_region'):
+            brand.target_region = data['target_region']
+
+        source = 'manual'
+
+        if use_ai:
+            api_key = get_openai_key(request.user)
+            if not api_key:
+                return Response(
+                    {'error': 'OpenAI API key not configured. Go to Settings to add your key.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            try:
+                client = openai.OpenAI(api_key=api_key)
+                prompt = f"""Enhance and fill in gaps for this Brand DNA profile.
+Keep user-provided values but make descriptions richer and more specific.
+Fill in any empty fields with reasonable defaults based on the other information.
+
+CURRENT DNA:
+{json.dumps(dna_data, indent=2)}
+
+Return the enhanced Brand DNA as a single JSON object with the same 15 fields.
+Only return valid JSON, no other text."""
+
+                resp = client.chat.completions.create(
+                    model='gpt-4o-mini',
+                    messages=[
+                        {'role': 'system', 'content': 'You are a brand strategist. Enhance the brand DNA. Return only valid JSON.'},
+                        {'role': 'user', 'content': prompt},
+                    ],
+                    temperature=0.3,
+                    max_tokens=2500,
+                )
+                raw = resp.choices[0].message.content.strip()
+                if raw.startswith('```'):
+                    raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
+                    if raw.endswith('```'):
+                        raw = raw[:-3]
+                    raw = raw.strip()
+                dna_data = json.loads(raw)
+                source = 'website'  # AI-enhanced
+            except Exception as e:
+                return Response(
+                    {'error': f'AI enhancement failed: {str(e)}. Your manual inputs were NOT saved — please try again or save without AI.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        # Save DNA to brand
+        dna_data['website_url'] = dna_data.get('website_url', '') or brand.website_url or ''
+        brand.brand_dna = dna_data
+        brand.brand_dna_generated_at = timezone.now()
+        brand.brand_dna_source = source
+        brand.save(update_fields=[
+            'brand_name', 'industry', 'voice_tone', 'website_url', 'target_region',
+            'brand_dna', 'brand_dna_generated_at', 'brand_dna_source',
+        ])
+
+        # Save to DNA history
+        from brands.models import BrandDNAHistory
+        BrandDNAHistory.objects.filter(brand=brand).update(is_active=False)
+        BrandDNAHistory.objects.create(
+            brand=brand,
+            dna_data=dna_data,
+            website_url=brand.website_url or '',
+            source=source,
+            is_active=True,
+        )
+
+        return Response({
+            'success': True,
+            'brand_dna': dna_data,
+            'generated_at': brand.brand_dna_generated_at.isoformat(),
+            'source': source,
+            'message': 'Brand DNA updated with AI enhancement!' if use_ai else 'Brand DNA saved successfully!',
         })
 
 

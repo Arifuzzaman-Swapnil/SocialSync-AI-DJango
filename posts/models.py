@@ -239,6 +239,7 @@ class PostCaption(models.Model):
     is_selected = models.BooleanField(default=False)
     is_ab_test = models.BooleanField(default=False)
     ab_label = models.CharField(max_length=1, choices=AB_LABEL_CHOICES, blank=True, null=True)
+    image_prompt = models.TextField(blank=True, null=True, help_text='AI-suggested image prompt for this caption')
     generation_prompt_hash = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

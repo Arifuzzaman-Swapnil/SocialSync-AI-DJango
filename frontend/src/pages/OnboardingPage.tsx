@@ -574,6 +574,9 @@ function BrandDNAStep({ brand, onNext }: { brand: Brand | null; onNext: () => vo
   const [generated, setGenerated] = useState(false);
   const [error, setError] = useState('');
 
+  // Detect pre-existing DNA (generated during registration)
+  const hasExistingDna = brand?.brand_dna && typeof brand.brand_dna === 'object' && Object.keys(brand.brand_dna).length > 2;
+
   const handleGenerate = async () => {
     if (!brand) return;
     setGenerating(true);
@@ -609,7 +612,26 @@ function BrandDNAStep({ brand, onNext }: { brand: Brand | null; onNext: () => vo
         </p>
       </div>
 
-      {brand && (
+      {/* Already generated during registration */}
+      {hasExistingDna && !generated && (
+        <div className="rounded-lg border border-green-500/20 bg-green-500/5 p-5 space-y-3 text-center">
+          <div className="flex items-center justify-center gap-2 text-green-400">
+            <CheckCircleIcon className="w-6 h-6" />
+            <span className="font-semibold text-lg">Brand DNA Already Generated</span>
+          </div>
+          <p className="text-sm text-text-secondary">
+            Your Brand DNA was automatically created during registration.
+            You can view and edit it anytime from the Strategy Hub.
+          </p>
+          <div className="flex gap-3 justify-center pt-2">
+            <a href="/strategy?tab=dna" className="text-sm text-primary hover:underline">
+              View & Edit in Strategy Hub
+            </a>
+          </div>
+        </div>
+      )}
+
+      {brand && !hasExistingDna && (
         <div className="rounded-lg border border-white/10 bg-dark-700/50 p-4 space-y-3">
           <h4 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">Brand Summary</h4>
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -660,12 +682,14 @@ function BrandDNAStep({ brand, onNext }: { brand: Brand | null; onNext: () => vo
         </div>
       )}
 
-      {generated ? (
+      {generated || hasExistingDna ? (
         <div className="text-center">
-          <div className="flex items-center justify-center gap-2 text-green-400 mb-4">
-            <CheckCircleIcon className="w-5 h-5" />
-            <span className="font-medium">Brand DNA generated successfully!</span>
-          </div>
+          {generated && (
+            <div className="flex items-center justify-center gap-2 text-green-400 mb-4">
+              <CheckCircleIcon className="w-5 h-5" />
+              <span className="font-medium">Brand DNA generated successfully!</span>
+            </div>
+          )}
           <button onClick={onNext} className="btn-primary w-full py-3">
             Continue
           </button>
