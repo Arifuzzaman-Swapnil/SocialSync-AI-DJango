@@ -358,38 +358,70 @@ NOTE: Could not fetch content from {profile.handle_or_url} (Error: {page_data.ge
 Analyze based on the URL/handle name only.
 """
 
-                prompt = f"""Analyze this competitor for my brand based on their ACTUAL page content.
+                prompt = f"""<context>
+You are conducting a competitive content audit for a brand.
 
-MY BRAND:
-- Name: "{brand.brand_name}"
-- Industry: {brand.industry}
-- Target Region: {brand.target_region}
-- Content Pillars: {pillar_context}
+My brand: "{brand.brand_name}"
+Industry: {brand.industry}
+Region: {brand.target_region}
 
-COMPETITOR:
-- URL/Handle: {profile.handle_or_url}
-- Platform: {profile.get_platform_display()}
+Competitor: {profile.handle_or_url}
+Platform: {profile.get_platform_display()}
+</context>
+
+<crawled_pages>
 {page_context}
+</crawled_pages>
 
-Based on the ACTUAL content from their site, provide 10 specific competitive insights.
-Each insight MUST reference a specific page from the crawled URLs above.
-Use DIFFERENT source_url values - pick the most relevant page URL for each insight.
+<instructions>
+Think step by step:
 
-For each insight provide:
-- hook_text: A specific content strategy or post idea for MY brand to compete (max 200 chars)
-- angle: Why this works based on what you see in their content (max 150 chars)
-- format_type: Best format (text/image/video/carousel/reel/story)
-- engagement_score: Effectiveness for MY brand (1-10)
-- recommendation: Exact action step for "{brand.brand_name}" (max 200 chars)
-- based_on: What specific part of their content inspired this insight (max 100 chars)
-- source_url: The EXACT page URL from the list above that this insight is based on. MUST be one of the actual crawled URLs, not the base URL unless the insight is actually from the homepage.
+1. READ all crawled pages thoroughly. Note the competitor's:
+   - Key messaging themes and value propositions
+   - Content formats and structures they use
+   - Tone of voice and language patterns
+   - CTAs and conversion strategies
+   - Audience targeting signals
+   - Content gaps or weaknesses
 
-Return as JSON array only."""
+2. GENERATE exactly 10 competitive insights by cross-referencing what the competitor does well (to learn from) and what they do poorly (to exploit).
+
+3. For EACH insight, provide:
+   a. **hook_text**: A compelling content hook my brand could use, inspired by this insight. Make it specific and ready to brief a content creator.
+   b. **angle**: The strategic approach — what makes this content idea different.
+   c. **format_type**: Recommended content format (post, carousel, video, story, reel, thread, infographic, blog).
+   d. **engagement_score**: 1-10 rating based on estimated audience impact. 10 = very likely to drive high engagement. Be honest — not everything is a 10.
+   e. **recommendation**: A specific, actionable recommendation for my brand. "Create more content" is NOT actionable. "Create a weekly carousel series comparing your pricing transparency vs. competitors who hide pricing" IS.
+   f. **based_on**: What specific content, pattern, or gap this insight is drawn from.
+   g. **source_url**: The EXACT URL from the crawled pages.
+</instructions>
+
+<output_format>
+Return ONLY a JSON array of exactly 10 objects:
+[
+  {{
+    "hook_text": "<compelling content hook>",
+    "angle": "<strategic angle>",
+    "format_type": "<content format>",
+    "engagement_score": <1-10>,
+    "recommendation": "<specific actionable recommendation>",
+    "based_on": "<what evidence this is drawn from>",
+    "source_url": "<exact URL from crawled pages>"
+  }}
+]
+</output_format>
+
+<constraints>
+- Every source_url MUST come from the crawled pages — never fabricate URLs.
+- Vary the engagement_scores realistically — not all insights are 8+.
+- Include at least 2 "gap exploitation" insights (things the competitor does poorly that my brand can capitalize on).
+- Return valid JSON array only.
+</constraints>"""
 
                 response = client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=[
-                        {'role': 'system', 'content': 'You are a competitive intelligence analyst. Analyze the actual page content provided. Each insight must reference a specific page URL from the crawled pages. Return only valid JSON arrays.'},
+                        {'role': 'system', 'content': 'You are a senior competitive intelligence analyst specializing in digital content strategy and social media marketing. You have deep expertise in:\n\n- Identifying content patterns, messaging frameworks, and positioning strategies from website copy and marketing materials\n- Reverse-engineering competitor content strategies from published pages\n- Translating competitive observations into actionable content opportunities\n- Distinguishing between surface-level observations and genuinely strategic insights\n\nYour analysis is grounded EXCLUSIVELY in the actual page content provided — you never fabricate, assume, or hallucinate information that isn\'t directly evidenced in the crawled pages.\n\nEvery insight you produce must cite a specific crawled page URL as its source.\n\nCRITICAL OUTPUT RULES:\n- Return ONLY a valid JSON array — no markdown, no commentary, no wrapping\n- Every source_url must be a real URL from the crawled pages provided\n- Insights must be specific and actionable, not generic marketing advice'},
                         {'role': 'user', 'content': prompt},
                     ],
                     temperature=0.5,
@@ -641,31 +673,71 @@ Incorporate these trends where appropriate.
 
         # Build prompt
         platform_text = platform if platform != 'all' else 'all platforms (Twitter, LinkedIn, Facebook, Instagram)'
-        prompt = f"""I have a {brand.industry} brand/business called "{brand.brand_name}" in {brand.target_region}.
-
-{dna_context}{competitor_context}{trending_context}{learning_context}
+        prompt = f"""<context>
+Brand: "{brand.brand_name}"
+Industry: {brand.industry}
+Region: {brand.target_region}
+Platform(s): {platform_text}
 Content pillars: {pillar_context}
 {f'Focus pillar: {specific_pillar.name}' if specific_pillar else ''}
-Platform: {platform_text}
+</context>
 
-Based on the above context — especially the trending topics — generate exactly {count} unique, actionable content ideas that I can post on social media to increase my brand visibility, engagement, and sales.
+<data_signals>
+Brand DNA: {dna_context}
+Competitor insights: {competitor_context}
+Trending topics: {trending_context}
+Past performance signals: {learning_context}
+</data_signals>
 
-Each idea must be:
-- Directly inspired by one of the trending topics or current events
-- Tailored to my brand, industry, and target audience
-- Ready to execute — specific enough to write a caption from
+<instructions>
+Think step by step:
 
-For each idea, return:
-- title: A catchy, scroll-stopping title (max 80 chars, NO generic text like "Idea 1")
-- hook: An attention-grabbing opening line that makes people stop scrolling
-- angle: The unique perspective, story, or approach
-- platform: Best platform for this idea (twitter/linkedin/facebook/instagram)
-- goal: Content goal (leads/growth/authority)
-- content_format: Format type (text/image/video/carousel/reel/thread)
-- pillar_name: Which content pillar this fits
-- engagement_tier: Expected engagement (high/mid/low)
+1. ANALYZE all data signals to identify:
+   - High-opportunity topics (trending + relevant to brand)
+   - Competitor gaps (things competitors aren't covering well)
+   - Audience pain points and aspirations
+   - Seasonal or timely angles
 
-Return as JSON array. Only return the JSON array, no other text."""
+2. GENERATE exactly {count} content ideas. For each idea:
+   a. Map it to a specific content pillar from the pillars above
+   b. Choose a creative framework:
+      - Storytelling (customer journey, founder story, behind-the-scenes)
+      - Contrarian (challenge conventional wisdom in the industry)
+      - Data-driven (surprising stat + insight + action)
+      - Listicle (numbered tips, mistakes, tools, examples)
+      - Social proof (testimonial, case study, result showcase)
+      - Trend-riding (timely angle on current conversation)
+      - Educational (how-to, explainer, myth-busting)
+   c. Write a hook that would work as the first line of a real post
+   d. Specify a concrete content format
+   e. Rate the expected engagement tier honestly
+
+3. DIVERSIFY: Ensure variety across hook types, content formats, pillars, and funnel stages (awareness, engagement, conversion, retention).
+</instructions>
+
+<output_format>
+Return ONLY a JSON array of exactly {count} objects:
+[
+  {{
+    "title": "<specific, descriptive 5-10 word title>",
+    "hook": "<the actual scroll-stopping first line, ready to use>",
+    "angle": "<the strategic angle or unique perspective, 1-2 sentences>",
+    "platform": "<target platform>",
+    "goal": "<awareness | engagement | conversion | education>",
+    "content_format": "<carousel | reel | story | post | thread | video | poll | infographic>",
+    "pillar_name": "<matching content pillar name>",
+    "engagement_tier": "<high | medium | low>"
+  }}
+]
+</output_format>
+
+<constraints>
+- All ideas must map to provided content pillars.
+- No two ideas should have the same hook type AND content format.
+- Hooks must be specific to the brand — not generic templates.
+- Rate engagement tiers honestly — not everything is "high."
+- Return valid JSON array only.
+</constraints>"""
 
         try:
             from accounts.api_keys import get_openai_key
@@ -682,7 +754,7 @@ Return as JSON array. Only return the JSON array, no other text."""
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
                 messages=[
-                    {'role': 'system', 'content': 'You are a senior social media analyst and business development strategist. You analyze trending topics and create viral, high-converting content ideas that drive real business results — more followers, more engagement, more sales. Return only valid JSON arrays.'},
+                    {'role': 'system', 'content': 'You are a senior social media strategist and creative director who generates content ideas that are specific, actionable, and strategically grounded.\n\nYour ideas are NOT generic "post about X" suggestions. Each idea is detailed enough that a content creator could execute it without additional briefing.\n\nYour approach combines:\n- Data signals (trending topics, competitor gaps, past performance)\n- Audience psychology (what makes people stop, save, share, and comment)\n- Content strategy (pillar balance, funnel alignment, platform optimization)\n- Creative frameworks (storytelling, contrarian takes, data-driven hooks, behind-the-scenes, social proof, UGC-inspired, educational series)\n\nYou understand that the best content ideas are at the intersection of:\n1. What the brand wants to say\n2. What the audience wants to hear\n3. What the platform rewards\n\nCRITICAL OUTPUT RULES:\n- Return ONLY a valid JSON array — no markdown, no commentary\n- Each idea must be specific enough to execute immediately\n- No duplicate angles or overlapping ideas'},
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.85,
@@ -794,32 +866,53 @@ class RegenerateIdeaView(APIView):
         if idea.pillar:
             pillar_context = f", Content Pillar: {idea.pillar.name}"
 
-        prompt = f"""Regenerate a single content idea with a fresh angle.
+        additional_instructions = request.data.get("instructions", "")
 
-{brand_context}{pillar_context}
+        prompt = f"""<task>
+Regenerate this content idea with a completely fresh creative direction.
+</task>
 
-Original idea to improve:
+<original_idea>
 - Title: {idea.title}
 - Hook: {idea.hook}
 - Angle: {idea.angle}
 - Platform: {idea.platform}
-- Goal: {idea.goal}
-- Format: {idea.content_format}
+</original_idea>
 
-{f'Additional instructions: {request.data.get("instructions", "")}' if request.data.get("instructions") else ''}
+<brand_context>
+{brand_context}{pillar_context}
+</brand_context>
 
-Create a completely new version with a different hook and angle, keeping the same platform, goal, and format.
+<instructions>
+Think step by step:
+1. UNDERSTAND the original idea's core topic and strategic goal.
+2. IDENTIFY what creative approach the original used (e.g., question hook + educational angle + curiosity appeal).
+3. CHOOSE a deliberately DIFFERENT combination:
+   - Different hook type (if original was a question, use a bold statement or stat)
+   - Different angle (if original was educational, try emotional or contrarian)
+   - Different emotional appeal (if original used curiosity, try FOMO or empathy)
+4. WRITE the new version — it should feel like it came from a different creative team.
+{f'5. FOLLOW these additional instructions: {additional_instructions}' if additional_instructions else ''}
+</instructions>
 
-Return JSON:
-{{"title": "...", "hook": "...", "angle": "...", "goal": "...", "content_format": "...", "engagement_tier": "high|medium|low"}}
-"""
+<output_format>
+Return ONLY this JSON:
+{{
+  "title": "<new title>",
+  "hook": "<new hook — ready to use as the first line of a post>",
+  "angle": "<new strategic angle>",
+  "goal": "<awareness | engagement | conversion | education>",
+  "content_format": "<carousel | reel | story | post | thread | video | poll>",
+  "engagement_tier": "<high | medium | low>"
+}}
+</output_format>"""
 
         try:
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
                 messages=[
-                    {'role': 'system', 'content': 'You are an expert social media strategist. Return only valid JSON.'},
+                    {'role': 'system', 'content': 'You are a creative director who can take any content idea and reimagine it with a completely different creative execution — different hook, different angle, different emotional appeal — while keeping the strategic intent intact.\n\nYou think in terms of creative pivots:\n- If the original was educational, try emotional storytelling\n- If the original asked a question, try a bold, contrarian claim\n- If the original was serious, try humor or relatability\n- If the original was broad, try hyper-specific\n\nCRITICAL OUTPUT RULES:\n- Return ONLY valid JSON — no markdown, no commentary\n- The new version must feel like a brand-new idea, not a rewording'},
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.9,
@@ -1137,29 +1230,71 @@ class SuggestCompetitorsView(APIView):
             import openai
             client = openai.OpenAI(api_key=api_key)
 
-            prompt = f"""You are a competitive intelligence analyst. Suggest {count} real competitor companies/brands for this brand.
+            system_prompt = """You are a competitive intelligence researcher with deep knowledge of the global business landscape. You specialize in identifying direct, indirect, and aspirational competitors for brands across industries.
 
-Brand: {brand.brand_name}
+Your suggestions are ALWAYS real, verifiable companies — never fabricated.
+You prioritize companies that have active, monitorable online presences.
+
+CRITICAL: If you are not confident a company exists or cannot verify its handle/URL, do NOT include it. Accuracy is more important than hitting the requested count.
+
+Return ONLY valid JSON — no markdown, no commentary."""
+
+            prompt = f"""<task>
+Suggest real competitor companies for competitive analysis and monitoring.
+</task>
+
+<context>
+Brand: "{brand.brand_name}"
 Industry: {brand.industry}
 Region: {brand.target_region}
-Target Audience: {dna.get('target_audience', 'general')}
-Products/Services: {dna.get('products_services', 'N/A')}
-Brand Values: {', '.join(dna.get('brand_values', [])) if dna.get('brand_values') else 'N/A'}
+</context>
 
-Existing competitors (DO NOT suggest these): {', '.join(existing) if existing else 'None'}
+<existing_competitors>
+Already added (DO NOT suggest): {', '.join(existing) if existing else 'None'}
+</existing_competitors>
 
-Return a JSON object:
-{{"competitors": [{{"name": "Company Name", "platform": "website", "handle_or_url": "https://example.com", "reason": "Brief reason why they are a competitor"}}]}}
+<instructions>
+Think step by step:
 
-Rules:
-- Suggest REAL companies that actually exist
-- Include their actual website URL or social media handle
-- Focus on direct and indirect competitors in the same region/market
-- platform should be one of: website, twitter, linkedin, facebook, instagram"""
+1. IDENTIFY the competitive landscape for "{brand.brand_name}" in {brand.industry} within {brand.target_region}.
+2. CONSIDER three categories:
+   - **Direct competitors** (same product/service, same audience)
+   - **Indirect competitors** (different product, overlapping audience)
+   - **Aspirational competitors** (industry leaders to learn from)
+3. SUGGEST exactly {count} real, verifiable companies.
+4. For each, choose the platform where they are MOST ACTIVE and monitorable.
+5. Provide their actual handle or URL — not a guess.
+
+IMPORTANT: Only suggest companies you are confident are real. If unsure about a handle or URL, use their website URL instead.
+</instructions>
+
+<output_format>
+{{
+  "competitors": [
+    {{
+      "name": "<real company name>",
+      "platform": "<website | twitter | linkedin | facebook | instagram>",
+      "handle_or_url": "<verified URL or @handle>",
+      "reason": "<1-2 sentence explanation of competitive relevance>"
+    }}
+  ]
+}}
+</output_format>
+
+<constraints>
+- ONLY real, existing companies — never fabricate.
+- Platform must be: website, twitter, linkedin, facebook, or instagram.
+- Do NOT duplicate any name in the existing competitors list.
+- If unsure of a social handle, default to the company's website URL.
+- Return valid JSON only.
+</constraints>"""
 
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt},
+                ],
                 temperature=0.3,
                 max_tokens=1500,
                 response_format={'type': 'json_object'},
@@ -1239,34 +1374,67 @@ The existing {len(existing_pillars)} pillars will be rebalanced so ALL pillars t
             else:
                 pct_instruction = f"Percentages must sum to exactly 100."
 
-            prompt = f"""You are a content strategy expert. Generate {count} content pillars for this brand.
+            system_prompt = """You are a content strategy architect who designs balanced content pillar frameworks for social media brands. Your pillars are not vague categories — they are strategic content territories that guide what to create, why, and how it serves the brand's goals.
 
-Brand: {brand.brand_name}
+A great pillar framework:
+- Covers the full content funnel (awareness > consideration > conversion > retention)
+- Balances audience value with business objectives
+- Creates clear, non-overlapping content categories
+- Is specific enough to guide daily content decisions
+- Is flexible enough to accommodate trends and timely content
+
+Return ONLY valid JSON — no markdown, no commentary."""
+
+            prompt = f"""<task>
+Generate a content pillar strategy framework for a brand's social media presence.
+</task>
+
+<context>
+Brand: "{brand.brand_name}"
 Industry: {brand.industry}
-Target Audience: {dna.get('target_audience', 'general')}
-Brand Voice: {dna.get('brand_voice', 'professional')}
-Brand Values: {', '.join(dna.get('brand_values', [])) if dna.get('brand_values') else 'N/A'}
-Products/Services: {dna.get('products_services', 'N/A')}
-
-Competitor Strategies: {'; '.join(insight_texts[:5]) if insight_texts else 'None analyzed yet'}
-Current Trending Topics: {', '.join(trending_texts[:5]) if trending_texts else 'None'}
-
-Existing pillars (DO NOT duplicate these): {', '.join(existing_pillars) if existing_pillars else 'None'}
+Competitor strategies: {'; '.join(insight_texts[:5]) if insight_texts else 'None analyzed yet'}
+Trending topics: {', '.join(trending_texts[:5]) if trending_texts else 'None'}
+Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pillars else 'None'}
 {f'Focus areas to emphasize: {", ".join(focus_areas)}' if focus_areas else ''}
+</context>
 
-Return a JSON object:
-{{"pillars": [{{"name": "Pillar Name", "description": "1-2 sentence description", "target_percentage": 20, "color_code": "#hex"}}]}}
+<instructions>
+1. Analyze the brand's industry, competitors, and trends.
+2. Design exactly {count} content pillars that form a balanced strategy.
+3. For each pillar:
+   a. Name: 2-4 words, specific and descriptive (e.g., "Customer Wins" not "Engagement").
+   b. Description: What types of content fall here AND why it matters strategically.
+   c. Target percentage: What share of total content this pillar should receive.
+   d. Color code: A unique hex color for visual differentiation.
+4. {pct_instruction}
+5. Include a mix of: educational, promotional, community-building, and authority content.
+</instructions>
 
-Rules:
-- {pct_instruction}
-- Each pillar should be distinct and actionable
-- Use vibrant, distinct hex color codes for each pillar
-- Name should be concise (2-4 words)
-- Description should explain what content falls under this pillar"""
+<output_format>
+{{
+  "pillars": [
+    {{
+      "name": "<2-4 word pillar name>",
+      "description": "<what content fits here + strategic purpose>",
+      "target_percentage": <integer>,
+      "color_code": "<#hex>"
+    }}
+  ]
+}}
+</output_format>
+
+<constraints>
+- No pillar should overlap thematically with another.
+- Do NOT duplicate existing pillars listed above.
+- Return valid JSON only.
+</constraints>"""
 
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt},
+                ],
                 temperature=0.5,
                 max_tokens=1500,
                 response_format={'type': 'json_object'},

@@ -30,27 +30,28 @@ def generate_alt_text(image_generation, api_key):
     if image_generation.style:
         context += f"Style: {image_generation.style}"
 
-    prompt = f"""Generate a concise, descriptive alt text for an image.
+    prompt = f"""<task>
+Generate accessible alt text for an image.
+</task>
 
-Context about the image:
+<context>
 {context}
+</context>
 
-Rules:
-- Maximum {MAX_ALT_TEXT_LENGTH} characters
-- Be descriptive but concise
-- Focus on what the image shows, not interpretation
-- Don't start with "Image of" or "Photo of"
-- Include key visual elements, colors, and subjects
-
-Return only the alt text string, nothing else.
-"""
+<rules>
+- Maximum {MAX_ALT_TEXT_LENGTH} characters (strict limit)
+- Start with the most important visual element
+- Be specific: "Woman presenting quarterly sales chart to four colleagues" not "People in a meeting"
+- Include relevant colors, text, or branding only if meaningful
+- Return ONLY the alt text string — no quotes, no labels
+</rules>"""
 
     try:
         client = openai.OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You generate concise image alt text for accessibility."},
+                {"role": "system", "content": "You are a web accessibility specialist who writes alt text that meets WCAG 2.1 guidelines. Your alt text is concise, descriptive, and useful for screen reader users who cannot see the image.\n\nYour alt text:\n- Describes the CONTENT and FUNCTION of the image\n- Prioritizes the most important visual information first\n- Uses specific, concrete language\n- Stays under 125 characters\n- Never starts with \"Image of,\" \"Photo of,\" or \"Picture of\"\n- Conveys the same information a sighted user would get from the image"},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,

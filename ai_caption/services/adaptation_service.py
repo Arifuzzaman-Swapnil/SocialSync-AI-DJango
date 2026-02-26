@@ -51,33 +51,56 @@ def adapt_caption(source_caption, target_platform, api_key, brand=None):
     if brand:
         brand_context = f"Brand voice: {brand.voice_tone or 'professional'}"
 
-    prompt = f"""Adapt this caption for {target_platform}.
+    prompt = f"""<context>
+You are adapting an existing caption from one platform to another.
 
-Original caption:
+Target platform: {target_platform}
+Platform character limit: {guidelines['max_chars']}
+Platform tone guidance: {guidelines['tone']}
+Platform-specific notes: {guidelines['notes']}
+Brand context: {brand_context}
+</context>
+
+<source_caption>
 {source_caption.body}
+</source_caption>
 
-Platform guidelines:
-- Max characters: {guidelines['max_chars']}
-- Tone: {guidelines['tone']}
-- Notes: {guidelines['notes']}
-{brand_context}
+<instructions>
+Think step by step:
 
-Rules:
-- Keep the core message intact
-- Adapt tone and length for the platform
-- Stay within character limit
-- If the original has a CTA, adapt it for the platform
+1. READ the source caption and extract:
+   - The core message (1 sentence summary)
+   - The emotional hook
+   - The CTA intent (if any)
+2. REWRITE for {target_platform} from scratch, as if a native user of that platform wrote it:
+   - Adapt tone to match {guidelines['tone']}
+   - Restructure for platform reading patterns (e.g., LinkedIn's "see more" fold, Instagram's 125-char preview, Twitter's character constraint)
+   - Apply platform-specific engagement mechanics (questions for Facebook, hot takes for Twitter, storytelling for LinkedIn)
+3. VERIFY the final caption is within {guidelines['max_chars']} characters.
+</instructions>
 
-Return JSON:
-{{"adapted_body": "...", "cta_text": "..."}}
-"""
+<output_format>
+Return ONLY this JSON structure:
+{{
+  "adapted_body": "<adapted caption text>",
+  "cta_text": "<adapted CTA or empty string>"
+}}
+</output_format>
+
+<constraints>
+- STRICTLY stay within {guidelines['max_chars']} characters — count carefully.
+- Do NOT simply truncate or pad the original — fully reimagine it.
+- Preserve the core message and intent.
+- No generic filler phrases.
+- Return valid JSON only.
+</constraints>"""
 
     try:
         client = openai.OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a social media copywriter. Return only valid JSON."},
+                {"role": "system", "content": "You are a platform-native social media strategist who specializes in cross-platform content adaptation. You understand that each platform has its own culture, algorithm preferences, and audience behavior patterns.\n\nYour expertise:\n- Twitter/X: Punchy, conversational, opinion-driven. Max 280 chars. Threads for depth. Power of brevity and hot takes. Algorithm favors replies and quotes.\n- LinkedIn: Professional thought leadership. First line is everything (it appears before \"see more\"). Story-driven, insight-led. 1300-1700 chars optimal. Algorithm favors comments and dwell time.\n- Facebook: Conversational, community-oriented. Questions drive engagement. Longer posts (400-800 chars) perform well. Algorithm favors meaningful interactions.\n- Instagram: Visual-first but caption matters. Hook in first 125 chars (before truncation). Emojis, line breaks for readability. Hashtag strategy. 2200 char max. Algorithm favors saves and shares.\n- TikTok: Ultra-casual, trend-aware, Gen-Z native language. Short hooks. 150 chars max recommended for overlay. Algorithm favors watch time.\n\nYour job is to translate the SOUL of a caption for a new platform — not just shorten or lengthen it. Rewrite it as if a native user of that platform wrote it from scratch.\n\nCRITICAL OUTPUT RULES:\n- Return ONLY valid JSON\n- Do NOT include explanations, notes, or markdown\n- Stay within character limits — this is non-negotiable"},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,

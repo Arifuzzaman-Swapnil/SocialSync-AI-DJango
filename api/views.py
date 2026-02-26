@@ -168,24 +168,35 @@ class RegisterWithBrandView(APIView):
                     if page_data.get('success'):
                         client = openai.OpenAI(api_key=server_key)
                         existing_dna = json.dumps(brand.brand_dna, indent=2)
-                        prompt = f"""Enhance this existing Brand DNA using the website content below.
-Keep all existing values but fill in gaps and improve descriptions.
+                        prompt = f"""<task>
+Enhance the existing Brand DNA using website content. Keep ALL existing values but fill gaps and enrich thin descriptions with evidence from the website.
+</task>
 
-EXISTING DNA:
+<existing_dna>
 {existing_dna}
+</existing_dna>
 
-WEBSITE: {brand.website_url}
-TITLE: {page_data.get('title', '')}
-CONTENT:
-{page_data.get('content', '')}
+<website_data>
+URL: {brand.website_url}
+Content: {page_data.get('content', '')}
+</website_data>
 
-Return the enhanced Brand DNA as a single JSON object with the same 15 fields.
-Only return valid JSON, no other text."""
+<instructions>
+For each of the 15 fields:
+1. If the field has a strong value, keep it exactly as-is.
+2. If the field has a thin/generic value, enrich it with website evidence while preserving the original intent.
+3. If the field is empty, fill it using website content.
+4. Return all 15 fields in the output.
+</instructions>
+
+<output_format>
+Return ONLY a single JSON object with all 15 Brand DNA fields.
+</output_format>"""
 
                         resp = client.chat.completions.create(
                             model='gpt-4o-mini',
                             messages=[
-                                {'role': 'system', 'content': 'You are a brand strategist. Enhance the brand DNA using website data. Return only valid JSON.'},
+                                {'role': 'system', 'content': 'You are a brand strategist specializing in enriching brand identity profiles. Your task is to enhance an existing Brand DNA by cross-referencing it with fresh website data — filling gaps, adding specificity, and improving strategic usefulness WITHOUT overwriting the user\'s original input.\n\nPrinciples:\n- User-provided values are sacred — enhance, never replace\n- Empty fields are opportunities — fill them with evidence-based content\n- Thin descriptions should be enriched with specifics from the website\n- The enhanced DNA should be immediately useful for content creation\n\nReturn ONLY valid JSON — no markdown, no commentary.'},
                                 {'role': 'user', 'content': prompt},
                             ],
                             temperature=0.3,
@@ -2916,39 +2927,58 @@ class GenerateBrandDNAView(APIView):
 
             client = openai.OpenAI(api_key=api_key)
 
-            prompt = f"""Analyze this website and extract a complete Brand DNA profile.
+            prompt = f"""<task>
+Analyze the website content and extract a complete 15-field Brand DNA profile.
+</task>
 
-WEBSITE: {url}
-TITLE: {page_data['title']}
-DESCRIPTION: {page_data['description']}
+<website_data>
+URL: {url}
+Page title: {page_data['title']}
+Page content: {page_data['content']}
+</website_data>
 
-PAGE CONTENT:
-{page_data['content']}
+<instructions>
+Think step by step:
 
-Extract a Brand DNA with these sections (be specific, use actual details from the page):
+1. READ the website content thoroughly — scan for messaging, positioning, offers, audience signals, and brand personality cues.
+2. EXTRACT information for all 15 Brand DNA fields:
 
-1. brand_name: The brand's name
-2. tagline: Their tagline or slogan (if visible)
-3. industry: Their industry/niche
-4. description: What the brand does in 2-3 sentences
-5. products_services: List of main products or services offered (array of strings)
-6. target_audience: Who their target customers are
-7. unique_selling_points: What makes them different (array of strings, max 5)
-8. brand_voice: Their communication tone/style (e.g., professional, casual, bold, friendly)
-9. brand_values: Core values (array of strings, max 5)
-10. color_theme: Dominant colors observed (array of strings)
-11. content_themes: Main content topics/themes they focus on (array of strings)
-12. cta_style: How they write calls-to-action
-13. social_platforms: Any social media platforms mentioned (array of strings)
-14. keywords: Key SEO/marketing terms used (array of strings, max 10)
-15. competitor_positioning: How they position themselves vs competitors
+   | # | Field | What to extract |
+   |---|-------|-----------------|
+   | 1 | brand_name | Official brand name as displayed |
+   | 2 | tagline | Primary tagline or slogan |
+   | 3 | industry | Industry vertical and sub-category |
+   | 4 | description | 2-3 sentence brand description |
+   | 5 | products_services | Specific offerings listed |
+   | 6 | target_audience | Who the brand is speaking to (demographics + psychographics) |
+   | 7 | unique_selling_points | 3-5 specific differentiators |
+   | 8 | brand_voice | Detailed voice description (not just "professional") |
+   | 9 | brand_values | Core values demonstrated through content |
+   | 10 | color_theme | Dominant colors observed on the site |
+   | 11 | content_themes | Recurring topics and themes in the content |
+   | 12 | cta_style | How the brand asks for action (aggressive, soft, value-led, etc.) |
+   | 13 | social_platforms | Any social media links or mentions found |
+   | 14 | keywords | 10-15 high-relevance keywords for content creation |
+   | 15 | competitor_positioning | How the brand positions itself vs. alternatives |
 
-Return as a single JSON object. Only return valid JSON, no other text."""
+3. For any field not directly stated, make a reasonable inference based on the content and note it in your description.
+</instructions>
+
+<output_format>
+Return ONLY a single JSON object with all 15 fields as keys.
+</output_format>
+
+<constraints>
+- All 15 fields are required — leave none empty.
+- Be specific and detailed — generic answers reduce strategic value.
+- Base everything on actual page content.
+- Return valid JSON only.
+</constraints>"""
 
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
                 messages=[
-                    {'role': 'system', 'content': 'You are a brand strategist. Analyze the website content and extract detailed brand DNA. Return only valid JSON.'},
+                    {'role': 'system', 'content': 'You are a senior brand strategist who extracts comprehensive brand identity profiles from website content. You combine analytical precision with strategic intuition to build Brand DNA profiles that power content creation.\n\nYour approach:\n- You read website copy the way a strategist reads — looking for positioning, messaging hierarchy, value propositions, and audience signals\n- You distinguish between what a brand SAYS and what it MEANS\n- You extract implicit signals (tone of voice from writing style, target audience from language choices, values from what they emphasize)\n- You are specific and detailed — "professional" is not a useful brand voice description; "authoritative but approachable, uses industry jargon sparingly, favors short sentences and active voice" IS\n\nCRITICAL: Base ALL analysis on the actual page content provided. Clearly distinguish between directly stated facts and reasonable inferences.\n\nReturn ONLY valid JSON — no markdown, no commentary.'},
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.3,
@@ -3092,20 +3122,29 @@ class RegenerateBrandDNAFromInputsView(APIView):
                 )
             try:
                 client = openai.OpenAI(api_key=api_key)
-                prompt = f"""Enhance and fill in gaps for this Brand DNA profile.
-Keep user-provided values but make descriptions richer and more specific.
-Fill in any empty fields with reasonable defaults based on the other information.
+                prompt = f"""<task>
+Enhance and complete this Brand DNA profile. Keep user-provided values but make them richer, more specific, and fill any empty fields with reasonable defaults.
+</task>
 
-CURRENT DNA:
+<current_dna>
 {json.dumps(dna_data, indent=2)}
+</current_dna>
 
-Return the enhanced Brand DNA as a single JSON object with the same 15 fields.
-Only return valid JSON, no other text."""
+<instructions>
+For each of the 15 fields:
+1. If populated: Enhance specificity and strategic usefulness while preserving intent.
+2. If empty: Infer a reasonable value from the other fields. For example, if industry is "SaaS" and audience is "small businesses," brand_voice might reasonably be "approachable, clear, jargon-light, solution-focused."
+3. Ensure all fields are internally consistent with each other.
+</instructions>
+
+<output_format>
+Return ONLY a single JSON object with all 15 Brand DNA fields.
+</output_format>"""
 
                 resp = client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=[
-                        {'role': 'system', 'content': 'You are a brand strategist. Enhance the brand DNA. Return only valid JSON.'},
+                        {'role': 'system', 'content': 'You are a brand strategist who polishes and completes Brand DNA profiles. You take user-provided brand information and make it richer, more specific, and more strategically actionable — while always preserving the user\'s original intent and voice.\n\nYour enhancements:\n- Transform vague descriptions into specific, usable strategic language\n- Fill empty fields with reasonable defaults inferred from filled fields\n- Ensure internal consistency (voice should match values, audience should match positioning)\n- Make every field useful for a content creator or social media manager\n\nReturn ONLY valid JSON — no markdown, no commentary.'},
                         {'role': 'user', 'content': prompt},
                     ],
                     temperature=0.3,

@@ -552,15 +552,15 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           {/* Edit Bar */}
           <div className="flex items-center justify-between bg-dark-700/50 border border-white/10 rounded-lg px-4 py-3">
-            <p className="text-sm text-text-secondary">Click any section to edit, or use the edit button</p>
+            <p className="text-sm text-text-secondary">Click the edit icon or button to modify your Brand DNA</p>
             <button onClick={enterEditMode} className="btn-primary flex items-center gap-2 px-5 py-2">
               <PencilIcon className="w-4 h-4" /> Edit Brand DNA
             </button>
           </div>
 
           {/* Brand Identity Card */}
-          <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={enterEditMode}>
-            <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <PencilIcon className="w-4 h-4 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+          <div className="card p-6 transition-all">
+            <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-4 h-4" /></button></h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {dnaData.brand_name && (<div><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Brand Name</label><p className="text-sm mt-1">{dnaData.brand_name}</p></div>)}
               {dnaData.tagline && (<div><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">Tagline</label><p className="text-sm mt-1 italic">"{dnaData.tagline}"</p></div>)}
@@ -575,39 +575,39 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
 
           {/* Products & Services */}
           {dnaData.products_services?.length > 0 && (
-            <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={enterEditMode}>
-              <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+            <div className="card p-6 transition-all">
+              <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h3>
               <div className="flex flex-wrap gap-2">{dnaData.products_services.map((item: string, idx: number) => (<span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm">{item}</span>))}</div>
             </div>
           )}
 
           {/* USP + Values + Content Themes */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={enterEditMode}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {dnaData.unique_selling_points?.length > 0 && (
-              <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">USPs <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+              <div className="card p-5 transition-all">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">USPs <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                 <ul className="space-y-2">{dnaData.unique_selling_points.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-green-400 mt-0.5">&#10003;</span> {item}</li>))}</ul>
               </div>
             )}
             {dnaData.brand_values?.length > 0 && (
-              <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+              <div className="card p-5 transition-all">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                 <ul className="space-y-2">{dnaData.brand_values.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-primary-400 mt-0.5">&#9679;</span> {item}</li>))}</ul>
               </div>
             )}
             {dnaData.content_themes?.length > 0 && (
-              <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+              <div className="card p-5 transition-all">
+                <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                 <ul className="space-y-2">{dnaData.content_themes.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-yellow-400 mt-0.5">&#9733;</span> {item}</li>))}</ul>
               </div>
             )}
           </div>
 
           {/* Keywords + Colors + Social */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={enterEditMode}>
-            {dnaData.keywords?.length > 0 && (<div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Keywords</h4><div className="flex flex-wrap gap-1.5">{dnaData.keywords.map((kw: string, idx: number) => (<span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>))}</div></div>)}
-            {dnaData.color_theme?.length > 0 && (<div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Color Theme</h4><div className="flex flex-wrap gap-2">{dnaData.color_theme.map((c: string, idx: number) => (<span key={idx} className="flex items-center gap-1.5 text-sm"><span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c.toLowerCase() }} />{c}</span>))}</div></div>)}
-            {dnaData.social_platforms?.length > 0 && (<div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary">Social Platforms</h4><div className="flex flex-wrap gap-2">{dnaData.social_platforms.map((p: string, idx: number) => (<span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>))}</div></div>)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {dnaData.keywords?.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Keywords <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-1.5">{dnaData.keywords.map((kw: string, idx: number) => (<span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>))}</div></div>)}
+            {dnaData.color_theme?.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Color Theme <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-2">{dnaData.color_theme.map((c: string, idx: number) => (<span key={idx} className="flex items-center gap-1.5 text-sm"><span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c.toLowerCase() }} />{c}</span>))}</div></div>)}
+            {dnaData.social_platforms?.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Social Platforms <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-2">{dnaData.social_platforms.map((p: string, idx: number) => (<span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>))}</div></div>)}
           </div>
 
           {/* Custom Fields */}
@@ -615,8 +615,8 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
             const extras = Object.entries(dnaData).filter(([k]) => !BUILTIN_KEYS.has(k) && dnaData[k] != null && dnaData[k] !== '');
             if (!extras.length) return null;
             return (
-              <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={enterEditMode}>
-                <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-text-secondary flex items-center justify-between">Custom Fields <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+              <div className="card p-6 transition-all">
+                <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-text-secondary flex items-center justify-between">Custom Fields <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {extras.map(([key, val]) => (<div key={key}><label className="text-xs font-medium text-text-secondary uppercase tracking-wide">{key.replace(/_/g, ' ')}</label>
                     {Array.isArray(val) ? (<div className="flex flex-wrap gap-1.5 mt-1">{val.map((v: string, i: number) => (<span key={i} className="bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded text-xs">{v}</span>))}</div>) : (<p className="text-sm mt-1">{String(val)}</p>)}
@@ -1469,9 +1469,34 @@ function CaptionsStep() {
       : 'an engaging social media post';
     const platform = idea?.platform || 'instagram';
 
-    const baseInstructions = `Write a ready-to-post social media caption for ${platform}. The caption must be engaging, scroll-stopping, and ready to copy-paste and post directly. Do NOT mention any idea number, internal ID, or the word "idea". Do NOT include any reference numbers. Variant {VAR} of 3 — each must use a completely different creative angle.`;
+    const baseInstructions = `<task>
+Write a ready-to-post social media caption for ${platform}.
+</task>
+
+<requirements>
+- This is variant {VAR} of 3.
+- Each variant MUST use a completely different creative approach:
+  * Variant 1: Lead with a QUESTION or CURIOSITY GAP hook
+  * Variant 2: Lead with a BOLD STATEMENT or CONTRARIAN take
+  * Variant 3: Lead with a MICRO-STORY or PERSONAL angle
+- The caption must be immediately copy-paste-ready.
+- Do NOT mention any idea number, internal ID, or the word "idea."
+</requirements>
+
+<parameters>
+Tone: enthusiastic
+Length: medium (40-80 words)
+Include hashtags: true (3-5 relevant hashtags at the end)
+Include emojis: true (2-3, placed naturally)
+Include CTA: true (clear, specific action)
+</parameters>
+
+<output_rules>
+- Output the caption ONLY — no labels, no preamble, no explanation.
+- Must be immediately ready to paste into ${platform}.
+</output_rules>`;
     const extraInstructions = customInstructions
-      ? `\n\nUSER INSTRUCTIONS (must follow): ${customInstructions}`
+      ? `\n\n<user_instructions>\n${customInstructions}\n</user_instructions>`
       : '';
 
     const variants: CaptionVariant[] = [];
@@ -1854,8 +1879,9 @@ function MediaStep() {
       setRefinedPrompts((p) => ({ ...p, [captionId]: finalPrompt }));
       setRefiningMap((p) => ({ ...p, [captionId]: false }));
 
-      // Step 2: Generate image
-      const result = await imageService.generate({ prompt: finalPrompt, style, enhance_prompt: true });
+      // Step 2: Generate image with enhanced prompt structure
+      const enhancedImagePrompt = `Create a professional social media content image based on this description: ${finalPrompt}\n\nRequirements:\n- Clean, brand-appropriate composition suitable for marketing\n- High visual quality with professional lighting\n- Clear focal point and intentional negative space\n- Style: ${style}\n- No text or watermarks in the image\n\nEnhance this prompt with specific details about composition, lighting direction, color palette, and depth of field to produce the highest quality result.`;
+      const result = await imageService.generate({ prompt: enhancedImagePrompt, style, enhance_prompt: true });
       const rawUrl = result.generated_image || result.generated_image_with_logo || null;
       const imageUrl = toMediaUrl(rawUrl);
       overflow.setCaptionMedia(captionId, imageUrl, result.id || null);

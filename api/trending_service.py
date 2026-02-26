@@ -290,41 +290,70 @@ def generate_trending_for_brand(brand_id, user):
 
         trend_list = json.dumps([t['topic'] for t in all_trends], indent=2) if all_trends else 'No Google Trends data available'
 
-        prompt = f"""You are a social media trend analyst. Today's date is {today_str}.
+        system_prompt = """You are a real-time social media trend analyst who identifies timely, relevant content opportunities at the intersection of cultural moments and brand relevance.
 
-Given a brand's context, the CURRENT seasonal/cultural moment, and Google Trends data, generate the TOP 15 most relevant trending topics for this brand's content strategy RIGHT NOW.
+Your trending topics are not generic industry keywords — they are specific, timely conversation hooks that a content creator can act on THIS WEEK.
 
-═══ BRAND CONTEXT ═══
-Brand: {brand.brand_name}
+You prioritize:
+- Specificity over breadth ("Ramadan marketing for SaaS" over "Ramadan")
+- Timeliness — topics that are peaking or about to peak
+- Brand relevance — every topic must connect to the brand's audience
+- Actionability — each topic should clearly suggest content to create
+
+Return ONLY valid JSON — no markdown, no commentary."""
+
+        prompt = f"""<context>
+Today's date: {today_str}
+Brand: "{brand.brand_name}"
 Industry: {brand.industry}
-Target Region: {brand.target_region or 'Global'}
-Target Audience: {dna.get('target_audience', 'general')}
-Brand Voice: {dna.get('brand_voice', 'professional')}
-Content Pillars: {', '.join(pillar_names) if pillar_names else 'Not set'}
-Brand Values: {', '.join(dna.get('brand_values', [])[:5]) if dna.get('brand_values') else 'Not set'}
-Competitor Strategies: {'; '.join(insight_texts[:5]) if insight_texts else 'None analyzed yet'}
+Region: {brand.target_region or 'Global'}
+</context>
 
-═══ CURRENT SEASONAL & CULTURAL CONTEXT ({today_str}) ═══
-{seasonal_text}
-
-═══ GOOGLE TRENDS DATA ═══
-{trend_list}
+<data_sources>
+Seasonal/cultural context: {seasonal_text}
+Google Trends data: {trend_list}
+</data_sources>
 {feedback_context}
 
-═══ INSTRUCTIONS ═══
-Generate exactly 15 trending topics. Your response MUST include:
-- At least 4-5 topics tied to the CURRENT seasonal/cultural events listed above (Ramadan content, Eid prep, seasonal campaigns, etc.) — these should be the highest-scored topics
-- The remaining topics should be industry-specific trends, viral social media themes, or Google Trends-based topics relevant to the brand
-- Each topic should be specific and actionable for social media content (not generic like "post more")
-- volume_score should reflect CURRENT relevance: seasonal/active events = 80-95, industry trends = 50-80, evergreen = 30-50
-- category should classify the topic: "seasonal", "cultural", "industry", "viral", "evergreen"
+<instructions>
+1. Cross-reference the date, region, industry, seasonal events, and Google Trends.
+2. Generate exactly 15 trending topics relevant to "{brand.brand_name}".
+3. Include AT LEAST 4-5 topics tied to current seasonal or cultural events in {brand.target_region or 'Global'}.
+4. For each topic:
+   a. Write a specific, actionable topic title (not just a keyword)
+   b. Assign a volume score (0-100) — distribute realistically across the range
+   c. Explain WHY this topic is relevant to the brand right now
+   d. Classify into a category
+5. Order by volume_score descending.
+</instructions>
 
-Return a JSON object:
-{{"topics": [{{"topic": "specific topic name", "volume_score": 0-100, "relevance_explanation": "1-sentence why this matters NOW for the brand", "platform": "google", "category": "seasonal|cultural|industry|viral|evergreen"}}]}}"""
+<output_format>
+{{
+  "topics": [
+    {{
+      "topic": "<specific trending topic title>",
+      "volume_score": <0-100>,
+      "relevance_explanation": "<why this matters for the brand right now>",
+      "category": "<seasonal | cultural | industry | viral | evergreen>"
+    }}
+  ]
+}}
+</output_format>
+
+<constraints>
+- Exactly 15 topics.
+- At least 4-5 seasonal/cultural.
+- Volume scores should be realistic — not all 85+.
+- Topics must be specific enough to create content about this week.
+- Return valid JSON only.
+</constraints>"""
 
         response = client.chat.completions.create(
             model='gpt-4o-mini',
-            messages=[{'role': 'user', 'content': prompt}],
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': prompt},
+            ],
             temperature=0.7,
             max_tokens=2500,
             response_format={'type': 'json_object'},

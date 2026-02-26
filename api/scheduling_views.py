@@ -247,34 +247,68 @@ class ComputeRecommendedTimesView(APIView):
             import json
             client = openai.OpenAI(api_key=api_key)
 
-            prompt = f"""You are a social media scheduling analyst. Analyze competitor data and recommend optimal posting times.
+            system_prompt = """You are a social media scheduling analyst who optimizes posting times based on competitive intelligence, audience behavior patterns, and platform algorithm insights.
 
-Brand: {brand.brand_name}
+You understand:
+- Platform-specific peak engagement windows vary by industry and region
+- Day-of-week patterns (B2B peaks mid-week, B2C peaks weekends)
+- Time zone considerations for target regions
+- Competitive timing strategies (posting before or after competitor peaks)
+- Algorithm freshness signals and feed ranking timing
+
+Your recommendations are data-informed, not generic "post at 9am" advice. Each recommendation includes a specific, evidence-based reason.
+
+Return ONLY valid JSON — no markdown, no commentary."""
+
+            prompt = f"""<context>
+Brand: "{brand.brand_name}"
 Industry: {brand.industry}
 Region: {brand.target_region}
-{f'Target platforms: {", ".join(platforms_filter)}' if platforms_filter else 'Target platforms: twitter, linkedin, facebook, instagram'}
+</context>
 
-Competitor Insights:
+<competitor_data>
 {chr(10).join(insight_texts[:15]) if insight_texts else 'No competitor data yet — use industry best practices instead.'}
+</competitor_data>
 
-Recommend the top 3-5 optimal posting time slots PER platform. Consider:
-- When competitors are most active/successful
-- Industry-standard best times for the region
-- Different content types may need different times
+<instructions>
+1. Analyze competitor posting patterns and engagement signals in the data.
+2. Factor in {brand.target_region} time zones and audience behavior for {brand.industry}.
+3. Recommend 3-5 optimal posting slots PER platform.
+4. For each slot:
+   a. Specify platform, day of week, and hour (UTC).
+   b. Assign a confidence score (0.0-1.0) — be honest, not all slots are 0.9+.
+   c. Provide a specific reason tied to data or industry patterns.
+5. Order by score descending within each platform.
+</instructions>
 
-Return a JSON object:
-{{"recommendations": [{{"platform": "twitter", "day_of_week": 0, "hour_utc": 14, "score": 0.85, "reason": "Brief reason"}}]}}
+<output_format>
+{{
+  "recommendations": [
+    {{
+      "platform": "<platform>",
+      "day_of_week": <0-6>,
+      "hour_utc": <0-23>,
+      "score": <0.0-1.0>,
+      "reason": "<specific reason>"
+    }}
+  ]
+}}
+</output_format>
 
-Rules:
-- day_of_week: 0=Monday, 6=Sunday
-- hour_utc: 0-23 (UTC time)
-- score: 0.0-1.0 (confidence)
-- Include 3-5 slots per platform
-- Order by score descending"""
+<constraints>
+- day_of_week: 0=Monday through 6=Sunday.
+- hour_utc: 0-23, 24-hour UTC format.
+- score: 0.0-1.0 (distribute realistically).
+- Order by score descending.
+- Return valid JSON only.
+</constraints>"""
 
             response = client.chat.completions.create(
                 model='gpt-4o-mini',
-                messages=[{'role': 'user', 'content': prompt}],
+                messages=[
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': prompt},
+                ],
                 temperature=0.3,
                 max_tokens=2000,
                 response_format={'type': 'json_object'},

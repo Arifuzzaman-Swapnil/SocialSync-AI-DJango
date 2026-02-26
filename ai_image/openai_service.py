@@ -76,26 +76,19 @@ class OpenAIImageService:
     
     def enhance_prompt(self, prompt, style='realistic', lighting=None, camera_angle=None):
         """Enhance user prompt with style and technical details"""
-        enhanced_parts = [prompt]
-        
-        # Add style
-        style_addition = self._get_style_prompt(style)
-        if style_addition:
-            enhanced_parts.append(style_addition)
-        
-        # Add lighting
-        if lighting:
-            lighting_addition = self._get_lighting_prompt(lighting)
-            if lighting_addition:
-                enhanced_parts.append(lighting_addition)
-        
-        # Add camera angle
-        if camera_angle:
-            camera_addition = self._get_camera_prompt(camera_angle)
-            if camera_addition:
-                enhanced_parts.append(camera_addition)
-        
-        return ". ".join(filter(None, enhanced_parts))
+        style_addition = self._get_style_prompt(style) or ''
+        lighting_addition = self._get_lighting_prompt(lighting) if lighting else ''
+        camera_addition = self._get_camera_prompt(camera_angle) if camera_angle else ''
+
+        enhanced = f"""{prompt}.
+
+Visual style: {style_addition}.
+{f'Lighting: {lighting_addition}.' if lighting_addition else ''}
+{f'Camera angle: {camera_addition}.' if camera_addition else ''}
+
+Additional quality guidance: Ensure the image has a clear focal point, professional composition, and consistent lighting throughout. The overall mood should be cohesive and intentional."""
+
+        return enhanced
     
     def _get_valid_size(self, size, model='dall-e-3'):
         """Get valid size for DALL-E model"""
@@ -151,7 +144,7 @@ class OpenAIImageService:
             
             # Add negative prompt as "avoid" instruction
             if negative_prompt:
-                final_prompt += f". Avoid: {negative_prompt}"
+                final_prompt += f"\nAvoid including: {negative_prompt}"
             
             # Get valid size for model
             valid_size = self._get_valid_size(size, model)

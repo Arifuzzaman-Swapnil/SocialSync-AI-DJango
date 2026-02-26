@@ -75,26 +75,19 @@ class GeminiVideoService:
     
     def enhance_prompt(self, prompt, style='realistic', camera_motion=None, motion_intensity=None):
         """Enhance user prompt with style and technical details"""
-        enhanced_parts = [prompt]
-        
-        # Add style
-        style_addition = self._get_style_prompt(style)
-        if style_addition:
-            enhanced_parts.append(style_addition)
-        
-        # Add camera motion
-        if camera_motion:
-            motion_addition = self._get_camera_motion_prompt(camera_motion)
-            if motion_addition:
-                enhanced_parts.append(motion_addition)
-        
-        # Add motion intensity
-        if motion_intensity:
-            intensity_addition = self._get_motion_intensity_prompt(motion_intensity)
-            if intensity_addition:
-                enhanced_parts.append(intensity_addition)
-        
-        return ". ".join(filter(None, enhanced_parts))
+        style_addition = self._get_style_prompt(style) or ''
+        motion_addition = self._get_camera_motion_prompt(camera_motion) if camera_motion else ''
+        intensity_addition = self._get_motion_intensity_prompt(motion_intensity) if motion_intensity else ''
+
+        enhanced = f"""{prompt}.
+
+Visual style: {style_addition}.
+{f'Camera movement: {motion_addition}.' if motion_addition else ''}
+{f'Motion intensity: {intensity_addition}.' if intensity_addition else ''}
+
+Additional guidance: Ensure smooth transitions, consistent lighting throughout the sequence, and natural motion that serves the narrative. The video should feel intentional and professionally directed, not randomly generated."""
+
+        return enhanced
     
     def generate_video(self, prompt, style='realistic', duration=5, resolution='1080p',
                        aspect_ratio='16:9', fps=30, negative_prompt=None,

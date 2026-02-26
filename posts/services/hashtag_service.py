@@ -49,31 +49,61 @@ def generate_hashtags(post, platform, api_key, count=None, topic=None):
     if post.pillar:
         brand_context += f", Content Pillar: {post.pillar.name}"
 
-    prompt = f"""Generate exactly {count} hashtags for a {platform} post.
+    high_count = int(count * 0.3)
+    mid_count = int(count * 0.4)
+    niche_count = count - high_count - mid_count
 
-Context:
-{brand_context}
+    prompt = f"""<task>
+Generate exactly {count} hashtags for a {platform} post using a 3-tier volume distribution strategy.
+</task>
+
+<context>
+Brand: {brand_context}
 Caption: {caption_text[:500]}
 {f'Topic: {topic}' if topic else ''}
+</context>
 
-Rules:
-- Return hashtags WITHOUT the # symbol
-- Organize into three tiers:
-  * high_volume ({int(count * 0.3)} tags): Popular, broad reach hashtags (100k+ posts)
-  * mid_volume ({int(count * 0.4)} tags): Moderately popular, relevant hashtags (10k-100k posts)
-  * niche ({count - int(count * 0.3) - int(count * 0.4)} tags): Specific, low-competition hashtags (<10k posts)
-- Banned hashtags to EXCLUDE: {', '.join(banned_tags) if banned_tags else 'none'}
+<tier_distribution>
+| Tier | Count | Volume Target |
+|------|-------|---------------|
+| high_volume | {high_count} | 100k+ posts |
+| mid_volume | {mid_count} | 10k-100k posts |
+| niche | {niche_count} | <10k posts |
+</tier_distribution>
 
-Return JSON format:
-{{"hashtags": [{{"tag": "hashtagname", "tier": "high_volume|mid_volume|niche", "estimated_volume": 50000}}]}}
-"""
+<instructions>
+1. Analyze the caption and topic for key themes, keywords, and audience signals.
+2. Generate hashtags that are directly relevant to the content.
+3. Distribute across tiers as specified.
+4. Return WITHOUT the # symbol.
+</instructions>
+
+<output_format>
+{{
+  "hashtags": [
+    {{
+      "tag": "<hashtag without #>",
+      "tier": "<high_volume | mid_volume | niche>",
+      "estimated_volume": <number>
+    }}
+  ]
+}}
+</output_format>
+
+<constraints>
+- Exactly {count} hashtags total.
+- No # symbol in tag values.
+- EXCLUDE these banned hashtags: {', '.join(banned_tags) if banned_tags else 'none'}
+- Platform limits: instagram=20, linkedin=5, twitter=3, facebook=3.
+- Return valid JSON only.
+</constraints>"""
 
     try:
         client = openai.OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a social media hashtag expert. Return only valid JSON."},
+                {"role": "system", "content": "You are a social media growth strategist who engineers hashtag strategies for maximum discoverability. You understand that hashtag strategy is not just about relevance — it's about strategic placement across volume tiers to balance reach (high-volume) with discoverability (niche).\n\nYour approach:\n- High-volume tags (100k+ posts): Cast a wide net, ride popular conversations\n- Mid-volume tags (10k-100k): Sweet spot for appearing in top posts\n- Niche tags (<10k): Low competition, high chance of ranking at top\n\nYou never suggest banned, spam-flagged, or irrelevant hashtags.\n\nReturn ONLY valid JSON — no markdown, no commentary."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,

@@ -95,32 +95,88 @@ class GenerateCaptionsView(APIView):
                 brand_context += f", Voice: {post.brand.voice_tone}"
         pillar_context = f", Content Pillar: {post.pillar.name}" if post.pillar else ''
 
-        prompt = f"""Generate {count} unique social media caption variants.
+        original_text = (post.caption or post.hook or 'No caption provided')[:500]
 
-Context:
-{brand_context}{pillar_context}
-Original text: {(post.caption or post.hook or 'No caption provided')[:500]}
+        prompt = f"""<context>
+You are generating caption variants for a social media draft post. Each variant must also include a DALL-E 3 image prompt that visually complements the caption.
+
+Brand context: {brand_context}{pillar_context}
+Original text: {original_text}
 {f'Hook/angle: {post.hook}' if post.hook else ''}
 {f'Goal: {post.goal}' if post.goal else ''}
-Tone: {tone}
-{'Include a clear call-to-action in each variant.' if include_cta else ''}
+Requested tone: {tone}
+Include CTA: {include_cta}
+</context>
 
-Rules:
-- Each variant must be meaningfully different (different hook, structure, or angle)
-- Match the requested tone
-- Make them engaging and platform-appropriate
-- For each caption, also generate a concise image prompt for DALL-E 3 that would create a perfect visual to accompany the caption
+<instructions>
+Think step by step:
 
-Return JSON:
-{{"captions": [{{"body": "...", "cta_text": "...", "image_prompt": "A concise DALL-E 3 image prompt..."}}]}}
-"""
+1. ANALYZE the original text and brand context to identify the core message, target audience, and emotional angle.
+2. PLAN {count} distinctly different approaches. For each variant, choose a DIFFERENT combination from these dimensions:
+   - Hook type: question | bold claim | statistic | micro-story | curiosity gap | pattern interrupt
+   - Structure: linear narrative | problem-solve | listicle | testimonial-style | before-after | open loop
+   - Persuasion lever: social proof | urgency | aspiration | empathy | authority | FOMO
+3. WRITE each caption variant ensuring:
+   a. The opening line (first 125 characters) is a scroll-stopper — this is the most critical part. It must earn the reader's next second.
+   b. Tone matches "{tone}" throughout.
+   c. Content is platform-appropriate and uses natural, human language.
+   d. No AI-sounding phrases: avoid "In today's world," "Unlock your potential," "Game-changer," "Dive in," "Elevate," "Leverage," "Seamlessly."
+4. If {include_cta} is true, embed a clear, specific call-to-action that tells the reader exactly what to do next.
+5. For each caption, generate a DALL-E 3 image prompt that:
+   - Describes the subject, setting, composition, and mood in vivid detail
+   - Specifies an art style (photography, illustration, flat design, etc.)
+   - Includes lighting direction (golden hour, studio, dramatic, soft)
+   - Mentions camera angle or framing (close-up, wide, overhead, eye-level)
+   - Stays under 80 words
+</instructions>
+
+<output_format>
+Return ONLY this JSON structure — no additional text:
+{{
+  "captions": [
+    {{
+      "body": "<full caption text>",
+      "cta_text": "<call-to-action text or empty string>",
+      "image_prompt": "<detailed DALL-E 3 image prompt>"
+    }}
+  ]
+}}
+</output_format>
+
+<constraints>
+- Each variant MUST use a different hook type and persuasion lever — not just synonym swaps or structural rearrangements.
+- Do NOT start two captions with the same word or sentence structure.
+- Do NOT use hashtags unless explicitly part of the instructions.
+- Image prompts must be specific enough to produce a unique, high-quality visual.
+- Return valid JSON only. No markdown fences, no explanation.
+</constraints>
+
+<example>
+Input: Brand sells eco-friendly water bottles. Tone: casual. Count: 2. CTA: true.
+
+Output:
+{{
+  "captions": [
+    {{
+      "body": "Your plastic bottle is judging you. \\n\\nEvery single-use bottle takes 450 years to decompose. Four hundred and fifty. Meanwhile, our bamboo bottles break down in 3 months — and they look way better on your desk.\\n\\nMake the switch that actually matters.",
+      "cta_text": "Tap the link in bio to grab yours before they sell out",
+      "image_prompt": "Flat lay photograph of a sleek bamboo water bottle surrounded by scattered single-use plastic bottles on a crumpled white backdrop. Natural daylight from the left. The bamboo bottle is centered and in sharp focus while plastic bottles are slightly blurred. Clean, minimalist composition. Editorial product photography style. Muted earth tones with a pop of green."
+    }},
+    {{
+      "body": "I stopped buying plastic water bottles 6 months ago.\\n\\nHere's what changed: I saved $340, kept 180 bottles out of landfills, and honestly? My water tastes better.\\n\\nThe small swaps are the ones that stick.",
+      "cta_text": "Start your swap today — link in bio",
+      "image_prompt": "Close-up lifestyle photograph of a person's hand holding a matte green bamboo water bottle on a sunlit hiking trail. Shallow depth of field with golden hour backlighting creating a warm rim light. Bokeh forest background. Warm, aspirational mood. Shot on 85mm lens, natural photography style."
+    }}
+  ]
+}}
+</example>"""
 
         try:
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are an expert social media copywriter. Return only valid JSON."},
+                    {"role": "system", "content": "You are a world-class social media copywriter and brand strategist specializing in high-engagement, conversion-focused content.\n\nYour task is to generate high-quality social media caption variants that feel authentic, strategic, emotionally engaging, and platform-optimized.\n\nYou understand:\n- Audience psychology and scroll-stopping behavior patterns\n- Hook frameworks: question hooks, bold-claim hooks, statistic hooks, story hooks, curiosity-gap hooks, and pattern-interrupt hooks\n- Storytelling frameworks: AIDA (Attention-Interest-Desire-Action), PAS (Problem-Agitate-Solve), BAB (Before-After-Bridge), and open loops\n- Persuasion principles: social proof, urgency, scarcity, reciprocity, authority, and emotional triggers (curiosity, FOMO, aspiration, empathy)\n- Modern social media best practices across all major platforms\n- Brand voice consistency and platform-native writing conventions\n\nYou also generate professional, detailed, and visually descriptive image prompts optimized for DALL-E 3 — specifying subject, composition, lighting, style, mood, color palette, and camera angle for maximum visual impact.\n\nCRITICAL OUTPUT RULES:\n- Return ONLY valid JSON — no markdown, no commentary, no wrapping\n- Follow the JSON schema exactly\n- Ensure captions are natural and human-like\n- Avoid generic or repetitive phrasing\n- Each variant must be clearly different in hook, angle, structure, and persuasion style"},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.8,

@@ -354,34 +354,51 @@ class MessageHandler:
             import openai
             openai.api_key = self.connection.ai_config.openai_api_key
             
-            detection_prompt = """Analyze this customer message and determine if it requires business attention.
+            system_prompt = """You are a message triage system for a business's Facebook Messenger inbox. Your job is to classify incoming messages quickly and accurately to determine if they require business attention.
 
-Message: "{message}"
+You are optimized for:
+- Speed: Classify in a single pass, no deliberation
+- Accuracy: Minimize false negatives (never miss a real business inquiry)
+- Multilingual support: Handle English, Bengali, and other languages
+- Clear categorization: Map every message to a defined type and priority
 
-Respond in JSON format only:
+When in doubt, classify as important — it's better to surface a false positive than miss a real customer inquiry.
+
+Return ONLY valid JSON — no explanation, no markdown."""
+
+            detection_prompt = """<message>
+"{message}"
+</message>
+
+<classification_rules>
+IMPORTANT (is_important: true):
+- Product inquiries, pricing questions, availability checks
+- Appointment or booking requests
+- Orders or purchase intent
+- Complaints or urgent issues
+- Contact requests or callback requests
+
+NOT IMPORTANT (is_important: false):
+- General greetings ("Hi", "Hello")
+- Casual chat without business intent
+- Thank-you messages with no follow-up needed
+- Spam or irrelevant messages
+</classification_rules>
+
+<output_format>
 {{
-    "is_important": true/false,
-    "type": "product_inquiry" | "appointment" | "order" | "urgent" | "complaint" | "pricing" | "availability" | "contact" | "general",
-    "priority": "high" | "medium" | "low",
-    "title": "Brief title (max 50 chars)",
-    "summary": "Brief summary of what the customer wants (max 100 chars)"
+  "is_important": <true | false>,
+  "type": "<product_inquiry | appointment | order | urgent | complaint | pricing | availability | contact | general>",
+  "priority": "<high | medium | low>",
+  "title": "<max 50 char summary title>",
+  "summary": "<max 100 char description of what the customer wants>"
 }}
-
-Important messages include:
-- Product purchase inquiries
-- Appointment/meeting requests  
-- Order confirmations
-- Urgent requests
-- Complaints or issues
-- Pricing questions
-- Stock/availability checks
-- Contact/location requests
-
-General greetings or casual chat are NOT important."""
+</output_format>"""
 
             response = openai.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": detection_prompt.format(message=message_text)}
                 ],
                 max_tokens=200,
@@ -619,15 +636,27 @@ General greetings or casual chat are NOT important."""
             
             response = openai.chat.completions.create(
                 model="gpt-4o",
-                messages=[{
+                messages=[
+                    {"role": "system", "content": "You are a visual analysis system for a business chatbot. When customers send images via Messenger, you analyze them to extract information that helps the business respond accurately.\n\nYour analysis is structured for downstream processing — clear, specific, and factual. You prioritize extracting actionable information (product identification, text extraction, inquiry intent) over aesthetic description."},
+                    {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": """Analyze this image in detail:
-1. What type of content? (screenshot, photo, product, document)
-2. Main subject/content
-3. If product: brand, features, specifications, price if visible
-4. If screenshot: extract all visible text
-5. Any other relevant details"""},
+                        {"type": "text", "text": """<task>
+Analyze this customer-sent image for business response purposes.
+</task>
+
+<instructions>
+Provide a structured analysis covering:
+
+1. **Content type**: screenshot | photo | product image | document | receipt | other
+2. **Main subject**: What is the primary content?
+3. **If product**: Brand name, model/variant, visible features, specifications, condition, price if shown
+4. **If screenshot/document**: Extract ALL visible text exactly as written
+5. **Customer intent**: What is the customer likely asking about or showing?
+6. **Key details**: Colors, sizes, quantities, condition, or any other business-relevant information
+
+Be specific and factual — extract only what is visible.
+</instructions>"""},
                         {"type": "image_url", "image_url": image_data}
                     ]
                 }],
@@ -836,20 +865,35 @@ General greetings or casual chat are NOT important."""
             system_prompt = active_prompt.system_prompt if active_prompt else "You are a helpful business assistant."
             
             if knowledge_context:
-                user_content = f"""User question: "{user_question}"
-
+                user_content = f"""<customer_inquiry>
+Customer message: "{user_question}"
 Image analysis: {image_description}
+</customer_inquiry>
 
-Company knowledge:
+<company_knowledge>
 {knowledge_context}
+</company_knowledge>
 
-Provide helpful response using company information."""
+<instructions>
+Using the company knowledge provided, respond to the customer's inquiry.
+- If the image shows a product, match it against company knowledge and provide
+  price, availability, and purchase details.
+- If you can identify the product, be specific. If you cannot, ask a clarifying
+  question.
+- Keep the response conversational and helpful — this is a Messenger chat.
+- Do NOT use markdown formatting (no **bold**, no *italic*, no headers).
+</instructions>"""
             else:
-                user_content = f"""User question: "{user_question}"
-
+                user_content = f"""<customer_inquiry>
+Customer message: "{user_question}"
 Image analysis: {image_description}
+</customer_inquiry>
 
-Provide helpful response."""
+<instructions>
+Provide a helpful response based on the image analysis. If you need more
+information to assist the customer, ask a specific clarifying question.
+Do NOT use markdown formatting.
+</instructions>"""
             
             # Get image data for OpenAI
             image_data = self._get_image_for_openai(image_url)

@@ -214,19 +214,40 @@ def enhance_product_prompt(original_prompt):
     The uploaded media contains the user's product — AI generates a matching scene for it.
     """
     enhanced = (
-        f"The user has uploaded their own product image. "
-        f"Generate a professional product photography background/scene based on this description: {original_prompt}. "
-        f"This scene will be used to showcase the user's product. "
-        f"Create a clean, professional environment that complements a product placement. "
-        f"Leave clear space in the center of the composition for the product to be placed. "
-        f"Do NOT generate any product or object in the image — only the background, scene, and environment."
+        f"<task>\n"
+        f"Generate ONLY a professional product photography background/scene.\n"
+        f"The user has uploaded their own product image which will be composited onto\n"
+        f"this scene afterward. You must generate the BACKGROUND ONLY.\n"
+        f"</task>\n\n"
+        f"<scene_description>\n"
+        f"{original_prompt}\n"
+        f"</scene_description>\n\n"
+        f"<instructions>\n"
+        f"Create a high-quality product photography environment that:\n"
+        f"1. Matches the scene description above\n"
+        f"2. Has even, professional lighting suitable for product photography\n"
+        f"3. Features a clean, unobstructed area in the center-bottom third of the\n"
+        f"   composition where a product will be placed\n"
+        f"4. Includes appropriate surface texture (marble, wood, fabric, etc.) as suggested\n"
+        f"5. Has depth and dimension through background elements, bokeh, or gradients\n"
+        f"6. Feels premium and brand-appropriate\n"
+        f"</instructions>\n\n"
+        f"<critical_constraints>\n"
+        f"- Do NOT generate any product, object, item, or subject in the foreground\n"
+        f"  or center of the image\n"
+        f"- The center of the composition MUST be empty — this is where the real\n"
+        f"  product will be placed\n"
+        f"- Focus exclusively on: background environment, surface/texture, lighting,\n"
+        f"  atmospheric depth, and mood\n"
+        f"- No text, logos, or watermarks\n"
+        f"</critical_constraints>"
     )
     return enhanced
 
 
 def get_product_negative_prompt(existing_negative=''):
     """Add product-exclusion terms to negative prompt"""
-    product_negatives = "product, item, object in center, subject in foreground"
+    product_negatives = "product, item, object in center, subject in foreground, text, logo, watermark"
     if existing_negative:
         return f"{existing_negative}, {product_negatives}"
     return product_negatives

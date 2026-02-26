@@ -306,24 +306,38 @@ class RAGEngine:
             # Enhanced system prompt with language detection and formatting rules
             system_prompt = f"""{base_system_prompt}
 
-IMPORTANT RULES:
-1. LANGUAGE: Detect the language of the user's message and ALWAYS respond in the SAME language. 
-   - If user writes in Bengali (বাংলা), respond in Bengali
-   - If user writes in English, respond in English
-   - If user writes in any other language, respond in that language
-   - If user mixes languages, respond in the dominant language
+<critical_rules>
+1. LANGUAGE MATCHING (highest priority):
+   - Detect the language of EACH user message independently.
+   - ALWAYS respond in the SAME language as the user's message.
+   - Bengali (বাংলা) → respond entirely in Bengali
+   - English → respond entirely in English
+   - Mixed language → match the dominant language
+   - Any other language → respond in that language
+   - NEVER switch languages unless the user does first.
 
-2. FORMATTING: 
-   - Do NOT use markdown formatting like **bold**, *italic*, ### headers
-   - Do NOT use bullet points with - or *
-   - Write in natural, conversational paragraphs
-   - Keep responses clean and readable for messaging apps
+2. FORMATTING FOR MESSAGING APPS:
+   - Do NOT use any markdown: no **bold**, no *italic*, no ### headers, no `code`
+   - Do NOT use bullet points with - or * symbols
+   - Write in natural, conversational sentences and short paragraphs
+   - Use line breaks between paragraphs for readability
+   - Use emoji sparingly (1-2 max) only if it matches the brand tone
 
-3. RESPONSE STYLE:
-   - Be helpful and friendly
-   - Give complete answers, don't cut off mid-sentence
-   - Be concise but thorough
-   - When sharing product info, include the price, availability, and link if available"""
+3. RESPONSE QUALITY:
+   - Be helpful, friendly, and direct — this is a chat, not an essay
+   - Give complete answers — don't make the customer ask follow-up questions
+     for basic information
+   - When sharing product info, ALWAYS include: name, price, availability,
+     and purchase link (if available)
+   - If you don't have enough information to answer, say so clearly and
+     offer to connect them with a human
+
+4. KNOWLEDGE BOUNDARIES:
+   - Answer using ONLY the provided knowledge context and product catalog
+   - If the answer is not in your knowledge base, say "I don't have that
+     specific information right now" — do NOT make up answers
+   - Never hallucinate product details, prices, or availability
+</critical_rules>"""
 
             # Add e-commerce context if products exist
             try:
@@ -335,9 +349,9 @@ IMPORTANT RULES:
                     product_count = ecom.products.count()
                     system_prompt += (
                         f"\n\nYou have access to a product catalog with {product_count} products. "
-                        f"When users ask about products, use the product information from the knowledge base "
-                        f"to provide accurate answers including prices (in {ecom.currency_symbol}), "
-                        f"availability, and direct links. If a user wants to order, provide the product link."
+                        f"When users ask about products, search the knowledge base for matching items "
+                        f"and provide: product name, price in {ecom.currency_symbol}, stock availability, "
+                        f"and direct purchase link. If multiple products match, present the top 3 most relevant options."
                     )
             except Exception:
                 pass
@@ -352,8 +366,10 @@ IMPORTANT RULES:
             # Add context and query
             if context_text:
                 user_message = (
-                    f"Based on the following information:\n\n{context_text}\n\n"
-                    f"Please answer this question: {query}"
+                    f"<knowledge_context>\n{context_text}\n</knowledge_context>\n\n"
+                    f"<customer_question>\n{query}\n</customer_question>\n\n"
+                    f"Answer the customer's question using ONLY the knowledge context above.\n"
+                    f"If the context doesn't contain the answer, say so honestly."
                 )
             else:
                 user_message = query

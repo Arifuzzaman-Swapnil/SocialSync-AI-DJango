@@ -66,26 +66,78 @@ class CaptionGeneratorService:
             'formal': "Formal, sophisticated, and refined",
             'conversational': "Natural, flowing, like talking to a friend"
         }
-        
-        system_prompt = f"""You are an expert social media content creator and copywriter with years of experience crafting viral, engaging content.
 
-Your writing style is: {tone_descriptions.get(tone, 'Professional and engaging')}
+        emoji_setting = "Include relevant emojis naturally throughout the caption" if include_emojis else "Do NOT use any emojis"
+        cta_setting = "Include a clear call-to-action at the end" if include_cta else "Do NOT include any call-to-action"
+        hashtag_setting = "Include relevant hashtags (separated at the end)" if include_hashtags else "Do NOT include any hashtags"
 
+        system_prompt = f"""<role>
+You are an elite social media content creator and conversion copywriter with 10+ years of experience crafting viral, high-engagement content for brands ranging from startups to Fortune 500 companies.
+</role>
+
+<writing_philosophy>
+Your writing is built on these principles:
+1. HOOK FIRST — The first line must earn the reader's next second. You never waste the opening on pleasantries or setup.
+2. AUTHENTIC VOICE — You write like a smart friend, not a corporate brochure. Every sentence passes the "would a real person say this?" test.
+3. EMOTIONAL RESONANCE — You tap into specific emotions (curiosity, aspiration, belonging, FOMO, relief, excitement) rather than generic positivity.
+4. VALUE DENSITY — Every line either entertains, educates, or moves toward the CTA. No filler. No fluff. No wasted words.
+5. PLATFORM INTELLIGENCE — You write natively for each platform's culture, algorithm, and reading patterns.
+</writing_philosophy>
+
+<current_style>
+Writing style for this request: {tone_descriptions.get(tone, 'Professional and engaging')}
+</current_style>
+
+<platform_guidelines>
 {self._get_platform_guidelines(platform)}
+</platform_guidelines>
 
-Guidelines:
-- Write authentic, human-sounding content (avoid AI-sounding phrases)
-- Create scroll-stopping opening lines
-- Use power words that trigger emotion
-- {"Include relevant emojis naturally throughout the caption" if include_emojis else "Do NOT use any emojis"}
-- {"Include a clear call-to-action at the end" if include_cta else "Do NOT include any call-to-action"}
-- {"Include relevant hashtags (separated at the end)" if include_hashtags else "Do NOT include any hashtags"}
+<engagement_techniques>
+Apply these proven techniques where appropriate:
+- Open loops ("Here's what nobody tells you about...")
+- Specificity over generality ("347 customers" beats "many customers")
+- Pattern interrupts in the first line
+- Power words: discover, secret, mistake, finally, proof, warning, free, instant
+- Micro-stories (setup > tension > resolution in 2-3 sentences)
+- Direct address ("You're probably making this mistake right now")
+</engagement_techniques>
 
-Output Format:
-- Return ONLY the caption text
-- If hashtags are requested, put them on a new line at the very end
-- No explanations, no markdown formatting, no quotes around the text"""
-        
+<anti_patterns>
+NEVER use these AI-sounding phrases:
+- "In today's fast-paced world"
+- "Unlock your potential" / "Unlock the power of"
+- "Game-changer" / "Revolutionary" / "Cutting-edge"
+- "Dive in" / "Dive deep" / "Let's dive into"
+- "Elevate your" / "Level up your"
+- "Leverage" / "Harness the power"
+- "Seamlessly" / "Effortlessly"
+- "Navigate the landscape"
+- "It's not just about X, it's about Y"
+- "Are you ready to..."
+- Starting with "Imagine..."
+</anti_patterns>
+
+<formatting_rules>
+- Emoji usage: {emoji_setting}
+- Call-to-action: {cta_setting}
+- Hashtag usage: {hashtag_setting}
+</formatting_rules>
+
+<output_rules>
+- Return ONLY the caption text — no preamble, no explanation
+- If hashtags are requested, place them on a new line at the very end
+- No markdown formatting, no quotes around the text
+- No meta-commentary like "Here's your caption:" or "Hope this helps!"
+</output_rules>
+
+<tone_options>
+professional | casual | friendly | enthusiastic | humorous | inspirational | formal | conversational
+</tone_options>
+
+<supported_platforms>
+general | facebook | instagram | twitter | linkedin | tiktok | youtube | pinterest
+</supported_platforms>"""
+
         return system_prompt
     
     def generate_from_text(self, topic, tone='professional', length='medium', platform='general',
@@ -118,12 +170,32 @@ Output Format:
         try:
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
             
-            user_prompt = f"""Create a social media caption about: {topic}
+            user_prompt = f"""<task>
+Create a single social media caption about the topic below.
+</task>
 
-Target length: {self._get_word_count(length)}
-{f'Additional instructions: {custom_instructions}' if custom_instructions else ''}
+<topic>
+{topic}
+</topic>
 
-Generate the caption now:"""
+<parameters>
+- Target length: {self._get_word_count(length)}
+- Custom instructions: {custom_instructions or 'None'}
+</parameters>
+
+<approach>
+Think step by step:
+1. Identify the single most compelling angle for this topic.
+2. Choose a hook type that will stop the scroll (question, bold claim, stat, micro-story, or curiosity gap).
+3. Write the caption in one pass — it should flow naturally, not feel assembled.
+4. Ensure it hits the target word count within +/-10 words.
+</approach>
+
+<length_guide>
+short = 20-40 words | medium = 40-80 words | long = 80-120 words | extra_long = 120-200 words
+</length_guide>
+
+Generate the caption now."""
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -254,17 +326,29 @@ Generate the caption now:"""
                         "content": [
                             {
                                 "type": "text",
-                                "text": """Analyze this image in detail. Describe:
-1. Main subject/focus
-2. Setting/background
-3. Colors and mood
-4. Any text visible
-5. People (if any) - their actions, expressions
-6. Objects and their arrangement
-7. Overall theme/message
-8. Potential use cases for social media
+                                "text": """<task>
+Analyze the attached image in detail to support social media caption generation.
+Your analysis will be used by a caption-writing system, so be specific, vivid, and actionable.
+</task>
 
-Be specific and detailed."""
+<instructions>
+Examine the image systematically. For each aspect, provide specific observations — not vague summaries:
+
+1. **Main subject/focus** — What is the primary element? Where does the eye land first? What makes it stand out?
+2. **Setting/background** — Describe the environment. Indoor/outdoor? Urban/natural? Any identifiable location cues?
+3. **Colors and mood** — What is the dominant color palette? What emotional tone do the colors and composition create? (e.g., warm and inviting, cool and professional, vibrant and energetic)
+4. **Visible text** — Transcribe any text, logos, signage, or labels exactly as they appear.
+5. **People** — If present: how many, approximate age range, what are they doing, what expressions do they show, what are they wearing? What's the interpersonal dynamic?
+6. **Objects and composition** — What objects are visible? How are they arranged? Is there visual hierarchy, symmetry, leading lines, or rule of thirds?
+7. **Overall narrative** — If this image were telling a story, what would it be? What message or feeling does it convey?
+8. **Social media angles** — Suggest 3 specific content angles this image could support (e.g., "behind-the-scenes culture post," "product feature highlight," "customer success story").
+</instructions>
+
+<constraints>
+- Be specific: "A woman in her 30s laughing while holding a blue mug" beats "A person with a drink."
+- Describe only what you can actually see — do not infer brand names, locations, or identities unless they're clearly visible.
+- Keep the total analysis under 300 words.
+</constraints>"""
                             },
                             {
                                 "type": "image_url",
@@ -311,19 +395,36 @@ Be specific and detailed."""
             
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
             
-            user_prompt = f"""Analyze this image and create an engaging social media caption for it.
+            user_prompt = f"""<task>
+Analyze the attached image, then create an engaging social media caption grounded in what you actually see.
+</task>
 
-{f'Context provided: {additional_context}' if additional_context else ''}
-{f'Additional instructions: {custom_instructions}' if custom_instructions else ''}
+<parameters>
+- Additional context from user: {additional_context or 'None'}
+- Target length: {self._get_word_count(length)}
+{f'- Custom instructions: {custom_instructions}' if custom_instructions else ''}
+</parameters>
 
-Target length: {self._get_word_count(length)}
+<instructions>
+Think step by step:
+1. OBSERVE: Scan the image carefully. Note the subject, setting, colors, mood, people, objects, and any text visible.
+2. IDENTIFY the most compelling story, emotion, or message the image conveys.
+3. CONNECT: If additional context is provided, weave it naturally into the caption — don't force it.
+4. WRITE: Create a caption that would make someone who hasn't seen the image curious, and someone who has seen it feel understood.
+</instructions>
 
-First, briefly describe what you see in the image (2-3 sentences).
-Then, create the caption.
+<output_format>
+Structure your response exactly as follows:
 
-Format your response as:
-ANALYSIS: [your image analysis]
-CAPTION: [the generated caption]"""
+ANALYSIS: [2-3 sentence detailed description of what you see]
+CAPTION: [The generated social media caption]
+</output_format>
+
+<constraints>
+- The caption must be grounded in visible image content — do not invent elements.
+- Follow the system prompt's tone and platform guidelines.
+- The caption should work both with and without the image visible.
+</constraints>"""
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -426,19 +527,34 @@ CAPTION: [the generated caption]"""
             content = [
                 {
                     "type": "text",
-                    "text": f"""These are frames extracted from a video. Analyze them to understand the video content and create an engaging social media caption.
+                    "text": f"""<task>
+The attached images are frames extracted from a video, presented in chronological order. Analyze the full sequence to understand the story, then generate an engaging caption.
+</task>
 
-{f'Context provided: {additional_context}' if additional_context else ''}
-{f'Additional instructions: {custom_instructions}' if custom_instructions else ''}
+<parameters>
+- Target length: {self._get_word_count(length)}
+{f'- Context provided: {additional_context}' if additional_context else ''}
+{f'- Custom instructions: {custom_instructions}' if custom_instructions else ''}
+</parameters>
 
-Target length: {self._get_word_count(length)}
+<instructions>
+Think step by step:
+1. SCAN all frames in order — identify the beginning, middle, and end of the visual narrative.
+2. IDENTIFY: What is happening? What changes across frames? What's the key moment or transformation?
+3. FIND THE HOOK: What's the single most interesting, surprising, or emotional aspect of this video?
+4. WRITE a caption that captures the essence of the video — not a frame-by-frame description, but the feeling and story it conveys.
+</instructions>
 
-First, describe what you see across these video frames (the story/action).
-Then, create the caption.
+<output_format>
+ANALYSIS: [2-3 sentences describing the video's content, story arc, and key moments]
+CAPTION: [The generated social media caption]
+</output_format>
 
-Format your response as:
-ANALYSIS: [your video analysis]
-CAPTION: [the generated caption]"""
+<constraints>
+- Treat the frames as a SEQUENCE — look for narrative flow, not just individual stills.
+- The caption should make someone want to watch the video, not replace it.
+- Follow the system prompt's tone and platform guidelines.
+</constraints>"""
                 }
             ]
             
@@ -527,14 +643,31 @@ CAPTION: [the generated caption]"""
         try:
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
             
-            user_prompt = f"""Here is a social media caption that was previously generated:
+            user_prompt = f"""<task>
+Regenerate a social media caption based on user feedback. The new version must be noticeably better than the original — not just slightly adjusted.
+</task>
 
-"{original_caption}"
+<original_caption>
+{original_caption}
+</original_caption>
 
-The user wants changes based on this feedback: {feedback}
+<user_feedback>
+{feedback}
+</user_feedback>
 
-Please regenerate the caption incorporating this feedback while maintaining quality.
-Return ONLY the new caption."""
+<instructions>
+Think step by step:
+1. DIAGNOSE: What specifically is the user unhappy with? Map their feedback to concrete issues (too long, wrong tone, weak hook, missing CTA, too generic, etc.).
+2. PRESERVE: Identify what works in the original — don't throw out the baby with the bathwater.
+3. REWRITE: Create a new caption that addresses ALL feedback points while maintaining or improving quality. If the user says "make it shorter," don't just trim — rewrite with brevity in mind from the start.
+4. VERIFY: Re-read the feedback and confirm every point has been addressed.
+</instructions>
+
+<constraints>
+- Return ONLY the new caption text — no explanation, no "Here's your updated version."
+- The new caption must demonstrably address the feedback.
+- Do not degrade quality while accommodating feedback.
+</constraints>"""
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -597,17 +730,45 @@ Return ONLY the new caption."""
         try:
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
             
-            user_prompt = f"""Create {num_variations} DIFFERENT social media caption variations for: {topic_or_analysis}
+            user_prompt = f"""<task>
+Generate {num_variations} distinctly different social media caption variations for the topic or analysis below. Each must feel like it was written by a different creative mind with a different strategy.
+</task>
 
-Target length per caption: {self._get_word_count(length)}
+<topic_or_analysis>
+{topic_or_analysis}
+</topic_or_analysis>
 
-Requirements:
-- Each caption should have a unique angle/approach
-- Vary the opening hooks
-- Different emotional appeals
-- Number each variation (1., 2., 3., etc.)
+<parameters>
+- Target length per caption: {self._get_word_count(length)}
+</parameters>
 
-Generate {num_variations} distinct captions now:"""
+<instructions>
+Think step by step:
+1. BRAINSTORM {num_variations} completely different creative strategies:
+   - Variation 1: Different HOOK type (e.g., question vs. bold statement vs. stat)
+   - Variation 2: Different ANGLE (e.g., educational vs. emotional vs. humorous)
+   - Variation 3+: Different PERSUASION style (e.g., FOMO vs. aspiration vs. social proof)
+2. WRITE each variation independently — do not reference or build upon the others.
+3. NUMBER each variation clearly: 1., 2., 3., etc.
+4. Each caption must be complete and ready to post as-is.
+</instructions>
+
+<quality_checklist>
+Before finalizing, verify each caption:
+- Opens with a different first word than all other variations
+- Uses a different sentence structure than all other variations
+- Appeals to a different emotion than all other variations
+- Could stand alone without the others
+- Hits the target word count +/-10 words
+</quality_checklist>
+
+<constraints>
+- Do NOT create variations that are merely synonym swaps or reordered sentences.
+- If two variations feel similar, rewrite one from scratch.
+- Stay within the target word count for each.
+</constraints>
+
+Generate {num_variations} distinct captions now."""
             
             response = self.client.chat.completions.create(
                 model="gpt-4o",

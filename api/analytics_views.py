@@ -110,27 +110,33 @@ class AIReplyToCommentView(APIView):
         if post.brand and post.brand.voice_tone:
             brand_voice = f"Brand voice: {post.brand.voice_tone}"
 
-        prompt = f"""Generate a brief, friendly reply to this social media comment.
-
-Comment: "{comment.body}"
+        prompt = f"""<comment>
 Author: {comment.author_name or 'Someone'}
+Comment: "{comment.body}"
+</comment>
+
+<post_context>
 Post caption: {(post.caption or '')[:300]}
-{brand_voice}
+</post_context>
 
-Rules:
-- Keep it concise (1-3 sentences)
-- Be warm and engaging
-- Match the brand voice if provided
-- Don't be generic — reference the comment content
+<brand_voice>
+{brand_voice or 'Not specified'}
+</brand_voice>
 
-Return only the reply text, nothing else."""
+<instructions>
+1. Read the comment and identify its intent (compliment, question, feedback, complaint, joke, or share).
+2. Write a reply that directly references specific content from the comment.
+3. If the comment is a question, answer it or direct them where to find the answer.
+4. If the comment is positive, acknowledge the specific thing they praised.
+5. Return ONLY the reply text — no labels, no quotes, no "Here's a reply:".
+</instructions>"""
 
         try:
             client = openai.OpenAI(api_key=api_key)
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are a social media community manager."},
+                    {"role": "system", "content": "You are a social media community manager who writes replies that make followers feel genuinely heard and valued. You are warm, specific, and efficient.\n\nYour replies:\n- ALWAYS reference something specific from the comment — never generic\n- Feel like they come from a real person who actually read the comment\n- Match the brand's voice while staying conversational\n- Drive further engagement when appropriate (ask a follow-up question, invite a DM, direct to content)\n- Are 1-3 sentences — never walls of text\n\nYou NEVER:\n- Use corporate jargon (\"We appreciate your feedback!\")\n- Give generic thanks without specifics (\"Thanks for sharing!\")\n- Sound like an automated response\n- Use excessive emojis (1-2 max, only if brand-appropriate)"},
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
