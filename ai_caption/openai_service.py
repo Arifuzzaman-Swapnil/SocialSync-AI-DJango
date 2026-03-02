@@ -214,12 +214,30 @@ Generate the caption now."""
             # Extract hashtags if present
             hashtags = ""
             if include_hashtags and '#' in caption:
+                import re
                 lines = caption.split('\n')
-                hashtag_lines = [l for l in lines if l.strip().startswith('#') or l.count('#') > 2]
-                if hashtag_lines:
-                    hashtags = hashtag_lines[-1].strip()
-                    # Remove hashtag line from caption
-                    caption = '\n'.join([l for l in lines if l not in hashtag_lines]).strip()
+                # Only treat lines that are PURELY hashtags (no substantial text before them)
+                pure_hashtag_lines = []
+                for l in lines:
+                    stripped = l.strip()
+                    if not stripped:
+                        continue
+                    # Line starts with # and is mostly hashtags
+                    words = stripped.split()
+                    hashtag_words = [w for w in words if w.startswith('#')]
+                    non_hashtag_words = [w for w in words if not w.startswith('#')]
+                    if len(hashtag_words) >= 2 and len(non_hashtag_words) <= 1:
+                        pure_hashtag_lines.append(l)
+
+                if pure_hashtag_lines:
+                    hashtags = pure_hashtag_lines[-1].strip()
+                    caption = '\n'.join([l for l in lines if l not in pure_hashtag_lines]).strip()
+
+                # If no pure hashtag lines found but caption has inline hashtags, extract them
+                if not hashtags:
+                    all_tags = re.findall(r'#\w+', caption)
+                    if all_tags:
+                        hashtags = ' '.join(all_tags)
             
             return {
                 'success': True,
@@ -227,16 +245,17 @@ Generate the caption now."""
                 'hashtags': hashtags,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o'
+                'model_used': 'gpt-4o',
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
                 'processing_time': time.time() - start_time
             }
-    
+
     def _encode_image(self, image_path):
         """Encode image to base64"""
         with open(image_path, 'rb') as image_file:
@@ -476,16 +495,17 @@ CAPTION: [The generated social media caption]
                 'analysis': analysis,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o'
+                'model_used': 'gpt-4o',
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
                 'processing_time': time.time() - start_time
             }
-    
+
     def generate_from_video(self, video_path, additional_context=None, tone='professional',
                             length='medium', platform='general', include_hashtags=True,
                             include_emojis=True, include_cta=True, custom_instructions=None):
@@ -605,6 +625,8 @@ CAPTION: [The generated social media caption]
                     hashtags = hashtag_lines[-1].strip()
                     caption = '\n'.join([l for l in lines if l not in hashtag_lines]).strip()
             
+            # Extract text prompt from content array for video
+            video_user_prompt = content[0]["text"] if content and isinstance(content, list) else str(content)
             return {
                 'success': True,
                 'caption': caption,
@@ -612,16 +634,17 @@ CAPTION: [The generated social media caption]
                 'analysis': analysis,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o'
+                'model_used': 'gpt-4o',
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{video_user_prompt}",
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
                 'processing_time': time.time() - start_time
             }
-    
+
     def regenerate_with_feedback(self, original_caption, feedback, tone='professional',
                                   platform='general', include_hashtags=True,
                                   include_emojis=True, include_cta=True):
@@ -698,16 +721,17 @@ Think step by step:
                 'hashtags': hashtags,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o'
+                'model_used': 'gpt-4o',
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
-            
+
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
                 'processing_time': time.time() - start_time
             }
-    
+
     def generate_multiple_variations(self, topic_or_analysis, num_variations=3, tone='professional',
                                       length='medium', platform='general', include_hashtags=True,
                                       include_emojis=True, include_cta=True):
@@ -812,7 +836,8 @@ Generate {num_variations} distinct captions now."""
                 'captions': captions,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o'
+                'model_used': 'gpt-4o',
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
             
         except Exception as e:

@@ -22,6 +22,9 @@ export interface GenerateImageRequest {
   enhance_prompt?: boolean;
   add_lighting?: string;
   camera_angle?: string;
+  product_image?: File;
+  product_position?: string;
+  product_scale?: number;
 }
 
 export interface RefinePromptRequest {
@@ -38,6 +41,7 @@ export interface RefinePromptRequest {
 
 export interface RefinePromptResponse {
   refined_prompt: string;
+  used_prompt?: string;
 }
 
 export const imageService = {
@@ -49,6 +53,28 @@ export const imageService = {
 
   // Generation
   async generate(data: GenerateImageRequest): Promise<ImageGeneration> {
+    if (data.product_image) {
+      const formData = new FormData();
+      formData.append('prompt', data.prompt);
+      if (data.title) formData.append('title', data.title);
+      if (data.negative_prompt) formData.append('negative_prompt', data.negative_prompt);
+      if (data.provider) formData.append('provider', data.provider);
+      if (data.style) formData.append('style', data.style);
+      if (data.size) formData.append('size', data.size);
+      if (data.quality) formData.append('quality', data.quality);
+      if (data.logo_id != null) formData.append('logo_id', String(data.logo_id));
+      if (data.logo_position) formData.append('logo_position', data.logo_position);
+      if (data.logo_size != null) formData.append('logo_size', String(data.logo_size));
+      if (data.logo_opacity != null) formData.append('logo_opacity', String(data.logo_opacity));
+      if (data.enhance_prompt != null) formData.append('enhance_prompt', String(data.enhance_prompt));
+      if (data.add_lighting) formData.append('add_lighting', data.add_lighting);
+      if (data.camera_angle) formData.append('camera_angle', data.camera_angle);
+      formData.append('product_image', data.product_image);
+      if (data.product_position) formData.append('product_position', data.product_position);
+      if (data.product_scale != null) formData.append('product_scale', String(data.product_scale));
+      const response = await api.post<ImageGeneration>('/ai-image/generate/', formData);
+      return response.data;
+    }
     const response = await api.post<ImageGeneration>('/ai-image/generate/', data);
     return response.data;
   },

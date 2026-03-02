@@ -7,6 +7,7 @@ from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from .views import ReactAppView
 
 # API and Admin URLs - these take priority
@@ -28,6 +29,11 @@ urlpatterns = [
     path('ai-voice/', include('ai_voice.urls')),
     path('messenger/', include('messenger_bot.urls')),
     path('business-profile/', include('brands.urls')),
+
+    # API Documentation (Swagger UI)
+    path('doc/api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('doc/api/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('doc/api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 ]
 
 # Static & Media files - serve via Django (cPanel Passenger sends ALL requests to Django)

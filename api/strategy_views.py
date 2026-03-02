@@ -310,6 +310,7 @@ class CompetitorCrawlView(APIView):
 
             client = openai.OpenAI(api_key=api_key)
             all_insights = []
+            all_used_prompts = []
 
             # Get brand context
             pillars = brand.content_pillars.filter(is_active=True)
@@ -359,11 +360,10 @@ Analyze based on the URL/handle name only.
 """
 
                 prompt = f"""<context>
-You are conducting a competitive content audit for a brand.
-
 My brand: "{brand.brand_name}"
 Industry: {brand.industry}
 Region: {brand.target_region}
+My content pillars: {pillar_context}
 
 Competitor: {profile.handle_or_url}
 Platform: {profile.get_platform_display()}
@@ -374,59 +374,102 @@ Platform: {profile.get_platform_display()}
 </crawled_pages>
 
 <instructions>
-Think step by step:
+STEP 1 — EXTRACT FACTS (do this first, silently):
+Read every crawled page carefully. Extract ONLY what is explicitly stated:
+- What does this competitor actually sell? (exact product categories, not assumptions)
+- What type of brand is it? (luxury, budget, streetwear, ethnic, etc. — based on products and pricing)
+- Pricing: Are prices shown? What currency? What price ranges? Any discounts/sale sections?
+- Offers: Free delivery? Discount codes? Seasonal sales? Bundle deals? Loyalty programs?
+- Delivery: What shipping options exist? (standard, express, same-day, free shipping threshold)
+- Returns: What is the exact return/exchange policy?
+- Payment: What payment methods are accepted?
+- Unique features: Customization options? Subscription? Gift cards? Sizing guides? Reviews section?
 
-1. READ all crawled pages thoroughly. Note the competitor's:
-   - Key messaging themes and value propositions
-   - Content formats and structures they use
-   - Tone of voice and language patterns
-   - CTAs and conversion strategies
-   - Audience targeting signals
-   - Content gaps or weaknesses
+STEP 2 — IDENTIFY GAPS AND STRENGTHS:
+Compare what the competitor HAS vs what they are MISSING or doing POORLY.
+- A "gap" means the page content does NOT mention it at all.
+- A "strength" means the page explicitly shows/promotes it.
+- NEVER claim a competitor lacks something if the crawled pages show they have it.
+- NEVER claim a competitor has something if the crawled pages don't show it.
 
-2. GENERATE exactly 10 competitive insights by cross-referencing what the competitor does well (to learn from) and what they do poorly (to exploit).
+STEP 3 — GENERATE 10 INSIGHTS:
+Create exactly 10 competitive insights for my brand. Each insight must include:
+a. **hook_text**: A compelling content hook for my brand. Must reference specific competitor data.
+b. **angle**: Strategic approach — WHY this insight matters and what competitor data supports it.
+c. **format_type**: Recommended format (post, carousel, video, story, reel, thread, infographic, blog).
+d. **engagement_score**: 1-10 honest rating. Spread scores realistically — max 2-3 insights can be 9-10.
+e. **recommendation**: Specific, actionable step. Include details: what to create, which platform, what data to highlight.
+f. **based_on**: Quote or paraphrase the ACTUAL content from the competitor's pages that supports this insight. Include specific details like prices, product names, policies found.
+g. **source_url**: The EXACT URL from the crawled pages where you found this evidence.
 
-3. For EACH insight, provide:
-   a. **hook_text**: A compelling content hook my brand could use, inspired by this insight. Make it specific and ready to brief a content creator.
-   b. **angle**: The strategic approach — what makes this content idea different.
-   c. **format_type**: Recommended content format (post, carousel, video, story, reel, thread, infographic, blog).
-   d. **engagement_score**: 1-10 rating based on estimated audience impact. 10 = very likely to drive high engagement. Be honest — not everything is a 10.
-   e. **recommendation**: A specific, actionable recommendation for my brand. "Create more content" is NOT actionable. "Create a weekly carousel series comparing your pricing transparency vs. competitors who hide pricing" IS.
-   f. **based_on**: What specific content, pattern, or gap this insight is drawn from.
-   g. **source_url**: The EXACT URL from the crawled pages.
+INSIGHT CATEGORIES — include a mix of:
+- Pricing & offers (competitor's discounts, free delivery thresholds, sale strategy)
+- Product gaps (categories they lack that my brand can exploit)
+- Content strategy (what types of content they create vs. miss)
+- Customer experience (return policy, payment options, loyalty programs)
+- Messaging & positioning (how they talk to customers, what tone they use)
 </instructions>
 
 <output_format>
 Return ONLY a JSON array of exactly 10 objects:
 [
   {{
-    "hook_text": "<compelling content hook>",
-    "angle": "<strategic angle>",
-    "format_type": "<content format>",
+    "hook_text": "<compelling content hook with specific details>",
+    "angle": "<strategic angle backed by competitor evidence>",
+    "format_type": "<post|carousel|video|story|reel|thread|infographic|blog>",
     "engagement_score": <1-10>,
-    "recommendation": "<specific actionable recommendation>",
-    "based_on": "<what evidence this is drawn from>",
+    "recommendation": "<specific actionable recommendation with details>",
+    "based_on": "<quote or paraphrase ACTUAL content from competitor pages — include prices, product names, policies>",
     "source_url": "<exact URL from crawled pages>"
   }}
 ]
 </output_format>
 
-<constraints>
-- Every source_url MUST come from the crawled pages — never fabricate URLs.
-- Vary the engagement_scores realistically — not all insights are 8+.
-- Include at least 2 "gap exploitation" insights (things the competitor does poorly that my brand can capitalize on).
-- Return valid JSON array only.
-</constraints>"""
+<critical_rules>
+- ACCURACY IS THE #1 PRIORITY. Every claim must be backed by crawled page evidence.
+- NEVER say "competitor lacks X" if the crawled pages show X exists.
+- NEVER say "competitor has X" if the crawled pages don't mention X.
+- If a feature is not found in crawled pages, say "not found on crawled pages" — do NOT assume it doesn't exist.
+- based_on field MUST contain specific evidence: exact prices, product names, policy details, or direct quotes.
+- Every source_url MUST be from the crawled pages list — never fabricate URLs.
+- Vary engagement_scores: use 5-6 for basic insights, 7-8 for good ones, 9-10 only for exceptional opportunities.
+- Include at least 3 insights about pricing, offers, discounts, or delivery strategies.
+- Return valid JSON array only — no markdown, no commentary.
+</critical_rules>"""
 
                 response = client.chat.completions.create(
                     model='gpt-4o-mini',
                     messages=[
-                        {'role': 'system', 'content': 'You are a senior competitive intelligence analyst specializing in digital content strategy and social media marketing. You have deep expertise in:\n\n- Identifying content patterns, messaging frameworks, and positioning strategies from website copy and marketing materials\n- Reverse-engineering competitor content strategies from published pages\n- Translating competitive observations into actionable content opportunities\n- Distinguishing between surface-level observations and genuinely strategic insights\n\nYour analysis is grounded EXCLUSIVELY in the actual page content provided — you never fabricate, assume, or hallucinate information that isn\'t directly evidenced in the crawled pages.\n\nEvery insight you produce must cite a specific crawled page URL as its source.\n\nCRITICAL OUTPUT RULES:\n- Return ONLY a valid JSON array — no markdown, no commentary, no wrapping\n- Every source_url must be a real URL from the crawled pages provided\n- Insights must be specific and actionable, not generic marketing advice'},
+                        {'role': 'system', 'content': """You are a senior competitive intelligence analyst specializing in e-commerce and social media marketing in South Asia (Bangladesh, India).
+
+Your core skill is extracting ACCURATE, SPECIFIC business intelligence from competitor websites:
+- Product categories, pricing ranges, discount strategies, and seasonal offers
+- Delivery options, return policies, payment methods, and customer experience features
+- Content gaps and messaging weaknesses that can be exploited
+- Loyalty programs, gift cards, customization options, and unique selling points
+
+ACCURACY RULES (non-negotiable):
+1. You ONLY state facts that are DIRECTLY EVIDENCED in the crawled page content.
+2. If a page shows prices, quote the actual price range and currency.
+3. If a page shows a discount/sale, quote the exact offer (e.g., "30% off", "Buy 2 Get 1 Free").
+4. If a page shows delivery options, state exactly what is offered.
+5. NEVER claim a competitor "lacks" or "doesn't have" something unless you have read ALL their crawled pages and confirmed it is absent.
+6. If you're unsure whether a feature exists, say "not found on crawled pages" — never assume.
+7. When a competitor DOES have a feature, acknowledge it as a strength — do not pretend it doesn't exist.
+
+You think like a business owner, not an academic. Your insights help brands find real competitive advantages: better pricing, better delivery, better offers, better content.
+
+Return ONLY valid JSON array — no markdown, no commentary."""},
                         {'role': 'user', 'content': prompt},
                     ],
                     temperature=0.5,
                     max_tokens=4500,
                 )
+
+                all_used_prompts.append({
+                    'competitor': profile.handle_or_url,
+                    'prompt': prompt,
+                })
 
                 raw = response.choices[0].message.content.strip()
                 if raw.startswith('```'):
@@ -455,7 +498,7 @@ Return ONLY a JSON array of exactly 10 objects:
 
                     insight = CompetitorInsight.objects.create(
                         competitor_profile=profile,
-                        hook_text=hook_with_extras[:700],
+                        hook_text=hook_with_extras[:1000],
                         angle=item.get('angle', '')[:200],
                         format_type=item.get('format_type', 'text')[:50],
                         engagement_score=min(float(item.get('engagement_score', 5)), 10),
@@ -481,6 +524,7 @@ Return ONLY a JSON array of exactly 10 objects:
                 'brand_id': brand.id,
                 'pages_crawled': pages_crawled_total,
                 'insights': all_insights,
+                'used_prompts': all_used_prompts,
             })
 
         except Exception as e:
@@ -824,6 +868,7 @@ Return ONLY a JSON array of exactly {count} objects:
                 'brand_id': brand.id,
                 'count_requested': count,
                 'ideas': saved_ideas,
+                'used_prompt': prompt,
             })
 
         except openai.AuthenticationError:
@@ -1339,6 +1384,36 @@ class GeneratePillarsView(APIView):
             return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
 
         dna = brand.brand_dna or {}
+
+        # Build concise Brand DNA summary for pillar generation
+        dna_parts = []
+        if dna.get('description'):
+            dna_parts.append(f"Description: {dna['description'][:200]}")
+        if dna.get('target_audience'):
+            dna_parts.append(f"Target audience: {dna['target_audience'][:150]}")
+        if dna.get('products_services'):
+            items = dna['products_services'] if isinstance(dna['products_services'], list) else [dna['products_services']]
+            dna_parts.append(f"Products/Services: {', '.join(items[:8])}")
+        if dna.get('unique_selling_points'):
+            usps = dna['unique_selling_points'] if isinstance(dna['unique_selling_points'], list) else [dna['unique_selling_points']]
+            dna_parts.append(f"USPs: {', '.join(usps[:5])}")
+        if dna.get('brand_voice'):
+            dna_parts.append(f"Brand voice: {dna['brand_voice'][:100]}")
+        if dna.get('brand_values'):
+            vals = dna['brand_values'] if isinstance(dna['brand_values'], list) else [dna['brand_values']]
+            dna_parts.append(f"Brand values: {', '.join(vals[:5])}")
+        if dna.get('content_themes'):
+            themes = dna['content_themes'] if isinstance(dna['content_themes'], list) else [dna['content_themes']]
+            dna_parts.append(f"Content themes: {', '.join(themes[:5])}")
+        if dna.get('keywords'):
+            kws = dna['keywords'] if isinstance(dna['keywords'], list) else [dna['keywords']]
+            dna_parts.append(f"Keywords: {', '.join(kws[:8])}")
+        if dna.get('cta_style'):
+            dna_parts.append(f"CTA style: {dna['cta_style'][:80]}")
+        if dna.get('competitor_positioning'):
+            dna_parts.append(f"Positioning: {dna['competitor_positioning'][:150]}")
+        dna_context = '\n'.join(dna_parts) if dna_parts else 'No Brand DNA generated yet'
+
         existing_qs = ContentPillar.objects.filter(brand=brand)
         existing_pillars = list(existing_qs.values_list('name', flat=True))
         existing_pct_sum = sum(existing_qs.values_list('target_percentage', flat=True))
@@ -1387,7 +1462,12 @@ Return ONLY valid JSON — no markdown, no commentary."""
 
             prompt = f"""<task>
 Generate a content pillar strategy framework for a brand's social media presence.
+Use the Brand DNA to deeply understand the business before designing pillars.
 </task>
+
+<brand_dna>
+{dna_context}
+</brand_dna>
 
 <context>
 Brand: "{brand.brand_name}"
@@ -1399,15 +1479,17 @@ Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pi
 </context>
 
 <instructions>
-1. Analyze the brand's industry, competitors, and trends.
-2. Design exactly {count} content pillars that form a balanced strategy.
-3. For each pillar:
+1. Read the Brand DNA carefully — understand the products, audience, voice, values, and positioning.
+2. Analyze the brand's industry, competitors, and trends.
+3. Design exactly {count} content pillars that align with the brand's DNA and form a balanced strategy.
+4. For each pillar:
    a. Name: 2-4 words, specific and descriptive (e.g., "Customer Wins" not "Engagement").
    b. Description: What types of content fall here AND why it matters strategically.
    c. Target percentage: What share of total content this pillar should receive.
    d. Color code: A unique hex color for visual differentiation.
-4. {pct_instruction}
-5. Include a mix of: educational, promotional, community-building, and authority content.
+5. {pct_instruction}
+6. Include a mix of: educational, promotional, community-building, and authority content.
+7. Pillars should reflect the brand's products, audience interests, and unique positioning from the DNA.
 </instructions>
 
 <output_format>
@@ -1482,6 +1564,7 @@ Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pi
                 'brand_id': brand.id,
                 'count': len(created_pillars),
                 'pillars': serializer.data,
+                'used_prompt': prompt,
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:

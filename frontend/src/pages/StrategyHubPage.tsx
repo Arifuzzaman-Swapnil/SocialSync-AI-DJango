@@ -1336,7 +1336,7 @@ export function StrategyHubPage() {
               {/* Edit Bar */}
               <div className="flex items-center justify-between bg-dark-700/50 border border-white/10 rounded-lg px-4 py-3">
                 <p className="text-sm text-text-secondary">
-                  Click on any section below to edit, or use the edit button
+                  Click the edit icon or button to modify your Brand DNA
                 </p>
                 <button
                   onClick={handleEnterDnaEdit}
@@ -1348,8 +1348,8 @@ export function StrategyHubPage() {
               </div>
 
               {/* Brand Identity Card */}
-              <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={handleEnterDnaEdit}>
-                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <PencilIcon className="w-4 h-4 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+              <div className="card p-6 transition-all">
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-4 h-4" /></button></h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {dnaData.brand_name && (
                     <div>
@@ -1404,8 +1404,8 @@ export function StrategyHubPage() {
 
               {/* Products/Services */}
               {dnaData.products_services && dnaData.products_services.length > 0 && (
-                <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={handleEnterDnaEdit}>
-                  <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h3>
+                <div className="card p-6 transition-all">
+                  <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h3>
                   <div className="flex flex-wrap gap-2">
                     {dnaData.products_services.map((item: string, idx: number) => (
                       <span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm">{item}</span>
@@ -1415,10 +1415,10 @@ export function StrategyHubPage() {
               )}
 
               {/* USP + Values + Keywords Row */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={handleEnterDnaEdit}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {dnaData.unique_selling_points && dnaData.unique_selling_points.length > 0 && (
-                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Unique Selling Points <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                  <div className="card p-5 transition-all">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Unique Selling Points <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                     <ul className="space-y-2">
                       {dnaData.unique_selling_points.map((item: string, idx: number) => (
                         <li key={idx} className="text-sm flex items-start gap-2">
@@ -1429,8 +1429,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.brand_values && dnaData.brand_values.length > 0 && (
-                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                  <div className="card p-5 transition-all">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                     <ul className="space-y-2">
                       {dnaData.brand_values.map((item: string, idx: number) => (
                         <li key={idx} className="text-sm flex items-start gap-2">
@@ -1441,8 +1441,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.content_themes && dnaData.content_themes.length > 0 && (
-                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                  <div className="card p-5 transition-all">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                     <ul className="space-y-2">
                       {dnaData.content_themes.map((item: string, idx: number) => (
                         <li key={idx} className="text-sm flex items-start gap-2">
@@ -1455,10 +1455,10 @@ export function StrategyHubPage() {
               </div>
 
               {/* Keywords + Colors + Social */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4" onClick={handleEnterDnaEdit}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {dnaData.keywords && dnaData.keywords.length > 0 && (
-                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Keywords <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                  <div className="card p-5 transition-all">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Keywords <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                     <div className="flex flex-wrap gap-1.5">
                       {dnaData.keywords.map((kw: string, idx: number) => (
                         <span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>
@@ -1467,8 +1467,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.color_theme && dnaData.color_theme.length > 0 && (
-                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Color Theme <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                  <div className="card p-5 transition-all">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Color Theme <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                     <div className="flex flex-wrap gap-2">
                       {dnaData.color_theme.map((color: string, idx: number) => (
                         <span key={idx} className="flex items-center gap-1.5 text-sm">
@@ -1480,8 +1480,8 @@ export function StrategyHubPage() {
                   </div>
                 )}
                 {dnaData.social_platforms && dnaData.social_platforms.length > 0 && (
-                  <div className="card p-5 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group">
-                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Social Platforms <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" /></h4>
+                  <div className="card p-5 transition-all">
+                    <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Social Platforms <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                     <div className="flex flex-wrap gap-2">
                       {dnaData.social_platforms.map((p: string, idx: number) => (
                         <span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>
@@ -1498,10 +1498,10 @@ export function StrategyHubPage() {
                 );
                 if (customEntries.length === 0) return null;
                 return (
-                  <div className="card p-6 cursor-pointer hover:ring-1 hover:ring-primary-500/40 transition-all group" onClick={handleEnterDnaEdit}>
+                  <div className="card p-6 transition-all">
                     <h3 className="text-sm font-semibold mb-4 uppercase tracking-wide text-text-secondary flex items-center justify-between">
                       Custom Fields
-                      <PencilIcon className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+                      <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button>
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {customEntries.map(([key, val]) => (

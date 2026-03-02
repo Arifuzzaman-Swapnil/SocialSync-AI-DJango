@@ -698,8 +698,11 @@ def generate_caption(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        # Return serialized CaptionGeneration object
-        return Response(CaptionGenerationSerializer(caption_gen).data)
+        # Return serialized CaptionGeneration object + used_prompt
+        response_data = CaptionGenerationSerializer(caption_gen).data
+        if result.get('used_prompt'):
+            response_data['used_prompt'] = result['used_prompt']
+        return Response(response_data)
 
     except Exception as e:
         return Response(
@@ -1209,7 +1212,7 @@ def refine_image_prompt(request):
         )
         refined_prompt = response.choices[0].message.content.strip()
 
-        return Response({'refined_prompt': refined_prompt})
+        return Response({'refined_prompt': refined_prompt, 'used_prompt': f"SYSTEM:\n{system_message}\n\nUSER:\n{user_message}"})
 
     except Exception as e:
         logger.error(f"Prompt refinement failed: {e}")
@@ -3018,6 +3021,7 @@ Return ONLY a single JSON object with all 15 fields as keys.
                 'brand_dna': dna_data,
                 'generated_at': brand.brand_dna_generated_at.isoformat(),
                 'message': 'Brand DNA generated successfully from your website!',
+                'used_prompt': prompt,
             })
 
         except json.JSONDecodeError:

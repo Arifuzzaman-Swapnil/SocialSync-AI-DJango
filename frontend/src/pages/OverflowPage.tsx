@@ -22,6 +22,7 @@ import {
   HandThumbUpIcon,
   HandThumbDownIcon,
   ChevronDownIcon,
+  ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
 import { useOverflowStore } from '../store';
 import strategyService from '../services/strategyService';
@@ -30,6 +31,7 @@ import { imageService } from '../services/imageService';
 import postService from '../services/postService';
 import api from '../services/api';
 import type { ContentIdea, TrendingTopic, PlatformType } from '../types';
+import { PromptInfoButton } from '../components/ui/PromptInfoButton';
 
 // ─── Step indicator ────────────────────────────────────────
 const STEPS = [
@@ -286,6 +288,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
   const [customFields, setCustomFields] = useState<Array<{ key: string; value: string; type: 'text' | 'list' }>>([]);
   const [newFieldKey, setNewFieldKey] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text' | 'list'>('text');
+  const [dnaUsedPrompt, setDnaUsedPrompt] = useState('');
 
   const BUILTIN_KEYS = new Set([
     'brand_name', 'tagline', 'industry', 'description', 'products_services',
@@ -314,6 +317,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
       if (result.brand_dna) {
         setDnaData(result.brand_dna);
         overflow.markDNAComplete();
+        if (result.used_prompt) setDnaUsedPrompt(result.used_prompt);
       }
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to generate DNA.');
@@ -383,6 +387,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
           <BeakerIcon className="w-5 h-5 text-primary-400" />
           Brand DNA Generator
+          <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" />
         </h3>
         <p className="text-sm text-text-secondary mb-4">
           Enter your website URL and we'll analyze it to extract your brand's identity, tone, products, values, and more.
@@ -660,6 +665,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
   const [focusAreas, setFocusAreas] = useState('');
   const [genCount, setGenCount] = useState(5);
   const [showGenPanel, setShowGenPanel] = useState(false);
+  const [pillarsUsedPrompt, setPillarsUsedPrompt] = useState('');
 
   const load = useCallback(async () => {
     if (!brandId) { setLoading(false); return; }
@@ -701,7 +707,8 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
     setGenerating(true);
     try {
       const areas = focusAreas.split(',').map((a) => a.trim()).filter(Boolean);
-      await strategyService.generatePillars(brandId, genCount, areas);
+      const genResult = await strategyService.generatePillars(brandId, genCount, areas);
+      if (genResult.used_prompt) setPillarsUsedPrompt(genResult.used_prompt);
       setShowGenPanel(false);
       setFocusAreas('');
       await load();
@@ -729,6 +736,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <div className="w-5 h-5 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
           Content Pillars
+          <PromptInfoButton prompt={pillarsUsedPrompt} label="Content Pillars Generation Prompt" />
         </h3>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowGenPanel(!showGenPanel)} className="btn-primary text-sm flex items-center gap-1.5">
@@ -867,6 +875,7 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
   const [analyzingAll, setAnalyzingAll] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [competitorUsedPrompts, setCompetitorUsedPrompts] = useState<Record<string, string>>({});
 
   const scoreColor = (score: number) => {
     if (score >= 8) return 'text-green-400 bg-green-400/10';
@@ -917,6 +926,11 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
           const kept = prev.filter((i) => !analyzed.has(i.competitor));
           return [...result.insights, ...kept];
         });
+      }
+      if (result.used_prompts) {
+        const promptMap: Record<string, string> = {};
+        result.used_prompts.forEach((p: { competitor: string; prompt: string }) => { promptMap[p.competitor] = p.prompt; });
+        setCompetitorUsedPrompts((prev) => ({ ...prev, ...promptMap }));
       }
       overflow.markCompetitorsComplete();
       load();
@@ -1005,6 +1019,7 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
                     <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                       <LightBulbIcon className="w-4 h-4 text-yellow-400" />
                       Strategic Insights
+                      <PromptInfoButton prompt={competitorUsedPrompts[comp.handle_or_url] || ''} label={`Competitor Analysis Prompt — ${comp.handle_or_url}`} />
                     </h4>
                     <div className="space-y-3">
                       {compInsights.map((insight) => (
@@ -1015,6 +1030,13 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
                               {insight.angle && <p className="text-xs text-text-secondary mt-1">Angle: {insight.angle}</p>}
                               {insight.based_on && <p className="text-xs text-text-secondary mt-1 italic">Based on: {insight.based_on}</p>}
                               {insight.recommendation && <p className="text-xs text-primary-400 mt-1">Action: {insight.recommendation}</p>}
+                              {(insight.source_url || insight.competitor) && (
+                                <a href={insight.source_url || insight.competitor} target="_blank" rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary-400/70 hover:text-primary-400 mt-2 transition-colors">
+                                  <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                                  {insight.source_url || insight.competitor}
+                                </a>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <span className="badge text-xs">{insight.format_type}</span>
@@ -1080,6 +1102,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
   // Custom topic input
   const [customTopic, setCustomTopic] = useState('');
   const [addingCustom, setAddingCustom] = useState(false);
+  const [trendingUsedPrompt, setTrendingUsedPrompt] = useState('');
 
   // Load cached trending data + existing feedback on mount
   useEffect(() => {
@@ -1128,6 +1151,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
       const result = await strategyService.generateTrending(id);
       const arr = result?.topics || [];
       setTopics(arr);
+      if (result?.used_prompt) setTrendingUsedPrompt(result.used_prompt);
       if (arr.length > 0) markTrendingComplete();
       else setError('No trending topics found. Try again.');
     } catch (err: any) {
@@ -1181,6 +1205,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <FireIcon className="w-5 h-5 text-orange-400" />
           Trending Topics
+          <PromptInfoButton prompt={trendingUsedPrompt} label="Trending Topics Generation Prompt" />
         </h3>
         <button onClick={handleGenerate} disabled={loading} className="btn-primary text-sm flex items-center gap-2">
           {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowPathIcon className="w-4 h-4" />}
@@ -1338,6 +1363,7 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ideasUsedPrompt, setIdeasUsedPrompt] = useState('');
 
   const doGenerate = useCallback(async () => {
     if (!brandId) {
@@ -1356,6 +1382,7 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
       });
       const newIdeas = result.ideas || result || [];
       setIdeas(newIdeas);
+      if (result.used_prompt) setIdeasUsedPrompt(result.used_prompt);
       // Store idea data for CaptionsStep + auto-select all
       const mapped = newIdeas.map((i: ContentIdea) => ({
         id: i.id, title: i.title, hook: i.hook, angle: i.angle || '',
@@ -1385,6 +1412,7 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <LightBulbIcon className="w-5 h-5 text-yellow-400" />
             Content Ideas
+            <PromptInfoButton prompt={ideasUsedPrompt} label="Content Ideas Generation Prompt" />
           </h3>
           <button onClick={doGenerate} disabled={loading} className="btn-secondary text-sm flex items-center gap-2">
             {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowPathIcon className="w-4 h-4" />}
@@ -1457,6 +1485,7 @@ function CaptionsStep() {
   const [customPrompts, setCustomPrompts] = useState<Record<number, string>>({});
   const [editingIdeaId, setEditingIdeaId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
+  const [captionUsedPrompts, setCaptionUsedPrompts] = useState<Record<string, string>>({});
 
   const getIdea = (ideaId: number) => overflow.ideasData.find((i) => i.id === ideaId);
   const topics = overflow.selectedTrendingTopics;
@@ -1469,38 +1498,18 @@ function CaptionsStep() {
       : 'an engaging social media post';
     const platform = idea?.platform || 'instagram';
 
-    const baseInstructions = `<task>
-Write a ready-to-post social media caption for ${platform}.
-</task>
-
-<requirements>
-- This is variant {VAR} of 3.
-- Each variant MUST use a completely different creative approach:
-  * Variant 1: Lead with a QUESTION or CURIOSITY GAP hook
-  * Variant 2: Lead with a BOLD STATEMENT or CONTRARIAN take
-  * Variant 3: Lead with a MICRO-STORY or PERSONAL angle
-- The caption must be immediately copy-paste-ready.
-- Do NOT mention any idea number, internal ID, or the word "idea."
-</requirements>
-
-<parameters>
-Tone: enthusiastic
-Length: medium (40-80 words)
-Include hashtags: true (3-5 relevant hashtags at the end)
-Include emojis: true (2-3, placed naturally)
-Include CTA: true (clear, specific action)
-</parameters>
-
-<output_rules>
-- Output the caption ONLY — no labels, no preamble, no explanation.
-- Must be immediately ready to paste into ${platform}.
-</output_rules>`;
-    const extraInstructions = customInstructions
-      ? `\n\n<user_instructions>\n${customInstructions}\n</user_instructions>`
-      : '';
+    const variantApproaches = [
+      'Lead with a QUESTION or CURIOSITY GAP hook that makes the reader stop scrolling.',
+      'Lead with a BOLD STATEMENT or CONTRARIAN take that challenges conventional thinking.',
+      'Lead with a MICRO-STORY or PERSONAL angle that creates emotional connection.',
+    ];
 
     const variants: CaptionVariant[] = [];
     for (let i = 0; i < 3; i++) {
+      const variantInstruction = `This is variant ${i + 1} of 3. ${variantApproaches[i]}
+The caption must be immediately copy-paste-ready for ${platform}. Do NOT mention any idea number, internal ID, or the word "idea."
+Output the caption ONLY — no labels, no preamble, no explanation.${customInstructions ? `\n\nAdditional instructions: ${customInstructions}` : ''}`;
+
       const result = await captionService.generate({
         topic,
         tone: 'enthusiastic',
@@ -1509,8 +1518,12 @@ Include CTA: true (clear, specific action)
         include_hashtags: true,
         include_emojis: true,
         include_cta: true,
-        custom_instructions: baseInstructions.replace('{VAR}', String(i + 1)) + extraInstructions,
+        custom_instructions: variantInstruction,
       });
+      // Store used prompt from first variant
+      if (i === 0 && result.used_prompt) {
+        setCaptionUsedPrompts((prev) => ({ ...prev, [String(ideaId)]: result.used_prompt }));
+      }
       variants.push({
         id: `${ideaId}-${i}`,
         ideaId,
@@ -1524,8 +1537,10 @@ Include CTA: true (clear, specific action)
   // Auto-generate captions for ALL ideas on mount
   useEffect(() => {
     if (autoTriggered || overflow.selectedIdeaIds.length === 0 || overflow.ideasData.length === 0) return;
-    // Skip if captions already exist for all ideas
-    const allDone = overflow.selectedIdeaIds.every((id) => captionGroups[id]?.length > 0);
+    // Skip if captions already exist WITH actual text for all ideas
+    const hasRealCaptions = (group: CaptionVariant[] | undefined) =>
+      group && group.length > 0 && group.some((c) => c.text.trim().length > 0);
+    const allDone = overflow.selectedIdeaIds.every((id) => hasRealCaptions(captionGroups[id]));
     if (allDone) return;
 
     setAutoTriggered(true);
@@ -1535,9 +1550,9 @@ Include CTA: true (clear, specific action)
     (async () => {
       for (let idx = 0; idx < ideaIds.length; idx++) {
         const ideaId = ideaIds[idx];
-        if (captionGroups[ideaId]?.length > 0) {
+        if (hasRealCaptions(captionGroups[ideaId])) {
           setProgress((p) => ({ ...p, done: p.done + 1 }));
-          continue; // already has captions
+          continue; // already has real captions with text
         }
         setGeneratingId(ideaId);
         try {
@@ -1679,6 +1694,7 @@ Include CTA: true (clear, specific action)
                   <div className="flex items-center gap-2">
                     <LightBulbIcon className="w-4 h-4 text-yellow-400 shrink-0" />
                     <h4 className="text-sm font-semibold">{idea?.title || 'Content Idea'}</h4>
+                    <PromptInfoButton prompt={captionUsedPrompts[String(ideaId)] || ''} label="Caption Generation Prompt" />
                   </div>
                   {idea?.hook && <p className="text-xs text-text-secondary mt-1 ml-6">{idea.hook}</p>}
                   {idea?.angle && <p className="text-xs text-text-muted mt-0.5 ml-6 italic">{idea.angle}</p>}
@@ -1811,10 +1827,14 @@ function MediaStep() {
   const [modes, setModes] = useState<Record<string, 'upload' | 'generate'>>({});
   const [prompts, setPrompts] = useState<Record<string, string>>({});
   const [styles, setStyles] = useState<Record<string, string>>({});
-  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
   const [refiningMap, setRefiningMap] = useState<Record<string, boolean>>({});
+  const [generatingMap, setGeneratingMap] = useState<Record<string, boolean>>({});
   const [errorMap, setErrorMap] = useState<Record<string, string | null>>({});
   const [refinedPrompts, setRefinedPrompts] = useState<Record<string, string | null>>({});
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File[]>>({});
+  const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Record<string, string[]>>({});
+  const [refineUsedPrompts, setRefineUsedPrompts] = useState<Record<string, string>>({});
+  const [imageUsedPrompts, setImageUsedPrompts] = useState<Record<string, string>>({});
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const captions = overflow.selectedCaptions;
@@ -1834,6 +1854,15 @@ function MediaStep() {
     }
   }, [captions]);
 
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(uploadPreviewUrls).forEach((urls) => {
+        urls.forEach((url) => { if (url) URL.revokeObjectURL(url); });
+      });
+    };
+  }, []);
+
   const getIdea = (ideaId: number) => overflow.ideasData.find((i) => i.id === ideaId);
 
   const gatherContext = (captionText: string) => {
@@ -1850,64 +1879,122 @@ function MediaStep() {
   };
 
   const handleFileUpload = (captionId: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const previewUrl = URL.createObjectURL(file);
-      overflow.setCaptionMedia(captionId, previewUrl, null);
-    }
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newFiles = Array.from(files);
+    const newUrls = newFiles.map((f) => URL.createObjectURL(f));
+    setUploadedFiles((p) => ({ ...p, [captionId]: [...(p[captionId] || []), ...newFiles] }));
+    setUploadPreviewUrls((p) => ({ ...p, [captionId]: [...(p[captionId] || []), ...newUrls] }));
+    // Clear refined prompt when new files are uploaded (context changed)
+    setRefinedPrompts((p) => ({ ...p, [captionId]: null }));
+    // Reset file input so same file can be re-selected
+    e.target.value = '';
   };
 
   const handleRemoveMedia = (captionId: string) => {
     overflow.setCaptionMedia(captionId, null, null);
+    (uploadPreviewUrls[captionId] || []).forEach((url) => URL.revokeObjectURL(url));
+    setUploadedFiles((p) => ({ ...p, [captionId]: [] }));
+    setUploadPreviewUrls((p) => ({ ...p, [captionId]: [] }));
+    setRefinedPrompts((p) => ({ ...p, [captionId]: null }));
+    setErrorMap((p) => ({ ...p, [captionId]: null }));
   };
 
-  const handleGenerate = async (captionId: string) => {
-    const userPrompt = prompts[captionId]?.trim();
-    if (!userPrompt) return;
+  const handleRemoveUploadedFile = (captionId: string, fileIndex: number) => {
+    const urls = uploadPreviewUrls[captionId] || [];
+    if (urls[fileIndex]) URL.revokeObjectURL(urls[fileIndex]);
+    setUploadedFiles((p) => ({ ...p, [captionId]: (p[captionId] || []).filter((_, i) => i !== fileIndex) }));
+    setUploadPreviewUrls((p) => ({ ...p, [captionId]: (p[captionId] || []).filter((_, i) => i !== fileIndex) }));
+    setRefinedPrompts((p) => ({ ...p, [captionId]: null }));
+  };
+
+  const handleModeSwitch = (captionId: string, newMode: 'upload' | 'generate') => {
+    setModes((p) => ({ ...p, [captionId]: newMode }));
+    setRefinedPrompts((p) => ({ ...p, [captionId]: null }));
+    setErrorMap((p) => ({ ...p, [captionId]: null }));
+    if (newMode === 'generate') {
+      (uploadPreviewUrls[captionId] || []).forEach((url) => URL.revokeObjectURL(url));
+      setUploadedFiles((p) => ({ ...p, [captionId]: [] }));
+      setUploadPreviewUrls((p) => ({ ...p, [captionId]: [] }));
+    }
+  };
+
+  // Step 1: Refine prompt only ("Generate Prompt" button)
+  const handleRefinePrompt = async (captionId: string) => {
     const style = styles[captionId] || 'modern';
     const caption = captions.find((c) => c.id === captionId);
+    const idea = caption ? getIdea(caption.ideaId) : null;
 
-    setLoadingMap((p) => ({ ...p, [captionId]: true }));
+    // Auto-fill if prompt is empty
+    let userPrompt = prompts[captionId]?.trim();
+    if (!userPrompt) {
+      const parts: string[] = [];
+      if (idea) { parts.push(idea.title); if (idea.hook) parts.push(idea.hook); }
+      if (overflow.selectedTrendingTopics.length > 0) parts.push(`themed around ${overflow.selectedTrendingTopics[0]}`);
+      if (overflow.brandContext) parts.push(`for ${overflow.brandContext.brand_name}`);
+      userPrompt = parts.join(' — ') || 'A professional social media image';
+      setPrompts((p) => ({ ...p, [captionId]: userPrompt! }));
+    }
+
     setRefiningMap((p) => ({ ...p, [captionId]: true }));
     setErrorMap((p) => ({ ...p, [captionId]: null }));
 
     try {
-      // Step 1: Refine prompt via link prompt
       const ctx = gatherContext(caption?.text || '');
       const refineResult = await imageService.refinePrompt({ ...ctx, user_prompt: userPrompt, style });
-      const finalPrompt = refineResult.refined_prompt;
-      setRefinedPrompts((p) => ({ ...p, [captionId]: finalPrompt }));
-      setRefiningMap((p) => ({ ...p, [captionId]: false }));
-
-      // Step 2: Generate image with enhanced prompt structure
-      const enhancedImagePrompt = `Create a professional social media content image based on this description: ${finalPrompt}\n\nRequirements:\n- Clean, brand-appropriate composition suitable for marketing\n- High visual quality with professional lighting\n- Clear focal point and intentional negative space\n- Style: ${style}\n- No text or watermarks in the image\n\nEnhance this prompt with specific details about composition, lighting direction, color palette, and depth of field to produce the highest quality result.`;
-      const result = await imageService.generate({ prompt: enhancedImagePrompt, style, enhance_prompt: true });
-      const rawUrl = result.generated_image || result.generated_image_with_logo || null;
-      const imageUrl = toMediaUrl(rawUrl);
-      overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
-      if (result.id) overflow.addMedia(result.id);
+      setRefinedPrompts((p) => ({ ...p, [captionId]: refineResult.refined_prompt }));
+      if (refineResult.used_prompt) setRefineUsedPrompts((p) => ({ ...p, [captionId]: refineResult.used_prompt }));
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.message || 'Failed to generate image.';
-      setErrorMap((p) => ({ ...p, [captionId]: msg.toLowerCase().includes('safety') ? 'Prompt flagged by safety system. Try rephrasing.' : msg }));
+      const msg = err?.response?.data?.error || err?.message || 'Failed to refine prompt.';
+      setErrorMap((p) => ({ ...p, [captionId]: msg }));
     }
     setRefiningMap((p) => ({ ...p, [captionId]: false }));
-    setLoadingMap((p) => ({ ...p, [captionId]: false }));
   };
 
-  const handleRegenerateRefined = async (captionId: string, editedPrompt: string) => {
+  // Step 2: Generate image from refined prompt ("Generate Image" button)
+  const handleGenerateImage = async (captionId: string) => {
+    const refined = refinedPrompts[captionId];
+    if (!refined) return;
     const style = styles[captionId] || 'modern';
-    setLoadingMap((p) => ({ ...p, [captionId]: true }));
+    const mode = modes[captionId] || 'generate';
+
+    setGeneratingMap((p) => ({ ...p, [captionId]: true }));
     setErrorMap((p) => ({ ...p, [captionId]: null }));
+
     try {
-      const result = await imageService.generate({ prompt: editedPrompt, style, enhance_prompt: true });
-      const rawUrl = result.generated_image || result.generated_image_with_logo || null;
+      const enhancedImagePrompt = `Create a professional social media content image based on this description: ${refined}\n\nRequirements:\n- Clean, brand-appropriate composition suitable for marketing\n- High visual quality with professional lighting\n- Clear focal point and intentional negative space\n- Style: ${style}\n- No text or watermarks in the image\n\nEnhance this prompt with specific details about composition, lighting direction, color palette, and depth of field to produce the highest quality result.`;
+
+      const generateRequest: any = {
+        prompt: enhancedImagePrompt,
+        style,
+        enhance_prompt: true,
+      };
+
+      // Include first uploaded image as product image for compositing
+      const files = uploadedFiles[captionId] || [];
+      if (mode === 'upload' && files.length > 0) {
+        generateRequest.product_image = files[0];
+        generateRequest.product_position = 'center';
+        generateRequest.product_scale = 50;
+      }
+
+      const result = await imageService.generate(generateRequest);
+      // Prioritize composited_image (product on scene), then generated_image
+      const rawUrl = result.composited_image || result.generated_image || result.generated_image_with_logo || null;
       const imageUrl = toMediaUrl(rawUrl);
       overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
       if (result.id) overflow.addMedia(result.id);
+      // Store enhanced prompt from image generation
+      const genPrompt = result.enhanced_prompt || result.revised_prompt || '';
+      if (genPrompt) setImageUsedPrompts((p) => ({ ...p, [captionId]: genPrompt }));
     } catch (err: any) {
-      setErrorMap((p) => ({ ...p, [captionId]: err?.response?.data?.error || err?.message || 'Failed to generate.' }));
+      const msg = err?.response?.data?.error || err?.message || 'Failed to generate image.';
+      setErrorMap((p) => ({
+        ...p,
+        [captionId]: msg.toLowerCase().includes('safety') ? 'Prompt flagged by safety system. Try rephrasing.' : msg,
+      }));
     }
-    setLoadingMap((p) => ({ ...p, [captionId]: false }));
+    setGeneratingMap((p) => ({ ...p, [captionId]: false }));
   };
 
   const doneCount = captions.filter((c) => overflow.captionMediaMap[c.id]?.mediaUrl).length;
@@ -1949,10 +2036,14 @@ function MediaStep() {
         const mediaUrl = toMediaUrl(media?.mediaUrl);
         const idea = getIdea(cap.ideaId);
         const mode = modes[cap.id] || 'generate';
-        const isLoading = loadingMap[cap.id] || false;
         const isRefining = refiningMap[cap.id] || false;
+        const isGenerating = generatingMap[cap.id] || false;
+        const isBusy = isRefining || isGenerating;
         const error = errorMap[cap.id] || null;
         const refined = refinedPrompts[cap.id] || null;
+        const uploadPreviews = uploadPreviewUrls[cap.id] || [];
+        const uploadFiles = uploadedFiles[cap.id] || [];
+        const hasUploadedFiles = uploadFiles.length > 0;
 
         return (
           <div key={cap.id} className="card overflow-hidden">
@@ -2000,7 +2091,7 @@ function MediaStep() {
                 {/* Mode toggle */}
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setModes((p) => ({ ...p, [cap.id]: 'upload' }))}
+                    onClick={() => handleModeSwitch(cap.id, 'upload')}
                     className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
                       mode === 'upload' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
                     }`}
@@ -2008,7 +2099,7 @@ function MediaStep() {
                     <ArrowUpTrayIcon className="w-3.5 h-3.5" /> Upload
                   </button>
                   <button
-                    onClick={() => setModes((p) => ({ ...p, [cap.id]: 'generate' }))}
+                    onClick={() => handleModeSwitch(cap.id, 'generate')}
                     className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors ${
                       mode === 'generate' ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50' : 'bg-white/5 text-text-muted hover:bg-white/10'
                     }`}
@@ -2017,27 +2108,46 @@ function MediaStep() {
                   </button>
                 </div>
 
-                {/* Upload mode */}
+                {/* Upload area (only in upload mode) */}
                 {mode === 'upload' && (
                   <div>
                     <input
                       ref={(el) => { fileRefs.current[cap.id] = el; }}
                       type="file"
-                      accept="image/*,video/*"
+                      accept="image/*"
+                      multiple
                       onChange={(e) => handleFileUpload(cap.id, e)}
                       className="hidden"
                     />
-                    {mediaUrl ? (
+                    {hasUploadedFiles ? (
                       <div className="space-y-2">
-                        <img src={mediaUrl} alt="" className="rounded-lg max-h-48 mx-auto border border-white/10" />
-                        <div className="flex items-center justify-center gap-3">
-                          <button onClick={() => fileRefs.current[cap.id]?.click()} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
-                            <ArrowPathIcon className="w-3 h-3" /> Replace
-                          </button>
-                          <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                            <TrashIcon className="w-3 h-3" /> Remove
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] text-text-muted font-medium uppercase">
+                            Uploaded Image{uploadFiles.length > 1 ? 's' : ''} ({uploadFiles.length})
+                          </p>
+                          <button onClick={() => fileRefs.current[cap.id]?.click()} className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-1">
+                            <ArrowUpTrayIcon className="w-2.5 h-2.5" /> Add more
                           </button>
                         </div>
+                        <div className={`grid gap-2 ${uploadPreviews.length === 1 ? 'grid-cols-1' : uploadPreviews.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                          {uploadPreviews.map((previewUrl, fileIdx) => (
+                            <div key={fileIdx} className="relative group">
+                              <img src={previewUrl} alt={`Upload ${fileIdx + 1}`} className={`rounded-lg w-full border border-white/10 object-cover ${uploadPreviews.length === 1 ? 'max-h-48 mx-auto' : 'h-28'}`} />
+                              {fileIdx === 0 && uploadFiles.length > 1 && (
+                                <span className="absolute top-1 left-1 text-[8px] px-1.5 py-0.5 rounded bg-primary-500/80 text-white font-medium">Primary</span>
+                              )}
+                              <button
+                                onClick={() => handleRemoveUploadedFile(cap.id, fileIdx)}
+                                className="absolute top-1 right-1 p-0.5 rounded-full bg-black/60 text-red-400 hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <TrashIcon className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-center text-text-muted">
+                          {uploadFiles.length > 1 ? 'First image will be used as the primary product for compositing' : 'AI will generate a professional scene for this product'}
+                        </p>
                       </div>
                     ) : (
                       <button
@@ -2045,58 +2155,54 @@ function MediaStep() {
                         className="flex flex-col items-center gap-2 px-4 py-8 rounded-lg border-2 border-dashed border-white/15 hover:border-primary-500/40 transition-colors w-full"
                       >
                         <ArrowUpTrayIcon className="w-6 h-6 text-text-muted" />
-                        <p className="text-xs text-text-muted">Click to upload</p>
+                        <p className="text-xs text-text-muted">Upload product images</p>
+                        <p className="text-[10px] text-text-muted/60">Single or multiple — AI will generate a scene and composite your product onto it</p>
                       </button>
                     )}
                   </div>
                 )}
 
-                {/* Generate mode */}
-                {mode === 'generate' && (
-                  <div className="space-y-3">
-                    {/* Current image preview */}
-                    {mediaUrl && (
-                      <div className="space-y-2">
-                        <img src={mediaUrl} alt="" className="rounded-lg max-h-48 mx-auto border border-white/10" />
-                        <div className="flex items-center justify-center">
-                          <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                            <TrashIcon className="w-3 h-3" /> Remove
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-medium">Image Description</label>
-                        <button
-                          onClick={() => {
-                            const parts: string[] = [];
-                            if (idea) { parts.push(idea.title); if (idea.hook) parts.push(idea.hook); }
-                            if (overflow.selectedTrendingTopics.length > 0) parts.push(`themed around ${overflow.selectedTrendingTopics[0]}`);
-                            if (overflow.brandContext) parts.push(`for ${overflow.brandContext.brand_name}`);
-                            if (parts.length > 0) setPrompts((p) => ({ ...p, [cap.id]: parts.join(' — ') }));
-                          }}
-                          className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-1"
-                        >
-                          <SparklesIcon className="w-2.5 h-2.5" /> Auto-fill
-                        </button>
-                      </div>
-                      <textarea
-                        className="input w-full text-xs"
-                        rows={2}
-                        value={prompts[cap.id] || ''}
-                        onChange={(e) => setPrompts((p) => ({ ...p, [cap.id]: e.target.value }))}
-                        placeholder={idea ? `${idea.title} — ${idea.hook}` : 'Describe the image...'}
-                      />
+                {/* Shared AI pipeline (both modes) */}
+                <div className="space-y-3">
+                  {/* Prompt textarea */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium">
+                        {mode === 'upload' ? 'Scene Description' : 'Image Description'}
+                        <span className="text-text-muted font-normal ml-1">(optional)</span>
+                      </label>
+                      <button
+                        onClick={() => {
+                          const parts: string[] = [];
+                          if (idea) { parts.push(idea.title); if (idea.hook) parts.push(idea.hook); }
+                          if (overflow.selectedTrendingTopics.length > 0) parts.push(`themed around ${overflow.selectedTrendingTopics[0]}`);
+                          if (overflow.brandContext) parts.push(`for ${overflow.brandContext.brand_name}`);
+                          if (parts.length > 0) setPrompts((p) => ({ ...p, [cap.id]: parts.join(' — ') }));
+                        }}
+                        className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                      >
+                        <SparklesIcon className="w-2.5 h-2.5" /> Auto-fill
+                      </button>
                     </div>
+                    <textarea
+                      className="input w-full text-xs"
+                      rows={2}
+                      value={prompts[cap.id] || ''}
+                      onChange={(e) => { setPrompts((p) => ({ ...p, [cap.id]: e.target.value })); setRefinedPrompts((p) => ({ ...p, [cap.id]: null })); }}
+                      placeholder={mode === 'upload'
+                        ? 'Describe the scene for your product (e.g., marble surface with soft lighting)...'
+                        : (idea ? `${idea.title} — ${idea.hook}` : 'Describe the image...')}
+                    />
+                  </div>
 
-                    {/* Style selector */}
+                  {/* Style selector */}
+                  <div>
+                    <p className="text-[10px] text-text-muted font-medium uppercase mb-1.5">Image Style</p>
                     <div className="flex gap-1.5 flex-wrap">
                       {STYLE_OPTIONS.map((s) => (
                         <button
                           key={s.value}
-                          onClick={() => setStyles((p) => ({ ...p, [cap.id]: s.value }))}
+                          onClick={() => { setStyles((p) => ({ ...p, [cap.id]: s.value })); setRefinedPrompts((p) => ({ ...p, [cap.id]: null })); }}
                           className={`text-[10px] px-2.5 py-1 rounded-lg transition-colors ${
                             (styles[cap.id] || 'modern') === s.value
                               ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
@@ -2107,50 +2213,77 @@ function MediaStep() {
                         </button>
                       ))}
                     </div>
+                  </div>
 
-                    {/* Generate button */}
+                  {/* "Generate Prompt" button */}
+                  <button
+                    onClick={() => handleRefinePrompt(cap.id)}
+                    disabled={isRefining || (mode === 'upload' && !hasUploadedFiles)}
+                    className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
+                  >
+                    {isRefining ? (
+                      <div className="animate-spin h-3.5 w-3.5 border-b-2 border-white rounded-full" />
+                    ) : (
+                      <SparklesIcon className="w-3.5 h-3.5" />
+                    )}
+                    {isRefining ? 'Generating Prompt...' : refined ? 'Re-generate Prompt' : 'Generate Prompt'}
+                  </button>
+
+                  {/* Refined prompt box */}
+                  {refined && (
+                    <div className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2 space-y-1.5">
+                      <p className="text-[10px] font-medium text-green-400 flex items-center gap-1">
+                        <SparklesIcon className="w-2.5 h-2.5" /> Refined Prompt
+                        <PromptInfoButton prompt={refineUsedPrompts[cap.id] || ''} label="Image Prompt Refinement Prompt" />
+                      </p>
+                      <textarea
+                        className="input w-full text-[11px]"
+                        rows={3}
+                        value={refined}
+                        onChange={(e) => setRefinedPrompts((p) => ({ ...p, [cap.id]: e.target.value }))}
+                      />
+                    </div>
+                  )}
+
+                  {/* "Generate Image" button (only shows after refined prompt exists) */}
+                  {refined && (
                     <button
-                      onClick={() => handleGenerate(cap.id)}
-                      disabled={isLoading || !(prompts[cap.id]?.trim())}
-                      className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5"
+                      onClick={() => handleGenerateImage(cap.id)}
+                      disabled={isGenerating}
+                      className="btn-primary text-xs py-2.5 px-5 flex items-center gap-1.5 bg-gradient-to-r from-primary-500 to-pink-500 hover:from-primary-400 hover:to-pink-400"
                     >
-                      {(isLoading || isRefining) ? (
+                      {isGenerating ? (
                         <div className="animate-spin h-3.5 w-3.5 border-b-2 border-white rounded-full" />
                       ) : (
-                        <SparklesIcon className="w-3.5 h-3.5" />
+                        <PhotoIcon className="w-3.5 h-3.5" />
                       )}
-                      {isRefining ? 'Refining...' : isLoading ? 'Generating...' : mediaUrl ? 'Re-generate' : 'Generate'}
+                      {isGenerating ? 'Generating Image...' : media?.mediaId ? 'Re-generate Image' : 'Generate Image'}
                     </button>
+                  )}
 
-                    {/* Refined prompt */}
-                    {refined && (
-                      <div className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2 space-y-1.5">
-                        <p className="text-[10px] font-medium text-green-400 flex items-center gap-1">
-                          <SparklesIcon className="w-2.5 h-2.5" /> Refined Prompt
-                        </p>
-                        <textarea
-                          className="input w-full text-[11px]"
-                          rows={2}
-                          value={refined}
-                          onChange={(e) => setRefinedPrompts((p) => ({ ...p, [cap.id]: e.target.value }))}
-                        />
-                        <button
-                          onClick={() => handleRegenerateRefined(cap.id, refined)}
-                          disabled={isLoading}
-                          className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-1"
-                        >
-                          <ArrowPathIcon className="w-2.5 h-2.5" /> Re-generate with edited prompt
+                  {/* Generated image result */}
+                  {media?.mediaId && mediaUrl && (
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                      <p className="text-[10px] font-medium text-green-400 uppercase flex items-center gap-1">
+                        <CheckCircleIcon className="w-3 h-3" /> Generated Result
+                        <PromptInfoButton prompt={imageUsedPrompts[cap.id] || ''} label="Image Generation Prompt (Enhanced)" />
+                      </p>
+                      <img src={mediaUrl} alt="" className="rounded-lg max-h-56 mx-auto border border-white/10" />
+                      <div className="flex items-center justify-center">
+                        <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                          <TrashIcon className="w-3 h-3" /> Remove
                         </button>
                       </div>
-                    )}
+                    </div>
+                  )}
 
-                    {error && (
-                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
-                        <p className="text-xs text-red-400">{error}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {/* Error display */}
+                  {error && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+                      <p className="text-xs text-red-400">{error}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

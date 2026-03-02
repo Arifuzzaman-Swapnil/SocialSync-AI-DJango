@@ -411,6 +411,7 @@ Google Trends data: {trend_list}
             'count': len(created),
             'source': 'pytrends+openai' if all_trends else 'openai',
             'topics': created,
+            'used_prompt': prompt,
         }
 
     except json.JSONDecodeError as e:
