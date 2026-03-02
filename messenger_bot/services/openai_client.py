@@ -2,13 +2,17 @@
 
 """
 OpenAI Client Service
-Handles OpenAI API interactions for embeddings and chat completions
+Handles OpenAI API interactions for embeddings and chat completions.
+Chat/vision completions are routed through the unified LLM service;
+embeddings remain OpenAI-only.
 """
 
 import openai
 import logging
 from typing import List, Dict, Optional
 import numpy as np
+
+from accounts.services.llm_service import UnifiedLLMService
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +21,19 @@ class OpenAIClient:
     """
     Wrapper for OpenAI API operations
     """
-    
-    def __init__(self, api_key: str):
+
+    def __init__(self, api_key: str, llm_service: Optional[UnifiedLLMService] = None):
         """
         Initialize OpenAI client
-        
+
         Args:
             api_key: OpenAI API key
+            llm_service: Optional UnifiedLLMService instance for chat/vision.
+                         When not provided, one is created from api_key.
         """
         self.api_key = api_key
         openai.api_key = api_key
+        self.llm_service = llm_service or UnifiedLLMService(openai_key=api_key)
     
     def create_embedding(self, text: str, model: str = "text-embedding-3-small") -> List[float]:
         """
@@ -112,15 +119,15 @@ class OpenAIClient:
         **kwargs
     ) -> Dict[str, any]:
         """
-        Create chat completion
-        
+        Create chat completion via the unified LLM service.
+
         Args:
             messages: List of message dicts with 'role' and 'content'
             model: Model to use
             temperature: Sampling temperature
             max_tokens: Maximum tokens in response
             **kwargs: Additional parameters
-            
+
         Returns:
             dict: {
                 'content': str,
@@ -129,28 +136,24 @@ class OpenAIClient:
                 'finish_reason': str
             }
         """
-        try:
-            response = openai.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                **kwargs
-            )
-            
-            result = {
-                'content': response.choices[0].message.content,
-                'model': response.model,
-                'tokens': response.usage.total_tokens,
-                'finish_reason': response.choices[0].finish_reason
-            }
-            
-            logger.info(f"Chat completion: {result['tokens']} tokens used")
-            return result
-        
-        except Exception as e:
-            logger.error(f"Error in chat completion: {e}")
-            raise
+        result = self.llm_service.chat_completion(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+
+        if not result.success:
+            raise RuntimeError(f"LLM chat completion failed: {result.error}")
+
+        logger.info(f"Chat completion: {result.tokens_used} tokens used")
+        return {
+            'content': result.content,
+            'model': result.model,
+            'tokens': result.tokens_used,
+            'finish_reason': result.finish_reason,
+        }
     
     def analyze_image(
         self,
@@ -160,43 +163,41 @@ class OpenAIClient:
         max_tokens: int = 300
     ) -> str:
         """
-        Analyze image using vision model
-        
+        Analyze image using vision model via the unified LLM service.
+
         Args:
             image_url: URL of image to analyze
             prompt: Question about the image
             model: Vision model to use (must support vision)
             max_tokens: Maximum tokens in response
-            
+
         Returns:
             str: Image description/analysis
         """
-        try:
-            response = openai.chat.completions.create(
-                model=model,
-                messages=[
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
                     {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {"url": image_url}
-                            }
-                        ]
+                        "type": "image_url",
+                        "image_url": {"url": image_url}
                     }
-                ],
-                max_tokens=max_tokens
-            )
-            
-            description = response.choices[0].message.content
-            logger.info(f"Image analyzed: {len(description)} characters")
-            
-            return description
-        
-        except Exception as e:
-            logger.error(f"Error analyzing image: {e}")
-            raise
+                ]
+            }
+        ]
+
+        result = self.llm_service.chat_completion(
+            messages=messages,
+            model=model,
+            max_tokens=max_tokens,
+        )
+
+        if not result.success:
+            raise RuntimeError(f"LLM vision analysis failed: {result.error}")
+
+        logger.info(f"Image analyzed: {len(result.content)} characters")
+        return result.content
     
     def vision_analysis(
         self,

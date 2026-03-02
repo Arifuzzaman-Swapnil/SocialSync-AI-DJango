@@ -199,12 +199,9 @@ class Command(BaseCommand):
     def _generate_llm_recommendations(self, brand, data, winners, losers, pillar_perf, ab_results):
         """Use LLM to generate strategic recommendations and test plan."""
         try:
-            from accounts.api_keys import get_openai_key
-            import openai
+            from accounts.services.llm_service import get_llm_service
 
-            api_key = get_openai_key(brand.workspace.owner)
-            if not api_key:
-                return [], {}
+            service = get_llm_service(brand.workspace.owner)
 
             summary = (
                 f"Brand: {brand.brand_name}, Industry: {brand.industry or 'general'}\n"
@@ -233,9 +230,7 @@ Return JSON:
 {{"recommendations": ["rec1", "rec2", ...], "test_plan": {{"experiments": [{{"title": "...", "hypothesis": "...", "metric": "..."}}]}}}}
 """
 
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': 'You are a social media analytics strategist. Return only valid JSON.'},
                     {'role': 'user', 'content': prompt},
@@ -244,10 +239,14 @@ Return JSON:
                 max_tokens=1000,
                 response_format={'type': 'json_object'},
             )
-            result = json.loads(response.choices[0].message.content)
+            if not result.success:
+                logger.error(f"LLM call failed for {brand.brand_name}: {result.error}")
+                return [], {}
+
+            parsed = json.loads(result.content)
             return (
-                result.get('recommendations', []),
-                result.get('test_plan', {}),
+                parsed.get('recommendations', []),
+                parsed.get('test_plan', {}),
             )
 
         except Exception as e:

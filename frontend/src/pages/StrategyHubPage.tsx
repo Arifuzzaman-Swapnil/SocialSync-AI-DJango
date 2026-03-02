@@ -11,6 +11,7 @@ import {
 import strategyService from '../services/strategyService';
 import api from '../services/api';
 import type { TrendingTopic, BrandDNAHistoryEntry } from '../types';
+import { PromptInfoButton } from '../components/ui/PromptInfoButton';
 
 interface Pillar {
   id: number;
@@ -131,6 +132,18 @@ export function StrategyHubPage() {
   const [trendFeedback, setTrendFeedback] = useState<Record<string, boolean | null>>({});
   const [manualTrendInput, setManualTrendInput] = useState('');
   const [addingManualTrend, setAddingManualTrend] = useState(false);
+
+  // Prompt visibility state
+  const [dnaUsedPrompt, setDnaUsedPrompt] = useState('');
+  const [dnaRegenerating, setDnaRegenerating] = useState(false);
+  const [pillarsUsedPrompt, setPillarsUsedPrompt] = useState('');
+  const [pillarsRegenerating, setPillarsRegenerating] = useState(false);
+  const [competitorUsedPrompts, setCompetitorUsedPrompts] = useState<Record<string, string>>({});
+  const [competitorRegenerating, setCompetitorRegenerating] = useState<Record<string, boolean>>({});
+  const [trendingUsedPrompt, setTrendingUsedPrompt] = useState('');
+  const [trendingRegenerating, setTrendingRegenerating] = useState(false);
+  const [suggestUsedPrompt, setSuggestUsedPrompt] = useState('');
+  const [suggestRegenerating, setSuggestRegenerating] = useState(false);
 
   // Fetch user's primary brand on mount
   useEffect(() => {
@@ -264,6 +277,10 @@ export function StrategyHubPage() {
           return [...result.insights, ...kept];
         });
       }
+      if (result.used_prompt) {
+        const comp = competitors.find(c => c.id === competitorId);
+        if (comp) setCompetitorUsedPrompts(p => ({ ...p, [comp.handle_or_url]: result.used_prompt }));
+      }
       loadData();
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Analysis failed. Check your API key.';
@@ -283,11 +300,26 @@ export function StrategyHubPage() {
         setDnaData(result.brand_dna);
         setDnaGeneratedAt(result.generated_at);
       }
+      if (result.used_prompt) setDnaUsedPrompt(result.used_prompt);
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Failed to generate Brand DNA. Check your API key.';
       setDnaError(msg);
     }
     setDnaLoading(false);
+  };
+
+  const handleDNARegenerate = async (editedPrompt: string) => {
+    if (!brandId || !dnaUrl.trim()) return;
+    setDnaRegenerating(true);
+    try {
+      const result = await strategyService.generateDNA(brandId, dnaUrl.trim(), editedPrompt);
+      if (result.brand_dna) {
+        setDnaData(result.brand_dna);
+        setDnaGeneratedAt(result.generated_at);
+      }
+      if (result.used_prompt) setDnaUsedPrompt(result.used_prompt);
+    } catch { /* keep existing */ }
+    setDnaRegenerating(false);
   };
 
   const handleGenerateTrending = async () => {
@@ -301,6 +333,7 @@ export function StrategyHubPage() {
       const result = await strategyService.generateTrending(brandId);
       const topics = result?.topics || [];
       setTrendingTopics(topics);
+      if (result?.used_prompt) setTrendingUsedPrompt(result.used_prompt);
       if (topics.length === 0) {
         setTrendingError('No trending topics found. Try again.');
       }
@@ -314,6 +347,47 @@ export function StrategyHubPage() {
     } finally {
       setTrendingLoading(false);
     }
+  };
+
+  const handleTrendingRegenerate = async (editedPrompt: string) => {
+    if (!brandId) return;
+    setTrendingRegenerating(true);
+    try {
+      const result = await strategyService.generateTrending(brandId, editedPrompt);
+      const topics = result?.topics || [];
+      setTrendingTopics(topics);
+      if (result?.used_prompt) setTrendingUsedPrompt(result.used_prompt);
+    } catch { /* keep existing */ }
+    setTrendingRegenerating(false);
+  };
+
+  const handleCompetitorRegenerate = async (handleOrUrl: string, competitorId: number, editedPrompt: string) => {
+    if (!brandId) return;
+    setCompetitorRegenerating(p => ({ ...p, [handleOrUrl]: true }));
+    try {
+      const result = await strategyService.triggerCrawl(brandId, competitorId, editedPrompt);
+      if (result.insights) {
+        setInsights(prev => {
+          const analyzedCompetitors = new Set(result.insights.map((i: CompetitorInsight) => i.competitor));
+          const kept = prev.filter(i => !analyzedCompetitors.has(i.competitor));
+          return [...result.insights, ...kept];
+        });
+      }
+      if (result.used_prompt) setCompetitorUsedPrompts(p => ({ ...p, [handleOrUrl]: result.used_prompt }));
+      loadData();
+    } catch { /* keep existing */ }
+    setCompetitorRegenerating(p => ({ ...p, [handleOrUrl]: false }));
+  };
+
+  const handleSuggestRegenerate = async (editedPrompt: string) => {
+    if (!brandId) return;
+    setSuggestRegenerating(true);
+    try {
+      const result = await strategyService.suggestCompetitors(brandId, undefined, editedPrompt);
+      setCompetitorSuggestions(result.suggestions || []);
+      if (result.used_prompt) setSuggestUsedPrompt(result.used_prompt);
+    } catch { /* keep existing */ }
+    setSuggestRegenerating(false);
   };
 
   const handleLoadDNAHistory = async () => {
@@ -504,6 +578,7 @@ export function StrategyHubPage() {
                 <h3 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
                   <ChartPieIcon className="w-5 h-5 text-primary-400" />
                   Pillar Distribution
+                  {pillarsUsedPrompt && <PromptInfoButton prompt={pillarsUsedPrompt} label="Content Pillars Generation Prompt" regenerating={pillarsRegenerating} regenerateLabel="Regenerate Pillars" onRegenerate={async (ep) => { if (!brandId) return; setPillarsRegenerating(true); try { const focusAreas = pillarGenFocusAreas.split(',').map(s => s.trim()).filter(Boolean); const r = await strategyService.generatePillars(brandId, pillarGenCount, focusAreas, ep); if (r?.used_prompt) setPillarsUsedPrompt(r.used_prompt); loadData(); } catch {} setPillarsRegenerating(false); }} />}
                 </h3>
                 <span className="text-xs text-gray-400">
                   {compliance.total_posts} total post{compliance.total_posts !== 1 ? 's' : ''}
@@ -750,7 +825,8 @@ export function StrategyHubPage() {
                         setGeneratingPillars(true);
                         try {
                           const focusAreas = pillarGenFocusAreas.split(',').map(s => s.trim()).filter(Boolean);
-                          await strategyService.generatePillars(brandId, pillarGenCount, focusAreas);
+                          const pillarResult = await strategyService.generatePillars(brandId, pillarGenCount, focusAreas);
+                          if (pillarResult?.used_prompt) setPillarsUsedPrompt(pillarResult.used_prompt);
                           setShowPillarGenModal(false);
                           setPillarGenFocusAreas('');
                           loadData();
@@ -804,6 +880,7 @@ export function StrategyHubPage() {
                   try {
                     const result = await strategyService.suggestCompetitors(brandId);
                     setCompetitorSuggestions(result.suggestions || []);
+                    if (result.used_prompt) setSuggestUsedPrompt(result.used_prompt);
                     setShowSuggestModal(true);
                   } catch (err) {
                     setAnalysisError('Failed to suggest competitors');
@@ -897,6 +974,7 @@ export function StrategyHubPage() {
                         <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                           <LightBulbIcon className="w-4 h-4 text-yellow-400" />
                           Strategic Insights
+                          {competitorUsedPrompts[comp.handle_or_url] && <PromptInfoButton prompt={competitorUsedPrompts[comp.handle_or_url]} label={`Competitor Analysis — ${comp.handle_or_url}`} onRegenerate={(ep) => handleCompetitorRegenerate(comp.handle_or_url, comp.id, ep)} regenerating={competitorRegenerating[comp.handle_or_url] || false} regenerateLabel="Re-analyze" />}
                         </h4>
                         <div className="space-y-3">
                           {compInsights.map((insight) => (
@@ -980,6 +1058,7 @@ export function StrategyHubPage() {
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <SparklesIcon className="w-5 h-5 text-primary-400" />
                   Suggested Competitors
+                  {suggestUsedPrompt && <PromptInfoButton prompt={suggestUsedPrompt} label="Competitor Suggestions Prompt" onRegenerate={handleSuggestRegenerate} regenerating={suggestRegenerating} regenerateLabel="Re-suggest" />}
                 </h3>
                 {competitorSuggestions.length === 0 ? (
                   <p className="text-sm text-text-secondary">No suggestions available.</p>
@@ -1349,7 +1428,13 @@ export function StrategyHubPage() {
 
               {/* Brand Identity Card */}
               <div className="card p-6 transition-all">
-                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">Brand Identity <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-4 h-4" /></button></h3>
+                <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    Brand Identity
+                    {dnaUsedPrompt && <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" onRegenerate={handleDNARegenerate} regenerating={dnaRegenerating} regenerateLabel="Regenerate DNA" />}
+                  </span>
+                  <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-4 h-4" /></button>
+                </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {dnaData.brand_name && (
                     <div>
@@ -1559,6 +1644,7 @@ export function StrategyHubPage() {
                 <h3 className="text-lg font-semibold flex items-center gap-2">
                   <FireIcon className="w-5 h-5 text-orange-400" />
                   Trending Topics
+                  {trendingUsedPrompt && <PromptInfoButton prompt={trendingUsedPrompt} label="Trending Topics Generation Prompt" onRegenerate={handleTrendingRegenerate} regenerating={trendingRegenerating} regenerateLabel="Regenerate Topics" />}
                 </h3>
                 <p className="text-sm text-text-secondary mt-1">
                   Discover trending topics relevant to your brand using Google Trends + AI analysis

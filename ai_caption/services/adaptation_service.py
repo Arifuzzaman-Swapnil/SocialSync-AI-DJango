@@ -4,10 +4,10 @@ Caption Adaptation Service
 - Character limit enforcement
 - Tone adaptation per platform
 """
-import openai
 import json
 import logging
 
+from accounts.services.llm_service import get_llm_service, UnifiedLLMService
 from posts.models import PostCaption
 
 logger = logging.getLogger(__name__)
@@ -36,14 +36,17 @@ PLATFORM_GUIDELINES = {
 }
 
 
-def adapt_caption(source_caption, target_platform, api_key, brand=None):
+def adapt_caption(source_caption, target_platform, api_key=None, brand=None, override_prompt=None, user=None):
     """Adapt a caption for a specific platform.
 
-    Returns the adapted PostCaption object.
+    Returns tuple (adapted PostCaption object, used_prompt string).
+
+    When `user` is provided, uses get_llm_service(user) for provider routing.
+    Falls back to UnifiedLLMService(openai_key=api_key) for backward compat.
     """
-    if not api_key:
+    if not api_key and not user:
         # Fallback: simple truncation
-        return _simple_adapt(source_caption, target_platform)
+        return _simple_adapt(source_caption, target_platform), ''
 
     guidelines = PLATFORM_GUIDELINES.get(target_platform, PLATFORM_GUIDELINES['facebook'])
 
@@ -95,10 +98,16 @@ Return ONLY this JSON structure:
 - Return valid JSON only.
 </constraints>"""
 
+    if override_prompt:
+        prompt = override_prompt
+
     try:
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        if user:
+            service = get_llm_service(user)
+        else:
+            service = UnifiedLLMService(openai_key=api_key)
+
+        result = service.chat_completion(
             messages=[
                 {"role": "system", "content": "You are a platform-native social media strategist who specializes in cross-platform content adaptation. You understand that each platform has its own culture, algorithm preferences, and audience behavior patterns.\n\nYour expertise:\n- Twitter/X: Punchy, conversational, opinion-driven. Max 280 chars. Threads for depth. Power of brevity and hot takes. Algorithm favors replies and quotes.\n- LinkedIn: Professional thought leadership. First line is everything (it appears before \"see more\"). Story-driven, insight-led. 1300-1700 chars optimal. Algorithm favors comments and dwell time.\n- Facebook: Conversational, community-oriented. Questions drive engagement. Longer posts (400-800 chars) perform well. Algorithm favors meaningful interactions.\n- Instagram: Visual-first but caption matters. Hook in first 125 chars (before truncation). Emojis, line breaks for readability. Hashtag strategy. 2200 char max. Algorithm favors saves and shares.\n- TikTok: Ultra-casual, trend-aware, Gen-Z native language. Short hooks. 150 chars max recommended for overlay. Algorithm favors watch time.\n\nYour job is to translate the SOUL of a caption for a new platform — not just shorten or lengthen it. Rewrite it as if a native user of that platform wrote it from scratch.\n\nCRITICAL OUTPUT RULES:\n- Return ONLY valid JSON\n- Do NOT include explanations, notes, or markdown\n- Stay within character limits — this is non-negotiable"},
                 {"role": "user", "content": prompt}
@@ -108,13 +117,16 @@ Return ONLY this JSON structure:
             response_format={"type": "json_object"},
         )
 
-        result = json.loads(response.choices[0].message.content)
-        body = result.get('adapted_body', source_caption.body)
-        cta = result.get('cta_text', source_caption.cta_text)
+        if not result.success:
+            raise Exception(result.error)
+
+        parsed = json.loads(result.content)
+        body = parsed.get('adapted_body', source_caption.body)
+        cta = parsed.get('cta_text', source_caption.cta_text)
 
     except Exception as e:
         logger.error(f"Caption adaptation failed: {e}")
-        return _simple_adapt(source_caption, target_platform)
+        return _simple_adapt(source_caption, target_platform), prompt
 
     # Enforce character limit
     max_chars = guidelines['max_chars']
@@ -131,7 +143,7 @@ Return ONLY this JSON structure:
     )
 
     source_caption.post.update_checklist()
-    return adapted
+    return adapted, prompt
 
 
 def _simple_adapt(source_caption, target_platform):

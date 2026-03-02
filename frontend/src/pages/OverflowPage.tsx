@@ -23,6 +23,8 @@ import {
   HandThumbDownIcon,
   ChevronDownIcon,
   ArrowTopRightOnSquareIcon,
+  EyeIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useOverflowStore } from '../store';
 import strategyService from '../services/strategyService';
@@ -289,6 +291,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
   const [newFieldKey, setNewFieldKey] = useState('');
   const [newFieldType, setNewFieldType] = useState<'text' | 'list'>('text');
   const [dnaUsedPrompt, setDnaUsedPrompt] = useState('');
+  const [dnaRegenerating, setDnaRegenerating] = useState(false);
 
   const BUILTIN_KEYS = new Set([
     'brand_name', 'tagline', 'industry', 'description', 'products_services',
@@ -323,6 +326,19 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
       setError(err?.response?.data?.error || 'Failed to generate DNA.');
     }
     setLoading(false);
+  };
+
+  const handleDNARegenerate = async (editedPrompt: string) => {
+    if (!brandId || !url.trim()) return;
+    setDnaRegenerating(true);
+    try {
+      const result = await strategyService.generateDNA(brandId, url.trim(), editedPrompt);
+      if (result.brand_dna) {
+        setDnaData(result.brand_dna);
+        if (result.used_prompt) setDnaUsedPrompt(result.used_prompt);
+      }
+    } catch { /* ignore */ }
+    setDnaRegenerating(false);
   };
 
   const enterEditMode = () => {
@@ -387,7 +403,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
           <BeakerIcon className="w-5 h-5 text-primary-400" />
           Brand DNA Generator
-          <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" />
+          <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" onRegenerate={handleDNARegenerate} regenerating={dnaRegenerating} regenerateLabel="Regenerate DNA" />
         </h3>
         <p className="text-sm text-text-secondary mb-4">
           Enter your website URL and we'll analyze it to extract your brand's identity, tone, products, values, and more.
@@ -666,6 +682,19 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
   const [genCount, setGenCount] = useState(5);
   const [showGenPanel, setShowGenPanel] = useState(false);
   const [pillarsUsedPrompt, setPillarsUsedPrompt] = useState('');
+  const [pillarsRegenerating, setPillarsRegenerating] = useState(false);
+
+  const handlePillarsRegenerate = async (editedPrompt: string) => {
+    if (!brandId) return;
+    setPillarsRegenerating(true);
+    try {
+      const areas = focusAreas.split(',').map((a) => a.trim()).filter(Boolean);
+      const genResult = await strategyService.generatePillars(brandId, genCount, areas, editedPrompt);
+      if (genResult.used_prompt) setPillarsUsedPrompt(genResult.used_prompt);
+      await load();
+    } catch { /* ignore */ }
+    setPillarsRegenerating(false);
+  };
 
   const load = useCallback(async () => {
     if (!brandId) { setLoading(false); return; }
@@ -736,7 +765,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <div className="w-5 h-5 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
           Content Pillars
-          <PromptInfoButton prompt={pillarsUsedPrompt} label="Content Pillars Generation Prompt" />
+          <PromptInfoButton prompt={pillarsUsedPrompt} label="Content Pillars Generation Prompt" onRegenerate={handlePillarsRegenerate} regenerating={pillarsRegenerating} regenerateLabel="Regenerate Pillars" />
         </h3>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowGenPanel(!showGenPanel)} className="btn-primary text-sm flex items-center gap-1.5">
@@ -876,6 +905,7 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
   const [analyzingId, setAnalyzingId] = useState<number | null>(null);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [competitorUsedPrompts, setCompetitorUsedPrompts] = useState<Record<string, string>>({});
+  const [competitorRegenerating, setCompetitorRegenerating] = useState<Record<string, boolean>>({});
 
   const scoreColor = (score: number) => {
     if (score >= 8) return 'text-green-400 bg-green-400/10';
@@ -939,6 +969,27 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
     }
     setAnalyzingId(null);
     setAnalyzingAll(false);
+  };
+
+  const handleCompetitorRegenerate = async (compHandle: string, compId: number, editedPrompt: string) => {
+    if (!brandId) return;
+    setCompetitorRegenerating((prev) => ({ ...prev, [compHandle]: true }));
+    try {
+      const result = await strategyService.triggerCrawl(brandId, compId, editedPrompt);
+      if (result.insights) {
+        setInsights((prev) => {
+          const analyzed = new Set(result.insights.map((i: CompetitorInsight) => i.competitor));
+          const kept = prev.filter((i) => !analyzed.has(i.competitor));
+          return [...result.insights, ...kept];
+        });
+      }
+      if (result.used_prompts) {
+        const promptMap: Record<string, string> = {};
+        result.used_prompts.forEach((p: { competitor: string; prompt: string }) => { promptMap[p.competitor] = p.prompt; });
+        setCompetitorUsedPrompts((prev) => ({ ...prev, ...promptMap }));
+      }
+    } catch { /* ignore */ }
+    setCompetitorRegenerating((prev) => ({ ...prev, [compHandle]: false }));
   };
 
   return (
@@ -1019,7 +1070,7 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
                     <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                       <LightBulbIcon className="w-4 h-4 text-yellow-400" />
                       Strategic Insights
-                      <PromptInfoButton prompt={competitorUsedPrompts[comp.handle_or_url] || ''} label={`Competitor Analysis Prompt — ${comp.handle_or_url}`} />
+                      <PromptInfoButton prompt={competitorUsedPrompts[comp.handle_or_url] || ''} label={`Competitor Analysis Prompt — ${comp.handle_or_url}`} onRegenerate={(ep) => handleCompetitorRegenerate(comp.handle_or_url, comp.id, ep)} regenerating={competitorRegenerating[comp.handle_or_url] || false} regenerateLabel="Re-analyze" />
                     </h4>
                     <div className="space-y-3">
                       {compInsights.map((insight) => (
@@ -1102,7 +1153,20 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
   // Custom topic input
   const [customTopic, setCustomTopic] = useState('');
   const [addingCustom, setAddingCustom] = useState(false);
-  const [trendingUsedPrompt, setTrendingUsedPrompt] = useState('');
+  const trendingUsedPrompt = useOverflowStore((s) => s.trendingUsedPrompt);
+  const [trendingRegenerating, setTrendingRegenerating] = useState(false);
+
+  const handleTrendingRegenerate = async (editedPrompt: string) => {
+    if (!brandId) return;
+    setTrendingRegenerating(true);
+    try {
+      const result = await strategyService.generateTrending(brandId, editedPrompt);
+      const arr = result?.topics || [];
+      setTopics(arr);
+      if (result?.used_prompt) useOverflowStore.getState().setTrendingUsedPrompt(result.used_prompt);
+    } catch { /* ignore */ }
+    setTrendingRegenerating(false);
+  };
 
   // Load cached trending data + existing feedback on mount
   useEffect(() => {
@@ -1151,7 +1215,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
       const result = await strategyService.generateTrending(id);
       const arr = result?.topics || [];
       setTopics(arr);
-      if (result?.used_prompt) setTrendingUsedPrompt(result.used_prompt);
+      if (result?.used_prompt) useOverflowStore.getState().setTrendingUsedPrompt(result.used_prompt);
       if (arr.length > 0) markTrendingComplete();
       else setError('No trending topics found. Try again.');
     } catch (err: any) {
@@ -1205,7 +1269,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <FireIcon className="w-5 h-5 text-orange-400" />
           Trending Topics
-          <PromptInfoButton prompt={trendingUsedPrompt} label="Trending Topics Generation Prompt" />
+          <PromptInfoButton prompt={trendingUsedPrompt} label="Trending Topics Generation Prompt" onRegenerate={handleTrendingRegenerate} regenerating={trendingRegenerating} regenerateLabel="Regenerate Topics" />
         </h3>
         <button onClick={handleGenerate} disabled={loading} className="btn-primary text-sm flex items-center gap-2">
           {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowPathIcon className="w-4 h-4" />}
@@ -1363,7 +1427,34 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ideasUsedPrompt, setIdeasUsedPrompt] = useState('');
+  const ideasUsedPrompt = overflow.ideasUsedPrompt;
+  const [ideasRegenerating, setIdeasRegenerating] = useState(false);
+
+  const handleIdeasRegenerate = async (editedPrompt: string) => {
+    if (!brandId) return;
+    setIdeasRegenerating(true);
+    try {
+      const topics = overflow.selectedTrendingTopics;
+      const count = topics.length > 0 ? topics.length : 3;
+      const result = await strategyService.generateIdeas({
+        brand_id: brandId,
+        count,
+        trending_topics: topics.length > 0 ? topics : undefined,
+        override_prompt: editedPrompt,
+      });
+      const newIdeas = result.ideas || result || [];
+      setIdeas(newIdeas);
+      if (result.used_prompt) {
+        useOverflowStore.getState().setIdeasUsedPrompt(result.used_prompt);
+      }
+      const mapped = newIdeas.map((i: ContentIdea) => ({
+        id: i.id, title: i.title, hook: i.hook, angle: i.angle, platform: i.platform,
+        content_format: i.content_format, engagement_tier: i.engagement_tier, pillar_name: i.pillar_name,
+      }));
+      useOverflowStore.getState().setIdeasData(mapped);
+    } catch { /* ignore */ }
+    setIdeasRegenerating(false);
+  };
 
   const doGenerate = useCallback(async () => {
     if (!brandId) {
@@ -1382,14 +1473,16 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
       });
       const newIdeas = result.ideas || result || [];
       setIdeas(newIdeas);
-      if (result.used_prompt) setIdeasUsedPrompt(result.used_prompt);
+      if (result.used_prompt) {
+        useOverflowStore.getState().setIdeasUsedPrompt(result.used_prompt);
+      }
       // Store idea data for CaptionsStep + auto-select all
       const mapped = newIdeas.map((i: ContentIdea) => ({
         id: i.id, title: i.title, hook: i.hook, angle: i.angle || '',
         platform: i.platform, content_format: i.content_format,
       }));
-      overflow.setIdeasData(mapped);
-      overflow.setIdeaSelection(newIdeas.map((i: ContentIdea) => i.id));
+      useOverflowStore.getState().setIdeasData(mapped);
+      useOverflowStore.getState().setIdeaSelection(newIdeas.map((i: ContentIdea) => i.id));
     } catch (err: any) {
       setError(err?.response?.data?.error || err?.message || 'Failed to generate ideas.');
     }
@@ -1412,7 +1505,7 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <LightBulbIcon className="w-5 h-5 text-yellow-400" />
             Content Ideas
-            <PromptInfoButton prompt={ideasUsedPrompt} label="Content Ideas Generation Prompt" />
+            <PromptInfoButton prompt={ideasUsedPrompt} label="Content Ideas Generation Prompt" onRegenerate={handleIdeasRegenerate} regenerating={ideasRegenerating} regenerateLabel="Regenerate Ideas" />
           </h3>
           <button onClick={doGenerate} disabled={loading} className="btn-secondary text-sm flex items-center gap-2">
             {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowPathIcon className="w-4 h-4" />}
@@ -1486,6 +1579,30 @@ function CaptionsStep() {
   const [editingIdeaId, setEditingIdeaId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [captionUsedPrompts, setCaptionUsedPrompts] = useState<Record<string, string>>({});
+  const [captionRegenerating, setCaptionRegenerating] = useState<Record<string, boolean>>({});
+
+  const handleCaptionRegenerate = async (ideaId: string, editedPrompt: string) => {
+    setCaptionRegenerating((prev) => ({ ...prev, [ideaId]: true }));
+    try {
+      const idea = overflow.ideasData.find((i) => i.id === Number(ideaId));
+      const topic = idea ? `${idea.title}\n\nHook: ${idea.hook}\nAngle: ${idea.angle}` : 'an engaging social media post';
+      const platform = idea?.platform || 'instagram';
+      const variants: CaptionVariant[] = [];
+      for (let i = 0; i < 3; i++) {
+        const result = await captionService.generate({
+          topic, tone: 'enthusiastic', length: 'medium', platform: platform as any,
+          include_hashtags: true, include_emojis: true, include_cta: true,
+          override_prompt: i === 0 ? editedPrompt : undefined,
+        });
+        if (i === 0 && result.used_prompt) {
+          const up = result.used_prompt; setCaptionUsedPrompts((prev) => ({ ...prev, [ideaId]: up }));
+        }
+        variants.push({ id: `${ideaId}-${i}`, ideaId: Number(ideaId), text: result.generated_caption || '', selected: i === 0 });
+      }
+      setCaptionGroups((prev) => ({ ...prev, [Number(ideaId)]: variants }));
+    } catch { /* ignore */ }
+    setCaptionRegenerating((prev) => ({ ...prev, [ideaId]: false }));
+  };
 
   const getIdea = (ideaId: number) => overflow.ideasData.find((i) => i.id === ideaId);
   const topics = overflow.selectedTrendingTopics;
@@ -1522,7 +1639,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
       });
       // Store used prompt from first variant
       if (i === 0 && result.used_prompt) {
-        setCaptionUsedPrompts((prev) => ({ ...prev, [String(ideaId)]: result.used_prompt }));
+        const up = result.used_prompt; setCaptionUsedPrompts((prev) => ({ ...prev, [String(ideaId)]: up }));
       }
       variants.push({
         id: `${ideaId}-${i}`,
@@ -1694,7 +1811,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
                   <div className="flex items-center gap-2">
                     <LightBulbIcon className="w-4 h-4 text-yellow-400 shrink-0" />
                     <h4 className="text-sm font-semibold">{idea?.title || 'Content Idea'}</h4>
-                    <PromptInfoButton prompt={captionUsedPrompts[String(ideaId)] || ''} label="Caption Generation Prompt" />
+                    <PromptInfoButton prompt={captionUsedPrompts[String(ideaId)] || ''} label="Caption Generation Prompt" onRegenerate={(ep) => handleCaptionRegenerate(String(ideaId), ep)} regenerating={captionRegenerating[String(ideaId)] || false} regenerateLabel="Regenerate Captions" />
                   </div>
                   {idea?.hook && <p className="text-xs text-text-secondary mt-1 ml-6">{idea.hook}</p>}
                   {idea?.angle && <p className="text-xs text-text-muted mt-0.5 ml-6 italic">{idea.angle}</p>}
@@ -1835,6 +1952,11 @@ function MediaStep() {
   const [uploadPreviewUrls, setUploadPreviewUrls] = useState<Record<string, string[]>>({});
   const [refineUsedPrompts, setRefineUsedPrompts] = useState<Record<string, string>>({});
   const [imageUsedPrompts, setImageUsedPrompts] = useState<Record<string, string>>({});
+  const [refineRegenerating, setRefineRegenerating] = useState<Record<string, boolean>>({});
+  const [imageRegenerating, setImageRegenerating] = useState<Record<string, boolean>>({});
+  const [providers, setProviders] = useState<Record<string, 'openai' | 'gemini' | 'both'>>({});
+  const [bothResults, setBothResults] = useState<Record<string, { openai?: any; gemini?: any }>>({});
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const captions = overflow.selectedCaptions;
@@ -1943,7 +2065,7 @@ function MediaStep() {
       const ctx = gatherContext(caption?.text || '');
       const refineResult = await imageService.refinePrompt({ ...ctx, user_prompt: userPrompt, style });
       setRefinedPrompts((p) => ({ ...p, [captionId]: refineResult.refined_prompt }));
-      if (refineResult.used_prompt) setRefineUsedPrompts((p) => ({ ...p, [captionId]: refineResult.used_prompt }));
+      if (refineResult.used_prompt) { const up = refineResult.used_prompt; setRefineUsedPrompts((p) => ({ ...p, [captionId]: up })); }
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Failed to refine prompt.';
       setErrorMap((p) => ({ ...p, [captionId]: msg }));
@@ -1957,36 +2079,55 @@ function MediaStep() {
     if (!refined) return;
     const style = styles[captionId] || 'modern';
     const mode = modes[captionId] || 'generate';
+    const provider = providers[captionId] || 'openai';
 
     setGeneratingMap((p) => ({ ...p, [captionId]: true }));
     setErrorMap((p) => ({ ...p, [captionId]: null }));
+    setBothResults((p) => ({ ...p, [captionId]: {} }));
 
-    try {
-      const enhancedImagePrompt = `Create a professional social media content image based on this description: ${refined}\n\nRequirements:\n- Clean, brand-appropriate composition suitable for marketing\n- High visual quality with professional lighting\n- Clear focal point and intentional negative space\n- Style: ${style}\n- No text or watermarks in the image\n\nEnhance this prompt with specific details about composition, lighting direction, color palette, and depth of field to produce the highest quality result.`;
+    const enhancedImagePrompt = `Create a professional social media content image based on this description: ${refined}\n\nRequirements:\n- Clean, brand-appropriate composition suitable for marketing\n- High visual quality with professional lighting\n- Clear focal point and intentional negative space\n- Style: ${style}\n- No text or watermarks in the image\n\nEnhance this prompt with specific details about composition, lighting direction, color palette, and depth of field to produce the highest quality result.`;
 
-      const generateRequest: any = {
-        prompt: enhancedImagePrompt,
-        style,
-        enhance_prompt: true,
-      };
-
-      // Include first uploaded image as product image for compositing
+    const buildRequest = (prov: 'openai' | 'gemini') => {
+      const req: any = { prompt: enhancedImagePrompt, style, enhance_prompt: true, provider: prov };
       const files = uploadedFiles[captionId] || [];
       if (mode === 'upload' && files.length > 0) {
-        generateRequest.product_image = files[0];
-        generateRequest.product_position = 'center';
-        generateRequest.product_scale = 50;
+        req.product_image = files[0];
+        req.product_position = 'center';
+        req.product_scale = 50;
       }
+      return req;
+    };
 
-      const result = await imageService.generate(generateRequest);
-      // Prioritize composited_image (product on scene), then generated_image
-      const rawUrl = result.composited_image || result.generated_image || result.generated_image_with_logo || null;
-      const imageUrl = toMediaUrl(rawUrl);
-      overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
-      if (result.id) overflow.addMedia(result.id);
-      // Store enhanced prompt from image generation
-      const genPrompt = result.enhanced_prompt || result.revised_prompt || '';
-      if (genPrompt) setImageUsedPrompts((p) => ({ ...p, [captionId]: genPrompt }));
+    try {
+      if (provider === 'both') {
+        const [openaiRes, geminiRes] = await Promise.allSettled([
+          imageService.generate(buildRequest('openai')),
+          imageService.generate(buildRequest('gemini')),
+        ]);
+        const results: { openai?: any; gemini?: any } = {};
+        if (openaiRes.status === 'fulfilled') results.openai = openaiRes.value;
+        if (geminiRes.status === 'fulfilled') results.gemini = geminiRes.value;
+        setBothResults((p) => ({ ...p, [captionId]: results }));
+        // Store prompt from whichever succeeded
+        const anyResult = results.openai || results.gemini;
+        if (anyResult) {
+          const genPrompt = anyResult.enhanced_prompt || anyResult.revised_prompt || '';
+          if (genPrompt) setImageUsedPrompts((p) => ({ ...p, [captionId]: genPrompt }));
+        }
+        if (!results.openai && !results.gemini) {
+          const openaiErr = openaiRes.status === 'rejected' ? openaiRes.reason : null;
+          const msg = openaiErr?.response?.data?.error || openaiErr?.message || 'Both providers failed to generate image.';
+          setErrorMap((p) => ({ ...p, [captionId]: msg }));
+        }
+      } else {
+        const result = await imageService.generate(buildRequest(provider));
+        const rawUrl = result.composited_image || result.generated_image || result.generated_image_with_logo || null;
+        const imageUrl = toMediaUrl(rawUrl);
+        overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
+        if (result.id) overflow.addMedia(result.id);
+        const genPrompt = result.enhanced_prompt || result.revised_prompt || '';
+        if (genPrompt) setImageUsedPrompts((p) => ({ ...p, [captionId]: genPrompt }));
+      }
     } catch (err: any) {
       const msg = err?.response?.data?.error || err?.message || 'Failed to generate image.';
       setErrorMap((p) => ({
@@ -1995,6 +2136,57 @@ function MediaStep() {
       }));
     }
     setGeneratingMap((p) => ({ ...p, [captionId]: false }));
+  };
+
+  // Regenerate refined prompt from edited prompt (PromptInfoButton callback)
+  const handleRefineRegenerate = async (captionId: string, editedPrompt: string) => {
+    const style = styles[captionId] || 'modern';
+    const caption = captions.find((c) => c.id === captionId);
+    setRefineRegenerating((p) => ({ ...p, [captionId]: true }));
+    try {
+      const ctx = gatherContext(caption?.text || '');
+      const refineResult = await imageService.refinePrompt({ ...ctx, user_prompt: prompts[captionId] || '', style, override_prompt: editedPrompt });
+      setRefinedPrompts((p) => ({ ...p, [captionId]: refineResult.refined_prompt }));
+      if (refineResult.used_prompt) { const up = refineResult.used_prompt; setRefineUsedPrompts((p) => ({ ...p, [captionId]: up })); }
+    } catch { /* keep existing prompt */ }
+    setRefineRegenerating((p) => ({ ...p, [captionId]: false }));
+  };
+
+  // Regenerate image from edited prompt (PromptInfoButton callback)
+  const handleImageRegenerate = async (captionId: string, editedPrompt: string) => {
+    const style = styles[captionId] || 'modern';
+    const mode = modes[captionId] || 'generate';
+    const provider = providers[captionId] || 'openai';
+    setImageRegenerating((p) => ({ ...p, [captionId]: true }));
+    try {
+      const buildReq = (prov: 'openai' | 'gemini') => {
+        const req: any = { prompt: editedPrompt, style, enhance_prompt: true, provider: prov };
+        const files = uploadedFiles[captionId] || [];
+        if (mode === 'upload' && files.length > 0) { req.product_image = files[0]; req.product_position = 'center'; req.product_scale = 50; }
+        return req;
+      };
+      if (provider === 'both') {
+        const [openaiRes, geminiRes] = await Promise.allSettled([
+          imageService.generate(buildReq('openai')),
+          imageService.generate(buildReq('gemini')),
+        ]);
+        const results: { openai?: any; gemini?: any } = {};
+        if (openaiRes.status === 'fulfilled') results.openai = openaiRes.value;
+        if (geminiRes.status === 'fulfilled') results.gemini = geminiRes.value;
+        setBothResults((p) => ({ ...p, [captionId]: results }));
+        const anyResult = results.openai || results.gemini;
+        if (anyResult) { const gp = anyResult.enhanced_prompt || anyResult.revised_prompt || ''; if (gp) setImageUsedPrompts((p) => ({ ...p, [captionId]: gp })); }
+      } else {
+        const result = await imageService.generate(buildReq(provider));
+        const rawUrl = result.composited_image || result.generated_image || result.generated_image_with_logo || null;
+        const imageUrl = toMediaUrl(rawUrl);
+        overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
+        if (result.id) overflow.addMedia(result.id);
+        const genPrompt = result.enhanced_prompt || result.revised_prompt || '';
+        if (genPrompt) setImageUsedPrompts((p) => ({ ...p, [captionId]: genPrompt }));
+      }
+    } catch { /* keep existing image */ }
+    setImageRegenerating((p) => ({ ...p, [captionId]: false }));
   };
 
   const doneCount = captions.filter((c) => overflow.captionMediaMap[c.id]?.mediaUrl).length;
@@ -2038,7 +2230,6 @@ function MediaStep() {
         const mode = modes[cap.id] || 'generate';
         const isRefining = refiningMap[cap.id] || false;
         const isGenerating = generatingMap[cap.id] || false;
-        const isBusy = isRefining || isGenerating;
         const error = errorMap[cap.id] || null;
         const refined = refinedPrompts[cap.id] || null;
         const uploadPreviews = uploadPreviewUrls[cap.id] || [];
@@ -2215,6 +2406,30 @@ function MediaStep() {
                     </div>
                   </div>
 
+                  {/* Provider selector */}
+                  <div>
+                    <p className="text-[10px] text-text-muted font-medium uppercase mb-1.5">AI Provider</p>
+                    <div className="flex gap-1.5">
+                      {([
+                        { value: 'openai', label: 'OpenAI' },
+                        { value: 'gemini', label: 'Gemini' },
+                        { value: 'both', label: 'Both' },
+                      ] as const).map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setProviders((p) => ({ ...p, [cap.id]: opt.value }))}
+                          className={`text-[10px] px-2.5 py-1 rounded-lg transition-colors ${
+                            (providers[cap.id] || 'openai') === opt.value
+                              ? 'bg-primary-500/20 text-primary-400 ring-1 ring-primary-500/50'
+                              : 'bg-white/5 text-text-muted hover:bg-white/10'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* "Generate Prompt" button */}
                   <button
                     onClick={() => handleRefinePrompt(cap.id)}
@@ -2234,7 +2449,7 @@ function MediaStep() {
                     <div className="bg-green-500/5 border border-green-500/20 rounded-lg px-3 py-2 space-y-1.5">
                       <p className="text-[10px] font-medium text-green-400 flex items-center gap-1">
                         <SparklesIcon className="w-2.5 h-2.5" /> Refined Prompt
-                        <PromptInfoButton prompt={refineUsedPrompts[cap.id] || ''} label="Image Prompt Refinement Prompt" />
+                        <PromptInfoButton prompt={refineUsedPrompts[cap.id] || ''} label="Image Prompt Refinement Prompt" onRegenerate={(ep) => handleRefineRegenerate(cap.id, ep)} regenerating={refineRegenerating[cap.id] || false} regenerateLabel="Re-refine Prompt" />
                       </p>
                       <textarea
                         className="input w-full text-[11px]"
@@ -2261,19 +2476,95 @@ function MediaStep() {
                     </button>
                   )}
 
-                  {/* Generated image result */}
-                  {media?.mediaId && mediaUrl && (
+                  {/* Generated image result — single provider */}
+                  {media?.mediaId && mediaUrl && (providers[cap.id] || 'openai') !== 'both' && (
                     <div className="space-y-2 pt-2 border-t border-white/5">
                       <p className="text-[10px] font-medium text-green-400 uppercase flex items-center gap-1">
                         <CheckCircleIcon className="w-3 h-3" /> Generated Result
-                        <PromptInfoButton prompt={imageUsedPrompts[cap.id] || ''} label="Image Generation Prompt (Enhanced)" />
+                        <PromptInfoButton prompt={imageUsedPrompts[cap.id] || ''} label="Image Generation Prompt (Enhanced)" onRegenerate={(ep) => handleImageRegenerate(cap.id, ep)} regenerating={imageRegenerating[cap.id] || false} regenerateLabel="Regenerate Image" />
                       </p>
-                      <img src={mediaUrl} alt="" className="rounded-lg max-h-56 mx-auto border border-white/10" />
-                      <div className="flex items-center justify-center">
+                      <div className="relative group cursor-pointer" onClick={() => setPreviewImage(mediaUrl)}>
+                        <img src={mediaUrl} alt="" className="rounded-lg max-h-56 mx-auto border border-white/10" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                          <EyeIcon className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-4">
+                        <button onClick={() => setPreviewImage(mediaUrl)} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
+                          <EyeIcon className="w-3 h-3" /> View
+                        </button>
                         <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
                           <TrashIcon className="w-3 h-3" /> Remove
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Generated image result — both providers side-by-side */}
+                  {(providers[cap.id] === 'both') && bothResults[cap.id] && (bothResults[cap.id].openai || bothResults[cap.id].gemini) && (
+                    <div className="space-y-2 pt-2 border-t border-white/5">
+                      <p className="text-[10px] font-medium text-green-400 uppercase flex items-center gap-1">
+                        <CheckCircleIcon className="w-3 h-3" /> Compare &amp; Choose
+                        <PromptInfoButton prompt={imageUsedPrompts[cap.id] || ''} label="Image Generation Prompt (Enhanced)" onRegenerate={(ep) => handleImageRegenerate(cap.id, ep)} regenerating={imageRegenerating[cap.id] || false} regenerateLabel="Regenerate Both" />
+                      </p>
+                      {media?.mediaId && mediaUrl && (
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-1.5 text-center">
+                          <p className="text-[10px] text-green-400 font-medium">Selected image ready for post</p>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-3">
+                        {(['openai', 'gemini'] as const).map((prov) => {
+                          const provResult = bothResults[cap.id]?.[prov];
+                          if (!provResult) return (
+                            <div key={prov} className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-center">
+                              <p className="text-[10px] font-medium text-text-muted uppercase mb-1">{prov === 'openai' ? 'OpenAI' : 'Gemini'}</p>
+                              <p className="text-[10px] text-red-400">Failed to generate</p>
+                            </div>
+                          );
+                          const provUrl = toMediaUrl(provResult.composited_image || provResult.generated_image || provResult.generated_image_with_logo || null);
+                          const isSelected = media?.mediaId === (provResult.id || null);
+                          return (
+                            <div key={prov} className={`rounded-lg border p-2 space-y-2 ${isSelected ? 'border-green-500/50 bg-green-500/5' : 'border-white/10'}`}>
+                              <p className="text-[10px] font-medium text-text-muted uppercase text-center">{prov === 'openai' ? 'OpenAI' : 'Gemini'}</p>
+                              {provUrl && (
+                                <div className="relative group cursor-pointer" onClick={() => setPreviewImage(provUrl)}>
+                                  <img src={provUrl} alt={prov} className="rounded-lg max-h-44 mx-auto border border-white/10" />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                                    <EyeIcon className="w-6 h-6 text-white" />
+                                  </div>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-center gap-2">
+                                {provUrl && (
+                                  <button onClick={() => setPreviewImage(provUrl)} className="text-[10px] text-primary-400 hover:text-primary-300 flex items-center gap-0.5">
+                                    <EyeIcon className="w-2.5 h-2.5" /> View
+                                  </button>
+                                )}
+                                {isSelected ? (
+                                  <span className="text-[10px] text-green-400 font-medium flex items-center gap-1"><CheckCircleIcon className="w-3 h-3" /> Selected</span>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      overflow.setCaptionMedia(cap.id, provUrl, provResult.id || null);
+                                      if (provResult.id) overflow.addMedia(provResult.id);
+                                    }}
+                                    className="text-[10px] px-3 py-1 rounded-lg bg-primary-500/20 text-primary-400 hover:bg-primary-500/30 transition-colors font-medium"
+                                  >
+                                    Use this
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {media?.mediaId && (
+                        <div className="flex items-center justify-center">
+                          <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                            <TrashIcon className="w-3 h-3" /> Remove Selection
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2294,6 +2585,27 @@ function MediaStep() {
       {doneCount < captions.length && (
         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg px-4 py-3 text-center">
           <p className="text-xs text-yellow-400">{captions.length - doneCount} caption{captions.length - doneCount > 1 ? 's' : ''} still need media before you can proceed.</p>
+        </div>
+      )}
+
+      {/* Image preview lightbox */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white"
+          >
+            <XMarkIcon className="w-6 h-6" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

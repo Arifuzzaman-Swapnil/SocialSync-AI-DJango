@@ -226,10 +226,10 @@ class ComputeRecommendedTimesView(APIView):
         except Brand.DoesNotExist:
             return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        from accounts.api_keys import get_openai_key
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
+        from accounts.services.llm_service import get_llm_service
+        service = get_llm_service(request.user)
+
+        override_prompt = request.data.get('override_prompt', '')
 
         from brands.models import CompetitorInsight
         insights = CompetitorInsight.objects.filter(
@@ -243,9 +243,7 @@ class ComputeRecommendedTimesView(APIView):
             insight_texts.append(f"[{platform}] {text} (engagement: {ci.engagement_score})")
 
         try:
-            import openai
             import json
-            client = openai.OpenAI(api_key=api_key)
 
             system_prompt = """You are a social media scheduling analyst who optimizes posting times based on competitive intelligence, audience behavior patterns, and platform algorithm insights.
 
@@ -303,8 +301,10 @@ Region: {brand.target_region}
 - Return valid JSON only.
 </constraints>"""
 
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            if override_prompt:
+                prompt = override_prompt
+
+            llm_result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': prompt},
@@ -314,7 +314,13 @@ Region: {brand.target_region}
                 response_format={'type': 'json_object'},
             )
 
-            result = json.loads(response.choices[0].message.content)
+            if not llm_result.success:
+                return Response(
+                    {'error': llm_result.error or 'No AI API key configured. Go to Settings to add your OpenAI or Gemini key.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            result = json.loads(llm_result.content)
             recs = result.get('recommendations', [])
 
             # Delete old competitor_analysis entries for this brand
@@ -353,6 +359,7 @@ Region: {brand.target_region}
                 'brand_id': brand.id,
                 'count': len(created),
                 'recommendations': created,
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}",
             })
 
         except Exception as e:

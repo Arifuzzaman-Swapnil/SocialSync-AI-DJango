@@ -1,7 +1,5 @@
-import json
 import logging
 
-import openai
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -15,7 +13,7 @@ from accounts.permissions import IsCreatorOrAbove, IsWorkspaceAdmin, IsViewerOrA
 from posts.models import Post
 from analytics.models import PostAnalytics, PostComment, LearningSignal, RepurposedContent
 from brands.models import Brand, WeeklyReport
-from accounts.api_keys import get_openai_key
+from accounts.services.llm_service import get_llm_service
 from .serializers import (
     PostAnalyticsSerializer, PostCommentSerializer, ReplyToCommentSerializer,
     LearningSignalSerializer, RepurposedContentSerializer,
@@ -97,15 +95,11 @@ class AIReplyToCommentView(APIView):
         except PostComment.DoesNotExist:
             return Response({'error': 'Comment not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'No OpenAI API key configured.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        service = get_llm_service(request.user)
 
         # Build context
         post = comment.post
+        override_prompt = request.data.get('override_prompt', '')
         brand_voice = ''
         if post.brand and post.brand.voice_tone:
             brand_voice = f"Brand voice: {post.brand.voice_tone}"
@@ -131,19 +125,20 @@ Post caption: {(post.caption or '')[:300]}
 5. Return ONLY the reply text — no labels, no quotes, no "Here's a reply:".
 </instructions>"""
 
-        try:
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a social media community manager who writes replies that make followers feel genuinely heard and valued. You are warm, specific, and efficient.\n\nYour replies:\n- ALWAYS reference something specific from the comment — never generic\n- Feel like they come from a real person who actually read the comment\n- Match the brand's voice while staying conversational\n- Drive further engagement when appropriate (ask a follow-up question, invite a DM, direct to content)\n- Are 1-3 sentences — never walls of text\n\nYou NEVER:\n- Use corporate jargon (\"We appreciate your feedback!\")\n- Give generic thanks without specifics (\"Thanks for sharing!\")\n- Sound like an automated response\n- Use excessive emojis (1-2 max, only if brand-appropriate)"},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-                max_tokens=200,
-            )
-            ai_reply = response.choices[0].message.content.strip().strip('"')
-        except Exception as e:
+        if override_prompt:
+            prompt = override_prompt
+
+        result = service.chat_completion(
+            messages=[
+                {"role": "system", "content": "You are a social media community manager who writes replies that make followers feel genuinely heard and valued. You are warm, specific, and efficient.\n\nYour replies:\n- ALWAYS reference something specific from the comment — never generic\n- Feel like they come from a real person who actually read the comment\n- Match the brand's voice while staying conversational\n- Drive further engagement when appropriate (ask a follow-up question, invite a DM, direct to content)\n- Are 1-3 sentences — never walls of text\n\nYou NEVER:\n- Use corporate jargon (\"We appreciate your feedback!\")\n- Give generic thanks without specifics (\"Thanks for sharing!\")\n- Sound like an automated response\n- Use excessive emojis (1-2 max, only if brand-appropriate)"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.7,
+            max_tokens=200,
+        )
+        if result.success:
+            ai_reply = result.content.strip().strip('"')
+        else:
             ai_reply = "Thank you for your comment! We appreciate your feedback."
 
         comment.reply_body = ai_reply
@@ -152,7 +147,9 @@ Post caption: {(post.caption or '')[:300]}
         comment.replied_at = timezone.now()
         comment.save()
 
-        return Response(PostCommentSerializer(comment).data)
+        response_data = PostCommentSerializer(comment).data
+        response_data['used_prompt'] = prompt
+        return Response(response_data)
 
 
 class WeeklyReportView(APIView):

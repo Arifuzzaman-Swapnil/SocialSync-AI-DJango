@@ -19,6 +19,7 @@ import logging
 
 from accounts.models import UserProfile, SiteConfiguration
 from accounts.api_keys import get_openai_key
+from accounts.services.llm_service import get_llm_service, UnifiedLLMService
 from posts.models import Post
 from platforms.models import SocialAccount
 from ai_caption.models import CaptionGeneration, CaptionTemplate, SavedCaption, UserAPISettings
@@ -166,7 +167,7 @@ class RegisterWithBrandView(APIView):
                         page_data = _fetch_page_content(brand.website_url)
 
                     if page_data.get('success'):
-                        client = openai.OpenAI(api_key=server_key)
+                        service = UnifiedLLMService(openai_key=server_key)
                         existing_dna = json.dumps(brand.brand_dna, indent=2)
                         prompt = f"""<task>
 Enhance the existing Brand DNA using website content. Keep ALL existing values but fill gaps and enrich thin descriptions with evidence from the website.
@@ -193,8 +194,7 @@ For each of the 15 fields:
 Return ONLY a single JSON object with all 15 Brand DNA fields.
 </output_format>"""
 
-                        resp = client.chat.completions.create(
-                            model='gpt-4o-mini',
+                        result = service.chat_completion(
                             messages=[
                                 {'role': 'system', 'content': 'You are a brand strategist specializing in enriching brand identity profiles. Your task is to enhance an existing Brand DNA by cross-referencing it with fresh website data — filling gaps, adding specificity, and improving strategic usefulness WITHOUT overwriting the user\'s original input.\n\nPrinciples:\n- User-provided values are sacred — enhance, never replace\n- Empty fields are opportunities — fill them with evidence-based content\n- Thin descriptions should be enriched with specifics from the website\n- The enhanced DNA should be immediately useful for content creation\n\nReturn ONLY valid JSON — no markdown, no commentary.'},
                                 {'role': 'user', 'content': prompt},
@@ -202,7 +202,9 @@ Return ONLY a single JSON object with all 15 Brand DNA fields.
                             temperature=0.3,
                             max_tokens=2500,
                         )
-                        raw = resp.choices[0].message.content.strip()
+                        if not result.success:
+                            raise Exception(result.error)
+                        raw = result.content.strip()
                         if raw.startswith('```'):
                             raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
                             if raw.endswith('```'):
@@ -594,6 +596,7 @@ def generate_caption(request):
         include_emojis = _parse_bool(request.data.get('include_emojis', True))
         include_cta = _parse_bool(request.data.get('include_cta', False))
         custom_instructions = request.data.get('custom_instructions', '')
+        override_prompt = request.data.get('override_prompt', '')
 
         if not input_text and not media_file:
             return Response(
@@ -648,6 +651,7 @@ def generate_caption(request):
                 include_emojis=include_emojis,
                 include_cta=include_cta,
                 custom_instructions=custom_instructions,
+                override_prompt=override_prompt or None,
             )
         elif media_type == 'video':
             result = service.generate_from_video(
@@ -660,6 +664,7 @@ def generate_caption(request):
                 include_emojis=include_emojis,
                 include_cta=include_cta,
                 custom_instructions=custom_instructions,
+                override_prompt=override_prompt or None,
             )
         else:
             result = service.generate_from_text(
@@ -671,6 +676,7 @@ def generate_caption(request):
                 include_emojis=include_emojis,
                 include_cta=include_cta,
                 custom_instructions=custom_instructions,
+                override_prompt=override_prompt or None,
             )
 
         if result.get('success'):
@@ -821,11 +827,27 @@ class GlobalAPIKeysView(APIView):
     def get(self, request):
         openai_key = get_openai_key(request.user)
         gemini_key = get_gemini_key(request.user)
+
+        # LLM preferences
+        llm_provider = 'openai'
+        default_model = 'gpt-4o'
+        gemini_model = 'gemini-2.0-flash'
+        try:
+            s = request.user.api_settings
+            llm_provider = getattr(s, 'default_llm_provider', 'openai')
+            default_model = s.default_model or 'gpt-4o'
+            gemini_model = getattr(s, 'default_gemini_model', 'gemini-2.0-flash')
+        except Exception:
+            pass
+
         return Response({
             'has_openai_key': bool(openai_key),
             'masked_openai_key': mask_key(openai_key) if openai_key else '',
             'has_gemini_key': bool(gemini_key),
             'masked_gemini_key': mask_key(gemini_key) if gemini_key else '',
+            'default_llm_provider': llm_provider,
+            'default_model': default_model,
+            'default_gemini_model': gemini_model,
         })
 
     def patch(self, request):
@@ -841,15 +863,45 @@ class GlobalAPIKeysView(APIView):
         if gemini_key:
             sync_gemini_key(request.user, gemini_key)
 
+        # Save LLM preferences
+        llm_provider = data.get('default_llm_provider', '')
+        default_model = data.get('default_model', '')
+        gemini_model = data.get('default_gemini_model', '')
+        if llm_provider or default_model or gemini_model:
+            from ai_caption.models import UserAPISettings
+            settings, _ = UserAPISettings.objects.get_or_create(user=request.user)
+            if llm_provider:
+                settings.default_llm_provider = llm_provider
+            if default_model:
+                settings.default_model = default_model
+            if gemini_model:
+                settings.default_gemini_model = gemini_model
+            settings.save()
+
         # Return updated status
         new_openai = get_openai_key(request.user)
         new_gemini = get_gemini_key(request.user)
+
+        ret_provider = 'openai'
+        ret_model = 'gpt-4o'
+        ret_gemini = 'gemini-2.0-flash'
+        try:
+            s = request.user.api_settings
+            ret_provider = s.default_llm_provider
+            ret_model = s.default_model
+            ret_gemini = s.default_gemini_model
+        except Exception:
+            pass
+
         return Response({
             'success': True,
             'has_openai_key': bool(new_openai),
             'masked_openai_key': mask_key(new_openai) if new_openai else '',
             'has_gemini_key': bool(new_gemini),
             'masked_gemini_key': mask_key(new_gemini) if new_gemini else '',
+            'default_llm_provider': ret_provider,
+            'default_model': ret_model,
+            'default_gemini_model': ret_gemini,
         })
 
 
@@ -1133,14 +1185,9 @@ class ImagePromptTemplateViewSet(viewsets.ModelViewSet):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def refine_image_prompt(request):
-    """Use GPT-4o-mini to refine raw context into a focused image generation prompt."""
+    """Use LLM to refine raw context into a focused image generation prompt."""
     try:
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'No OpenAI API key configured. Please add one in Settings.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        service = get_llm_service(request.user)
 
         brand_name = request.data.get('brand_name', '')
         industry = request.data.get('industry', '')
@@ -1151,6 +1198,7 @@ def refine_image_prompt(request):
         caption_snippet = request.data.get('caption_snippet', '')
         user_prompt = request.data.get('user_prompt', '')
         style = request.data.get('style', '')
+        override_prompt = request.data.get('override_prompt', '')
 
         if not user_prompt:
             return Response(
@@ -1200,9 +1248,10 @@ def refine_image_prompt(request):
             "Generate a clean, focused image prompt that matches this brand's industry and the user's direction."
         )
 
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        if override_prompt:
+            user_message = override_prompt
+
+        result = service.chat_completion(
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message},
@@ -1210,7 +1259,9 @@ def refine_image_prompt(request):
             temperature=0.7,
             max_tokens=300,
         )
-        refined_prompt = response.choices[0].message.content.strip()
+        if not result.success:
+            return Response({'error': result.error}, status=status.HTTP_400_BAD_REQUEST)
+        refined_prompt = result.content.strip()
 
         return Response({'refined_prompt': refined_prompt, 'used_prompt': f"SYSTEM:\n{system_message}\n\nUSER:\n{user_message}"})
 
@@ -2895,15 +2946,11 @@ class GenerateBrandDNAView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'OpenAI API key not configured. Go to Settings to add your key.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        service = get_llm_service(request.user)
+
+        override_prompt = request.data.get('override_prompt', '')
 
         try:
-            import openai, json
             from api.strategy_views import _crawl_site_pages, _fetch_page_content
 
             # Fetch the website content — multi-page crawl for richer DNA
@@ -2927,8 +2974,6 @@ class GenerateBrandDNAView(APIView):
                     {'error': f"Could not read website: {page_data.get('error', 'unknown error')}"},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-
-            client = openai.OpenAI(api_key=api_key)
 
             prompt = f"""<task>
 Analyze the website content and extract a complete 15-field Brand DNA profile.
@@ -2978,8 +3023,10 @@ Return ONLY a single JSON object with all 15 fields as keys.
 - Return valid JSON only.
 </constraints>"""
 
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            if override_prompt:
+                prompt = override_prompt
+
+            result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': 'You are a senior brand strategist who extracts comprehensive brand identity profiles from website content. You combine analytical precision with strategic intuition to build Brand DNA profiles that power content creation.\n\nYour approach:\n- You read website copy the way a strategist reads — looking for positioning, messaging hierarchy, value propositions, and audience signals\n- You distinguish between what a brand SAYS and what it MEANS\n- You extract implicit signals (tone of voice from writing style, target audience from language choices, values from what they emphasize)\n- You are specific and detailed — "professional" is not a useful brand voice description; "authoritative but approachable, uses industry jargon sparingly, favors short sentences and active voice" IS\n\nCRITICAL: Base ALL analysis on the actual page content provided. Clearly distinguish between directly stated facts and reasonable inferences.\n\nReturn ONLY valid JSON — no markdown, no commentary.'},
                     {'role': 'user', 'content': prompt},
@@ -2988,7 +3035,10 @@ Return ONLY a single JSON object with all 15 fields as keys.
                 max_tokens=2500,
             )
 
-            raw = response.choices[0].message.content.strip()
+            if not result.success:
+                return Response({'error': result.error}, status=status.HTTP_400_BAD_REQUEST)
+
+            raw = result.content.strip()
             if raw.startswith('```'):
                 raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
                 if raw.endswith('```'):
@@ -3116,16 +3166,12 @@ class RegenerateBrandDNAFromInputsView(APIView):
             brand.target_region = data['target_region']
 
         source = 'manual'
+        used_prompt = ''
+        override_prompt = request.data.get('override_prompt', '')
 
         if use_ai:
-            api_key = get_openai_key(request.user)
-            if not api_key:
-                return Response(
-                    {'error': 'OpenAI API key not configured. Go to Settings to add your key.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            service = get_llm_service(request.user)
             try:
-                client = openai.OpenAI(api_key=api_key)
                 prompt = f"""<task>
 Enhance and complete this Brand DNA profile. Keep user-provided values but make them richer, more specific, and fill any empty fields with reasonable defaults.
 </task>
@@ -3145,8 +3191,11 @@ For each of the 15 fields:
 Return ONLY a single JSON object with all 15 Brand DNA fields.
 </output_format>"""
 
-                resp = client.chat.completions.create(
-                    model='gpt-4o-mini',
+                if override_prompt:
+                    prompt = override_prompt
+                used_prompt = prompt
+
+                result = service.chat_completion(
                     messages=[
                         {'role': 'system', 'content': 'You are a brand strategist who polishes and completes Brand DNA profiles. You take user-provided brand information and make it richer, more specific, and more strategically actionable — while always preserving the user\'s original intent and voice.\n\nYour enhancements:\n- Transform vague descriptions into specific, usable strategic language\n- Fill empty fields with reasonable defaults inferred from filled fields\n- Ensure internal consistency (voice should match values, audience should match positioning)\n- Make every field useful for a content creator or social media manager\n\nReturn ONLY valid JSON — no markdown, no commentary.'},
                         {'role': 'user', 'content': prompt},
@@ -3154,7 +3203,12 @@ Return ONLY a single JSON object with all 15 Brand DNA fields.
                     temperature=0.3,
                     max_tokens=2500,
                 )
-                raw = resp.choices[0].message.content.strip()
+                if not result.success:
+                    return Response(
+                        {'error': f'AI enhancement failed: {result.error}. Your manual inputs were NOT saved — please try again or save without AI.'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                raw = result.content.strip()
                 if raw.startswith('```'):
                     raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
                     if raw.endswith('```'):
@@ -3195,6 +3249,7 @@ Return ONLY a single JSON object with all 15 Brand DNA fields.
             'generated_at': brand.brand_dna_generated_at.isoformat(),
             'source': source,
             'message': 'Brand DNA updated with AI enhancement!' if use_ai else 'Brand DNA saved successfully!',
+            'used_prompt': used_prompt,
         })
 
 
@@ -3408,19 +3463,14 @@ class SupportChatView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get API key: admin site config first, then user's key, then Django settings
-        api_key = SiteConfiguration.get('support_chat_api_key', '')
-        if not api_key:
-            api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'Support chat is not configured. Please contact the administrator.'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
+        # Get LLM service: admin site config key first, then user's configured provider
+        site_key = SiteConfiguration.get('support_chat_api_key', '')
+        if site_key:
+            service = UnifiedLLMService(openai_key=site_key)
+        else:
+            service = get_llm_service(request.user)
 
         try:
-            openai.api_key = api_key
-
             # Get the latest user message for RAG retrieval
             latest_user_msg = ''
             for msg in reversed(messages):
@@ -3444,17 +3494,18 @@ class SupportChatView(APIView):
                 if role in ('user', 'assistant') and content:
                     api_messages.append({'role': role, 'content': content})
 
-            response = openai.chat.completions.create(
-                model='gpt-4o-mini',
+            result = service.chat_completion(
                 messages=api_messages,
                 temperature=0.7,
                 max_tokens=1000,
             )
 
-            reply = response.choices[0].message.content
+            if not result.success:
+                return Response({'error': result.error}, status=status.HTTP_400_BAD_REQUEST)
+
             return Response({
-                'reply': reply,
-                'model': response.model,
+                'reply': result.content,
+                'model': result.model,
             })
 
         except Exception as e:

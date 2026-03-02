@@ -37,6 +37,7 @@ export interface RefinePromptRequest {
   caption_snippet?: string;
   user_prompt: string;
   style?: string;
+  override_prompt?: string;
 }
 
 export interface RefinePromptResponse {

@@ -6,6 +6,7 @@ import {
   ChevronDownIcon, ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
+import { PromptInfoButton } from './ui/PromptInfoButton';
 
 interface Caption {
   id: number;
@@ -54,6 +55,10 @@ export function CaptionEditor({ postId, onCaptionChange }: Props) {
   const [platform, setPlatform] = useState('all');
   const [count, setCount] = useState(3);
 
+  // Prompt visibility
+  const [captionUsedPrompt, setCaptionUsedPrompt] = useState('');
+  const [captionRegenerating, setCaptionRegenerating] = useState(false);
+
   // Image prompt
   const [expandedPrompt, setExpandedPrompt] = useState<number | null>(null);
   const [generatingImage, setGeneratingImage] = useState<number | null>(null);
@@ -84,11 +89,26 @@ export function CaptionEditor({ postId, onCaptionChange }: Props) {
       });
       const data = res.data?.captions || res.data;
       setCaptions(Array.isArray(data) ? data : []);
+      if (res.data?.used_prompt) setCaptionUsedPrompt(res.data.used_prompt);
       onCaptionChange?.();
     } catch (err) {
       console.error('Failed to generate captions:', err);
     }
     setGenerating(false);
+  };
+
+  const handleCaptionRegenerate = async (editedPrompt: string) => {
+    setCaptionRegenerating(true);
+    try {
+      const res = await api.post(`/drafts/${postId}/captions/generate/`, {
+        tone, platforms: [platform], count, override_prompt: editedPrompt,
+      });
+      const data = res.data?.captions || res.data;
+      setCaptions(Array.isArray(data) ? data : []);
+      if (res.data?.used_prompt) setCaptionUsedPrompt(res.data.used_prompt);
+      onCaptionChange?.();
+    } catch { /* keep existing */ }
+    setCaptionRegenerating(false);
   };
 
   const handleSelect = async (captionId: number) => {
@@ -174,6 +194,7 @@ export function CaptionEditor({ postId, onCaptionChange }: Props) {
           )}
           Generate
         </button>
+        {captionUsedPrompt && <PromptInfoButton prompt={captionUsedPrompt} label="Caption Generation Prompt" onRegenerate={handleCaptionRegenerate} regenerating={captionRegenerating} regenerateLabel="Regenerate Captions" />}
       </div>
 
       {/* Caption List */}

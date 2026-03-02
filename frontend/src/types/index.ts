@@ -100,6 +100,8 @@ export interface ContentIdea {
   post?: number;
   batch_id: string;
   generation_run: number;
+  engagement_tier?: string;
+  pillar_name?: string;
   created_at: string;
   updated_at: string;
 }
@@ -379,6 +381,7 @@ export interface CaptionGeneration {
   tokens_used: number;
   processing_time: number;
   model_used: string;
+  used_prompt?: string;
   created_at: string;
   updated_at: string;
 }

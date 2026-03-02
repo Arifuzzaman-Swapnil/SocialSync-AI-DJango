@@ -35,6 +35,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Button, Card, Input, Textarea, Modal, Spinner, PlatformIcon } from '../components/ui';
 import type { CaptionGeneration, CaptionTemplate, SavedCaption, CaptionTone, CaptionLength, CaptionPlatform, TemplateCategory, GenerationStatus } from '../types';
 import { authFetch } from '../services/api';
+import { PromptInfoButton } from '../components/ui/PromptInfoButton';
 
 // Tone options with icons
 const tones: { id: CaptionTone; label: string; Icon: typeof BriefcaseIcon; description: string }[] = [
@@ -96,6 +97,8 @@ export function AICaptionPage() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState<CaptionGeneration | null>(null);
+  const [captionUsedPrompt, setCaptionUsedPrompt] = useState('');
+  const [captionRegenerating, setCaptionRegenerating] = useState(false);
 
   // Form state
   const [inputText, setInputText] = useState('');
@@ -234,6 +237,7 @@ export function AICaptionPage() {
       const data = await response.json();
       if (response.ok) {
         setGeneratedCaption(data);
+        if (data.used_prompt) setCaptionUsedPrompt(data.used_prompt);
       } else {
         setError(data.error || 'Failed to generate caption. Please check your API key in Settings.');
       }
@@ -243,6 +247,36 @@ export function AICaptionPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleCaptionRegenerate = async (editedPrompt: string) => {
+    if (!inputText.trim() && !mediaFile) return;
+    setCaptionRegenerating(true);
+    try {
+      const formData = new FormData();
+      if (inputText) formData.append('input_text', inputText);
+      if (mediaFile) formData.append('media_file', mediaFile);
+      formData.append('tone', selectedTone);
+      formData.append('length', selectedLength);
+      formData.append('platform', selectedPlatform);
+      formData.append('include_hashtags', String(includeHashtags));
+      formData.append('include_emojis', String(includeEmojis));
+      formData.append('include_cta', String(includeCta));
+      if (customInstructions) formData.append('custom_instructions', customInstructions);
+      formData.append('override_prompt', editedPrompt);
+
+      const response = await authFetch('/api/v1/ai-caption/generate/', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setGeneratedCaption(data);
+        if (data.used_prompt) setCaptionUsedPrompt(data.used_prompt);
+      }
+    } catch { /* keep existing */ }
+    setCaptionRegenerating(false);
   };
 
   const copyToClipboard = async (text: string) => {
@@ -629,7 +663,10 @@ export function AICaptionPage() {
             {/* Generated Caption */}
             <Card className="sticky top-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-text-primary">Generated Caption</h3>
+                <h3 className="font-semibold text-text-primary flex items-center gap-2">
+                  Generated Caption
+                  {captionUsedPrompt && <PromptInfoButton prompt={captionUsedPrompt} label="Caption Generation Prompt" onRegenerate={handleCaptionRegenerate} regenerating={captionRegenerating} regenerateLabel="Regenerate Caption" />}
+                </h3>
                 {generatedCaption && (
                   <div className="flex items-center gap-2">
                     <button

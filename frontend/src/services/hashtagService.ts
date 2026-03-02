@@ -5,7 +5,7 @@ export const hashtagService = {
     const res = await api.get(`/drafts/${postId}/hashtags/`);
     return res.data;
   },
-  async generateHashtags(postId: number, data: { platform: string; topic?: string; count?: number }) {
+  async generateHashtags(postId: number, data: { platform: string; topic?: string; count?: number; override_prompt?: string }) {
     const res = await api.post(`/drafts/${postId}/hashtags/generate/`, data);
     return res.data;
   },

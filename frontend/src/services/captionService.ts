@@ -2,7 +2,7 @@ import api from './api';
 import type { GenerateCaptionRequest, GeneratedCaption } from '../types';
 
 export const captionService = {
-  async generate(data: GenerateCaptionRequest): Promise<GeneratedCaption> {
+  async generate(data: GenerateCaptionRequest & { override_prompt?: string }): Promise<GeneratedCaption> {
     const formData = new FormData();
 
     if (data.topic) formData.append('topic', data.topic);
@@ -14,6 +14,7 @@ export const captionService = {
     formData.append('include_cta', String(data.include_cta));
     if (data.custom_instructions) formData.append('custom_instructions', data.custom_instructions);
     if (data.media_file) formData.append('media_file', data.media_file);
+    if (data.override_prompt) formData.append('override_prompt', data.override_prompt);
 
     const response = await api.post<GeneratedCaption>('/ai-caption/generate/', formData);
     return response.data;

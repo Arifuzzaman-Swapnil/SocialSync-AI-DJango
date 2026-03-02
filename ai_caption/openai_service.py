@@ -1,8 +1,9 @@
 # ai_caption/openai_service.py
 
 """
-OpenAI Service for AI Caption Generation
-Supports text, images, and video frame analysis
+AI Caption Generation Service (via Unified LLM Service)
+Supports text, images, and video frame analysis.
+Routes through OpenAI or Gemini depending on user/key configuration.
 """
 
 import os
@@ -10,25 +11,32 @@ import base64
 import time
 import tempfile
 import subprocess
-from openai import OpenAI
 from django.conf import settings
 
 
 class CaptionGeneratorService:
     """
-    Comprehensive AI Caption Generator using OpenAI GPT-4o
+    Comprehensive AI Caption Generator using the Unified LLM Service.
+    Routes through OpenAI or Gemini depending on user configuration.
     Supports:
     - Text-based caption generation
     - Image analysis and caption generation
     - Video frame extraction and analysis
     """
     
-    def __init__(self, api_key=None):
-        self.api_key = api_key or getattr(settings, 'OPENAI_API_KEY', None)
-        if self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
-        else:
-            self.client = None
+    def __init__(self, api_key=None, llm_service=None):
+        self.llm_service = llm_service
+        if not self.llm_service and api_key:
+            from accounts.services.llm_service import UnifiedLLMService
+            self.llm_service = UnifiedLLMService(openai_key=api_key)
+        elif not self.llm_service:
+            # Try settings as last resort for backward compat
+            fallback_key = getattr(settings, 'OPENAI_API_KEY', None)
+            if fallback_key:
+                from accounts.services.llm_service import UnifiedLLMService
+                self.llm_service = UnifiedLLMService(openai_key=fallback_key)
+            else:
+                raise ValueError("Either api_key or llm_service must be provided")
     
     def _get_word_count(self, length):
         """Get word count range based on length setting"""
@@ -142,7 +150,7 @@ general | facebook | instagram | twitter | linkedin | tiktok | youtube | pintere
     
     def generate_from_text(self, topic, tone='professional', length='medium', platform='general',
                            include_hashtags=True, include_emojis=True, include_cta=True,
-                           custom_instructions=None):
+                           custom_instructions=None, override_prompt=None):
         """
         Generate caption from text/topic
         
@@ -159,17 +167,11 @@ general | facebook | instagram | twitter | linkedin | tiktok | youtube | pintere
         Returns:
             dict: {success, caption, hashtags, tokens_used, processing_time, error}
         """
-        if not self.client:
-            return {
-                'success': False,
-                'error': 'OpenAI API key not configured'
-            }
-        
         start_time = time.time()
-        
+
         try:
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
-            
+
             user_prompt = f"""<task>
 Create a single social media caption about the topic below.
 </task>
@@ -196,19 +198,25 @@ short = 20-40 words | medium = 40-80 words | long = 80-120 words | extra_long = 
 </length_guide>
 
 Generate the caption now."""
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+
+            if override_prompt:
+                user_prompt = override_prompt
+
+            result = self.llm_service.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
+                model="gpt-4o",
                 temperature=0.8,
-                max_tokens=500
+                max_tokens=500,
             )
-            
-            caption = response.choices[0].message.content.strip()
-            tokens_used = response.usage.total_tokens if response.usage else 0
+
+            if not result.success:
+                raise Exception(result.error)
+
+            caption = result.content.strip()
+            tokens_used = result.tokens_used
             processing_time = time.time() - start_time
             
             # Extract hashtags if present
@@ -245,7 +253,7 @@ Generate the caption now."""
                 'hashtags': hashtags,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o',
+                'model_used': result.model or 'gpt-4o',
                 'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
 
@@ -330,15 +338,11 @@ Generate the caption now."""
         Returns:
             dict: {success, analysis, error}
         """
-        if not self.client:
-            return {'success': False, 'error': 'OpenAI API key not configured'}
-        
         try:
             base64_image = self._encode_image(image_path)
             mime_type = self._get_mime_type(image_path)
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+
+            result = self.llm_service.chat_completion(
                 messages=[
                     {
                         "role": "user",
@@ -378,20 +382,25 @@ Examine the image systematically. For each aspect, provide specific observations
                         ]
                     }
                 ],
-                max_tokens=800
+                model="gpt-4o",
+                max_tokens=800,
             )
-            
+
+            if not result.success:
+                raise Exception(result.error)
+
             return {
                 'success': True,
-                'analysis': response.choices[0].message.content.strip()
+                'analysis': result.content.strip()
             }
-            
+
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
     def generate_from_image(self, image_path, additional_context=None, tone='professional',
                             length='medium', platform='general', include_hashtags=True,
-                            include_emojis=True, include_cta=True, custom_instructions=None):
+                            include_emojis=True, include_cta=True, custom_instructions=None,
+                            override_prompt=None):
         """
         Generate caption from image using GPT-4o Vision
         
@@ -403,17 +412,14 @@ Examine the image systematically. For each aspect, provide specific observations
         Returns:
             dict: {success, caption, hashtags, analysis, tokens_used, processing_time, error}
         """
-        if not self.client:
-            return {'success': False, 'error': 'OpenAI API key not configured'}
-        
         start_time = time.time()
-        
+
         try:
             base64_image = self._encode_image(image_path)
             mime_type = self._get_mime_type(image_path)
-            
+
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
-            
+
             user_prompt = f"""<task>
 Analyze the attached image, then create an engaging social media caption grounded in what you actually see.
 </task>
@@ -444,9 +450,11 @@ CAPTION: [The generated social media caption]
 - Follow the system prompt's tone and platform guidelines.
 - The caption should work both with and without the image visible.
 </constraints>"""
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+
+            if override_prompt:
+                user_prompt = override_prompt
+
+            result = self.llm_service.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {
@@ -462,12 +470,16 @@ CAPTION: [The generated social media caption]
                         ]
                     }
                 ],
+                model="gpt-4o",
                 temperature=0.8,
-                max_tokens=800
+                max_tokens=800,
             )
-            
-            full_response = response.choices[0].message.content.strip()
-            tokens_used = response.usage.total_tokens if response.usage else 0
+
+            if not result.success:
+                raise Exception(result.error)
+
+            full_response = result.content.strip()
+            tokens_used = result.tokens_used
             processing_time = time.time() - start_time
             
             # Parse response
@@ -495,7 +507,7 @@ CAPTION: [The generated social media caption]
                 'analysis': analysis,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o',
+                'model_used': result.model or 'gpt-4o',
                 'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
 
@@ -508,7 +520,8 @@ CAPTION: [The generated social media caption]
 
     def generate_from_video(self, video_path, additional_context=None, tone='professional',
                             length='medium', platform='general', include_hashtags=True,
-                            include_emojis=True, include_cta=True, custom_instructions=None):
+                            include_emojis=True, include_cta=True, custom_instructions=None,
+                            override_prompt=None):
         """
         Generate caption from video by extracting and analyzing frames
         
@@ -519,11 +532,8 @@ CAPTION: [The generated social media caption]
         Returns:
             dict: {success, caption, hashtags, analysis, tokens_used, processing_time, error}
         """
-        if not self.client:
-            return {'success': False, 'error': 'OpenAI API key not configured'}
-        
         start_time = time.time()
-        
+
         try:
             # Extract frames from video
             frames, temp_dir = self._extract_video_frames(video_path, num_frames=4)
@@ -578,6 +588,9 @@ CAPTION: [The generated social media caption]
                 }
             ]
             
+            if override_prompt:
+                content[0]["text"] = override_prompt
+
             # Add frame images
             for frame_path in frames:
                 base64_image = self._encode_image(frame_path)
@@ -588,18 +601,21 @@ CAPTION: [The generated social media caption]
                     }
                 })
             
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+            result = self.llm_service.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": content}
                 ],
+                model="gpt-4o",
                 temperature=0.8,
-                max_tokens=800
+                max_tokens=800,
             )
-            
-            full_response = response.choices[0].message.content.strip()
-            tokens_used = response.usage.total_tokens if response.usage else 0
+
+            if not result.success:
+                raise Exception(result.error)
+
+            full_response = result.content.strip()
+            tokens_used = result.tokens_used
             processing_time = time.time() - start_time
             
             # Cleanup temp files
@@ -634,7 +650,7 @@ CAPTION: [The generated social media caption]
                 'analysis': analysis,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o',
+                'model_used': result.model or 'gpt-4o',
                 'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{video_user_prompt}",
             }
 
@@ -658,14 +674,11 @@ CAPTION: [The generated social media caption]
         Returns:
             dict: {success, caption, hashtags, tokens_used, processing_time, error}
         """
-        if not self.client:
-            return {'success': False, 'error': 'OpenAI API key not configured'}
-        
         start_time = time.time()
-        
+
         try:
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
-            
+
             user_prompt = f"""<task>
 Regenerate a social media caption based on user feedback. The new version must be noticeably better than the original — not just slightly adjusted.
 </task>
@@ -691,21 +704,24 @@ Think step by step:
 - The new caption must demonstrably address the feedback.
 - Do not degrade quality while accommodating feedback.
 </constraints>"""
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+
+            result = self.llm_service.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
+                model="gpt-4o",
                 temperature=0.8,
-                max_tokens=500
+                max_tokens=500,
             )
-            
-            caption = response.choices[0].message.content.strip()
-            tokens_used = response.usage.total_tokens if response.usage else 0
+
+            if not result.success:
+                raise Exception(result.error)
+
+            caption = result.content.strip()
+            tokens_used = result.tokens_used
             processing_time = time.time() - start_time
-            
+
             # Extract hashtags
             hashtags = ""
             if include_hashtags and '#' in caption:
@@ -714,14 +730,14 @@ Think step by step:
                 if hashtag_lines:
                     hashtags = hashtag_lines[-1].strip()
                     caption = '\n'.join([l for l in lines if l not in hashtag_lines]).strip()
-            
+
             return {
                 'success': True,
                 'caption': caption,
                 'hashtags': hashtags,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o',
+                'model_used': result.model or 'gpt-4o',
                 'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
 
@@ -745,15 +761,12 @@ Think step by step:
         Returns:
             dict: {success, captions: [list of captions], tokens_used, processing_time, error}
         """
-        if not self.client:
-            return {'success': False, 'error': 'OpenAI API key not configured'}
-        
         start_time = time.time()
         num_variations = min(max(num_variations, 1), 5)  # Limit 1-5
-        
+
         try:
             system_prompt = self._build_system_prompt(tone, platform, include_hashtags, include_emojis, include_cta)
-            
+
             user_prompt = f"""<task>
 Generate {num_variations} distinctly different social media caption variations for the topic or analysis below. Each must feel like it was written by a different creative mind with a different strategy.
 </task>
@@ -793,19 +806,22 @@ Before finalizing, verify each caption:
 </constraints>
 
 Generate {num_variations} distinct captions now."""
-            
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
+
+            result = self.llm_service.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
+                model="gpt-4o",
                 temperature=0.9,
-                max_tokens=1000
+                max_tokens=1000,
             )
-            
-            full_response = response.choices[0].message.content.strip()
-            tokens_used = response.usage.total_tokens if response.usage else 0
+
+            if not result.success:
+                raise Exception(result.error)
+
+            full_response = result.content.strip()
+            tokens_used = result.tokens_used
             processing_time = time.time() - start_time
             
             # Parse variations
@@ -836,7 +852,7 @@ Generate {num_variations} distinct captions now."""
                 'captions': captions,
                 'tokens_used': tokens_used,
                 'processing_time': processing_time,
-                'model_used': 'gpt-4o',
+                'model_used': result.model or 'gpt-4o',
                 'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{user_prompt}",
             }
             

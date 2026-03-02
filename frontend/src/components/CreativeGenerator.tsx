@@ -13,6 +13,7 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
+import { PromptInfoButton } from './ui/PromptInfoButton';
 
 interface Asset {
   id: number;
@@ -77,6 +78,8 @@ export function CreativeGenerator({ postId, onAssetGenerated }: Props) {
   const [customPrompt, setCustomPrompt] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [imageUsedPrompt, setImageUsedPrompt] = useState('');
+  const [imageRegenerating, setImageRegenerating] = useState(false);
 
   // Assets state
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -145,7 +148,9 @@ export function CreativeGenerator({ postId, onAssetGenerated }: Props) {
       if (customPrompt.trim()) {
         payload.prompt = customPrompt.trim();
       }
-      await api.post('/ai-image/generate/', payload);
+      const res = await api.post('/ai-image/generate/', payload);
+      const usedP = res.data?.used_prompt || res.data?.enhanced_prompt || '';
+      if (usedP) setImageUsedPrompt(usedP);
       await loadAssets();
       onAssetGenerated?.();
     } catch (err: any) {
@@ -157,6 +162,19 @@ export function CreativeGenerator({ postId, onAssetGenerated }: Props) {
       setGenerateError(msg);
     }
     setGenerating(false);
+  };
+
+  const handleImageRegenerate = async (editedPrompt: string) => {
+    setImageRegenerating(true);
+    try {
+      const payload: Record<string, unknown> = { post_id: postId, style: selectedStyle, prompt: editedPrompt };
+      const res = await api.post('/ai-image/generate/', payload);
+      const usedP = res.data?.used_prompt || res.data?.enhanced_prompt || '';
+      if (usedP) setImageUsedPrompt(usedP);
+      await loadAssets();
+      onAssetGenerated?.();
+    } catch { /* keep existing */ }
+    setImageRegenerating(false);
   };
 
   const handleGenerateAltText = async (assetId: number) => {
@@ -229,6 +247,7 @@ export function CreativeGenerator({ postId, onAssetGenerated }: Props) {
           <h4 className="text-sm font-semibold text-text-primary">
             Generate Creative
           </h4>
+          {imageUsedPrompt && <PromptInfoButton prompt={imageUsedPrompt} label="Image Generation Prompt" size="sm" onRegenerate={handleImageRegenerate} regenerating={imageRegenerating} regenerateLabel="Regenerate Image" />}
         </div>
 
         {/* Style Presets */}

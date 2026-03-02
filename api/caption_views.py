@@ -1,7 +1,6 @@
 import json
 import logging
 
-import openai
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,7 +10,7 @@ from rest_framework import viewsets
 from accounts.permissions import IsCreatorOrAbove, IsViewerOrAbove
 
 from posts.models import Post, PostCaption
-from accounts.api_keys import get_openai_key
+from accounts.services.llm_service import get_llm_service
 from ai_caption.services.adaptation_service import adapt_caption
 from ai_caption.services.compliance_service import check_compliance
 from accounts.services.notification_service import notify_captions_ready, notify_daily_limit_warning
@@ -69,12 +68,7 @@ class GenerateCaptionsView(APIView):
         tone = data.get('tone', 'professional')
         include_cta = data.get('include_cta', False)
 
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'No OpenAI API key configured. Please add one in Settings.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        service = get_llm_service(request.user)
 
         # V1.2.1 — Rate limit check
         if post.brand and post.brand.workspace:
@@ -96,6 +90,7 @@ class GenerateCaptionsView(APIView):
         pillar_context = f", Content Pillar: {post.pillar.name}" if post.pillar else ''
 
         original_text = (post.caption or post.hook or 'No caption provided')[:500]
+        override_prompt = request.data.get('override_prompt', '')
 
         prompt = f"""<context>
 You are generating caption variants for a social media draft post. Each variant must also include a DALL-E 3 image prompt that visually complements the caption.
@@ -171,10 +166,11 @@ Output:
 }}
 </example>"""
 
+        if override_prompt:
+            prompt = override_prompt
+
         try:
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
+            llm_result = service.chat_completion(
                 messages=[
                     {"role": "system", "content": "You are a world-class social media copywriter and brand strategist specializing in high-engagement, conversion-focused content.\n\nYour task is to generate high-quality social media caption variants that feel authentic, strategic, emotionally engaging, and platform-optimized.\n\nYou understand:\n- Audience psychology and scroll-stopping behavior patterns\n- Hook frameworks: question hooks, bold-claim hooks, statistic hooks, story hooks, curiosity-gap hooks, and pattern-interrupt hooks\n- Storytelling frameworks: AIDA (Attention-Interest-Desire-Action), PAS (Problem-Agitate-Solve), BAB (Before-After-Bridge), and open loops\n- Persuasion principles: social proof, urgency, scarcity, reciprocity, authority, and emotional triggers (curiosity, FOMO, aspiration, empathy)\n- Modern social media best practices across all major platforms\n- Brand voice consistency and platform-native writing conventions\n\nYou also generate professional, detailed, and visually descriptive image prompts optimized for DALL-E 3 — specifying subject, composition, lighting, style, mood, color palette, and camera angle for maximum visual impact.\n\nCRITICAL OUTPUT RULES:\n- Return ONLY valid JSON — no markdown, no commentary, no wrapping\n- Follow the JSON schema exactly\n- Ensure captions are natural and human-like\n- Avoid generic or repetitive phrasing\n- Each variant must be clearly different in hook, angle, structure, and persuasion style"},
                     {"role": "user", "content": prompt},
@@ -183,7 +179,12 @@ Output:
                 max_tokens=2000,
                 response_format={"type": "json_object"},
             )
-            result = json.loads(response.choices[0].message.content)
+            if not llm_result.success:
+                return Response(
+                    {'error': llm_result.error or 'No AI API key configured. Go to Settings to add your OpenAI or Gemini key.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            result = json.loads(llm_result.content)
             generated = result.get('captions', [])
         except Exception as e:
             logger.error(f"Caption generation failed: {e}")
@@ -235,6 +236,7 @@ Output:
         result = PostCaptionSerializer(captions_created, many=True)
         response_data = {
             'captions': result.data,
+            'used_prompt': prompt,
         }
         if compliance_warnings:
             response_data['compliance_warnings'] = compliance_warnings
@@ -262,17 +264,22 @@ class AdaptCaptionView(APIView):
         except PostCaption.DoesNotExist:
             return Response({'error': 'Source caption not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        api_key = get_openai_key(request.user)
         brand = post.brand
+        override_prompt = request.data.get('override_prompt', '')
 
         adapted = []
+        all_used_prompts = []
         for platform in data['target_platforms']:
-            adapted_caption = adapt_caption(source, platform, api_key, brand=brand)
+            adapted_caption, used_prompt = adapt_caption(source, platform, brand=brand, override_prompt=override_prompt or None, user=request.user)
             adapted.append(adapted_caption)
+            all_used_prompts.append(used_prompt)
 
         post.update_checklist()
         result = PostCaptionSerializer(adapted, many=True)
-        return Response(result.data, status=status.HTTP_201_CREATED)
+        return Response({
+            'captions': result.data,
+            'used_prompt': all_used_prompts[0] if all_used_prompts else '',
+        }, status=status.HTTP_201_CREATED)
 
 
 class SelectCaptionView(APIView):

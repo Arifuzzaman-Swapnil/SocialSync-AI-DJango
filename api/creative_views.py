@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from accounts.permissions import IsCreatorOrAbove, IsViewerOrAbove
 from accounts.services.notification_service import notify_images_ready
+from accounts.services.llm_service import get_llm_service
 
 from ai_image.models import ImageGeneration, AssetPlatformVariant, CreativeVersionHistory
 from posts.models import Post, PostCaption, PostHashtag
@@ -494,18 +495,10 @@ class CarouselSplitView(APIView):
         max_slides = min(int(request.data.get('max_slides', 10)), 10)
         style = request.data.get('style', 'minimal')
 
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'No OpenAI API key configured.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         # Step 1: Use LLM to split content into slide texts
         try:
-            client = openai.OpenAI(api_key=api_key)
-            split_response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            service = get_llm_service(request.user)
+            result = service.chat_completion(
                 messages=[
                     {
                         'role': 'system',
@@ -518,11 +511,17 @@ class CarouselSplitView(APIView):
                     },
                     {'role': 'user', 'content': content[:3000]},
                 ],
+                model='gpt-4o-mini',
                 temperature=0.7,
                 max_tokens=2000,
                 response_format={'type': 'json_object'},
             )
-            slides_data = json.loads(split_response.choices[0].message.content)
+            if not result.success:
+                return Response(
+                    {'error': result.error or 'No AI API key configured.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            slides_data = json.loads(result.content)
             slides = slides_data.get('slides', [])[:max_slides]
         except Exception as e:
             logger.error(f"Carousel split LLM failed: {e}")
@@ -537,7 +536,15 @@ class CarouselSplitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Step 2: Generate image for each slide
+        # Step 2: Generate image for each slide (DALL-E requires direct OpenAI client)
+        api_key = get_openai_key(request.user)
+        if not api_key:
+            return Response(
+                {'error': 'No OpenAI API key configured for image generation.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        dalle_client = openai.OpenAI(api_key=api_key)
+
         created_assets = []
         for i, slide in enumerate(slides):
             slide_prompt = (
@@ -557,7 +564,7 @@ class CarouselSplitView(APIView):
             )
 
             try:
-                response = client.images.generate(
+                response = dalle_client.images.generate(
                     model='dall-e-3',
                     prompt=f"Clean {style} carousel slide design: {slide_prompt}",
                     size='1024x1024',

@@ -297,18 +297,13 @@ class CompetitorCrawlView(APIView):
         if not profiles.exists():
             return Response({'error': 'No competitor profiles configured'}, status=status.HTTP_400_BAD_REQUEST)
 
+        override_prompt = request.data.get('override_prompt', '')
+
         try:
-            from accounts.api_keys import get_openai_key
-            import openai, json
+            from accounts.services.llm_service import get_llm_service
+            import json
 
-            api_key = get_openai_key(request.user)
-            if not api_key:
-                return Response(
-                    {'error': 'OpenAI API key not configured. Go to Settings to add your key.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            client = openai.OpenAI(api_key=api_key)
+            service = get_llm_service(request.user)
             all_insights = []
             all_used_prompts = []
 
@@ -437,8 +432,10 @@ Return ONLY a JSON array of exactly 10 objects:
 - Return valid JSON array only — no markdown, no commentary.
 </critical_rules>"""
 
-                response = client.chat.completions.create(
-                    model='gpt-4o-mini',
+                if override_prompt:
+                    prompt = override_prompt
+
+                result = service.chat_completion(
                     messages=[
                         {'role': 'system', 'content': """You are a senior competitive intelligence analyst specializing in e-commerce and social media marketing in South Asia (Bangladesh, India).
 
@@ -466,12 +463,15 @@ Return ONLY valid JSON array — no markdown, no commentary."""},
                     max_tokens=4500,
                 )
 
+                if not result.success:
+                    return Response({'error': result.error}, status=status.HTTP_400_BAD_REQUEST)
+
                 all_used_prompts.append({
                     'competitor': profile.handle_or_url,
                     'prompt': prompt,
                 })
 
-                raw = response.choices[0].message.content.strip()
+                raw = result.content
                 if raw.startswith('```'):
                     raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
                     if raw.endswith('```'):
@@ -479,6 +479,16 @@ Return ONLY valid JSON array — no markdown, no commentary."""},
                     raw = raw.strip()
 
                 insights_data = json.loads(raw)
+
+                # Handle both array and object-wrapped responses
+                if isinstance(insights_data, dict):
+                    # LLM wrapped the array in an object — extract the list
+                    for v in insights_data.values():
+                        if isinstance(v, list):
+                            insights_data = v
+                            break
+                    else:
+                        insights_data = []
 
                 # Delete old insights
                 profile.insights.all().delete()
@@ -528,6 +538,7 @@ Return ONLY valid JSON array — no markdown, no commentary."""},
             })
 
         except Exception as e:
+            logger.exception(f"CompetitorCrawlView error for brand {brand_id}: {e}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -783,20 +794,15 @@ Return ONLY a JSON array of exactly {count} objects:
 - Return valid JSON array only.
 </constraints>"""
 
+        override_prompt = request.data.get('override_prompt', '')
+        if override_prompt:
+            prompt = override_prompt
+
         try:
-            from accounts.api_keys import get_openai_key
-            import openai
+            from accounts.services.llm_service import get_llm_service
 
-            api_key = get_openai_key(request.user)
-            if not api_key:
-                return Response(
-                    {'error': 'OpenAI API key not configured. Go to Settings to add your key.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            service = get_llm_service(request.user)
+            result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': 'You are a senior social media strategist and creative director who generates content ideas that are specific, actionable, and strategically grounded.\n\nYour ideas are NOT generic "post about X" suggestions. Each idea is detailed enough that a content creator could execute it without additional briefing.\n\nYour approach combines:\n- Data signals (trending topics, competitor gaps, past performance)\n- Audience psychology (what makes people stop, save, share, and comment)\n- Content strategy (pillar balance, funnel alignment, platform optimization)\n- Creative frameworks (storytelling, contrarian takes, data-driven hooks, behind-the-scenes, social proof, UGC-inspired, educational series)\n\nYou understand that the best content ideas are at the intersection of:\n1. What the brand wants to say\n2. What the audience wants to hear\n3. What the platform rewards\n\nCRITICAL OUTPUT RULES:\n- Return ONLY a valid JSON array — no markdown, no commentary\n- Each idea must be specific enough to execute immediately\n- No duplicate angles or overlapping ideas'},
                     {'role': 'user', 'content': prompt},
@@ -805,8 +811,11 @@ Return ONLY a JSON array of exactly {count} objects:
                 max_tokens=3000,
             )
 
+            if not result.success:
+                return Response({'error': result.error}, status=status.HTTP_400_BAD_REQUEST)
+
             import json
-            raw = response.choices[0].message.content.strip()
+            raw = result.content
             # Strip markdown code fences if present
             if raw.startswith('```'):
                 raw = raw.split('\n', 1)[1] if '\n' in raw else raw[3:]
@@ -871,8 +880,6 @@ Return ONLY a JSON array of exactly {count} objects:
                 'used_prompt': prompt,
             })
 
-        except openai.AuthenticationError:
-            return Response({'error': 'Invalid OpenAI API key'}, status=status.HTTP_401_UNAUTHORIZED)
         except json.JSONDecodeError:
             return Response({'error': 'Failed to parse AI response'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
@@ -890,15 +897,10 @@ class RegenerateIdeaView(APIView):
         except ContentIdea.DoesNotExist:
             return Response({'error': 'Idea not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        from accounts.api_keys import get_openai_key
-        import openai, json
+        from accounts.services.llm_service import get_llm_service
+        import json
 
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response(
-                {'error': 'No OpenAI API key configured.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        service = get_llm_service(request.user)
 
         brand = idea.brand
         brand_context = f"Brand: {brand.brand_name}"
@@ -912,6 +914,7 @@ class RegenerateIdeaView(APIView):
             pillar_context = f", Content Pillar: {idea.pillar.name}"
 
         additional_instructions = request.data.get("instructions", "")
+        override_prompt = request.data.get('override_prompt', '')
 
         prompt = f"""<task>
 Regenerate this content idea with a completely fresh creative direction.
@@ -952,10 +955,11 @@ Return ONLY this JSON:
 }}
 </output_format>"""
 
+        if override_prompt:
+            prompt = override_prompt
+
         try:
-            client = openai.OpenAI(api_key=api_key)
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            llm_result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': 'You are a creative director who can take any content idea and reimagine it with a completely different creative execution — different hook, different angle, different emotional appeal — while keeping the strategic intent intact.\n\nYou think in terms of creative pivots:\n- If the original was educational, try emotional storytelling\n- If the original asked a question, try a bold, contrarian claim\n- If the original was serious, try humor or relatability\n- If the original was broad, try hyper-specific\n\nCRITICAL OUTPUT RULES:\n- Return ONLY valid JSON — no markdown, no commentary\n- The new version must feel like a brand-new idea, not a rewording'},
                     {'role': 'user', 'content': prompt},
@@ -964,9 +968,9 @@ Return ONLY this JSON:
                 max_tokens=500,
                 response_format={'type': 'json_object'},
             )
-            result = json.loads(response.choices[0].message.content)
-        except openai.AuthenticationError:
-            return Response({'error': 'Invalid OpenAI API key'}, status=status.HTTP_401_UNAUTHORIZED)
+            if not llm_result.success:
+                return Response({'error': llm_result.error}, status=status.HTTP_400_BAD_REQUEST)
+            result = json.loads(llm_result.content)
         except Exception as e:
             return Response({'error': f'Regeneration failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -990,6 +994,7 @@ Return ONLY this JSON:
             'content_format': idea.content_format,
             'engagement_tier': idea.engagement_tier,
             'generation_run': idea.generation_run,
+            'used_prompt': prompt,
         })
 
 
@@ -1049,7 +1054,8 @@ class GenerateTrendingView(APIView):
 
         try:
             from .trending_service import generate_trending_for_brand
-            result = generate_trending_for_brand(brand_id, request.user)
+            override_prompt = request.data.get('override_prompt', '')
+            result = generate_trending_for_brand(brand_id, request.user, override_prompt=override_prompt or None)
             return Response(result)
         except Exception as e:
             logger.error(f"Trending generation failed for brand {brand_id}: {e}", exc_info=True)
@@ -1263,17 +1269,14 @@ class SuggestCompetitorsView(APIView):
         except Brand.DoesNotExist:
             return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        from accounts.api_keys import get_openai_key
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
+        from accounts.services.llm_service import get_llm_service
 
         dna = brand.brand_dna or {}
         existing = list(CompetitorProfile.objects.filter(brand=brand).values_list('handle_or_url', flat=True))
+        override_prompt = request.data.get('override_prompt', '')
 
         try:
-            import openai
-            client = openai.OpenAI(api_key=api_key)
+            service = get_llm_service(request.user)
 
             system_prompt = """You are a competitive intelligence researcher with deep knowledge of the global business landscape. You specialize in identifying direct, indirect, and aspirational competitors for brands across industries.
 
@@ -1334,8 +1337,10 @@ IMPORTANT: Only suggest companies you are confident are real. If unsure about a 
 - Return valid JSON only.
 </constraints>"""
 
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            if override_prompt:
+                prompt = override_prompt
+
+            llm_result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': prompt},
@@ -1345,14 +1350,18 @@ IMPORTANT: Only suggest companies you are confident are real. If unsure about a 
                 response_format={'type': 'json_object'},
             )
 
+            if not llm_result.success:
+                return Response({'error': llm_result.error}, status=status.HTTP_400_BAD_REQUEST)
+
             import json
-            result = json.loads(response.choices[0].message.content)
+            result = json.loads(llm_result.content)
             suggestions = result.get('competitors', [])
 
             return Response({
                 'brand_id': brand.id,
                 'count': len(suggestions),
                 'suggestions': suggestions,
+                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}",
             })
 
         except Exception as e:
@@ -1377,11 +1386,9 @@ class GeneratePillarsView(APIView):
 
         count = request.data.get('count', 5)
         focus_areas = request.data.get('focus_areas', [])
+        override_prompt = request.data.get('override_prompt', '')
 
-        from accounts.api_keys import get_openai_key
-        api_key = get_openai_key(request.user)
-        if not api_key:
-            return Response({'error': 'No OpenAI API key configured.'}, status=status.HTTP_400_BAD_REQUEST)
+        from accounts.services.llm_service import get_llm_service
 
         dna = brand.brand_dna or {}
 
@@ -1437,9 +1444,8 @@ class GeneratePillarsView(APIView):
         total_pillars = len(existing_pillars) + count
 
         try:
-            import openai
             import json
-            client = openai.OpenAI(api_key=api_key)
+            service = get_llm_service(request.user)
 
             if rebalance:
                 pct_instruction = f"""Percentages for the NEW {count} pillars must sum to {round(100 * count / total_pillars)}.
@@ -1511,8 +1517,10 @@ Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pi
 - Return valid JSON only.
 </constraints>"""
 
-            response = client.chat.completions.create(
-                model='gpt-4o-mini',
+            if override_prompt:
+                prompt = override_prompt
+
+            llm_result = service.chat_completion(
                 messages=[
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': prompt},
@@ -1522,7 +1530,10 @@ Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pi
                 response_format={'type': 'json_object'},
             )
 
-            result = json.loads(response.choices[0].message.content)
+            if not llm_result.success:
+                return Response({'error': llm_result.error}, status=status.HTTP_400_BAD_REQUEST)
+
+            result = json.loads(llm_result.content)
             pillars_data = result.get('pillars', [])
 
             # Force-normalize percentages so new + existing = 100

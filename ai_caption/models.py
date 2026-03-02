@@ -23,11 +23,25 @@ class UserAPISettings(models.Model):
     # Encrypted API key storage (simple base64 encoding for now)
     _openai_api_key = models.TextField(blank=True, null=True, db_column='openai_api_key')
     
-    # Settings
+    # LLM provider preference
+    default_llm_provider = models.CharField(max_length=20, default='openai', choices=[
+        ('openai', 'OpenAI'),
+        ('gemini', 'Google Gemini'),
+    ])
+
+    # OpenAI model preference
     default_model = models.CharField(max_length=50, default='gpt-4o', choices=[
         ('gpt-4o', 'GPT-4o (Best Quality)'),
         ('gpt-4o-mini', 'GPT-4o Mini (Faster & Cheaper)'),
         ('gpt-4-turbo', 'GPT-4 Turbo'),
+    ])
+
+    # Gemini model preference
+    default_gemini_model = models.CharField(max_length=50, default='gemini-2.0-flash', choices=[
+        ('gemini-2.0-flash', 'Gemini 2.0 Flash'),
+        ('gemini-2.0-flash-lite', 'Gemini 2.0 Flash Lite'),
+        ('gemini-1.5-pro', 'Gemini 1.5 Pro'),
+        ('gemini-1.5-flash', 'Gemini 1.5 Flash'),
     ])
     
     # Usage tracking

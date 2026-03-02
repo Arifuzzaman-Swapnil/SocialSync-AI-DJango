@@ -41,6 +41,7 @@ import type {
   GenerationStatus,
 } from '../types';
 import { authFetch } from '../services/api';
+import { PromptInfoButton } from '../components/ui/PromptInfoButton';
 
 // Style options
 const styles: { id: ImageStyle; label: string }[] = [
@@ -136,6 +137,8 @@ export function AIImagePage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPreview, setShowPreview] = useState<ImageGeneration | null>(null);
   const [error, setError] = useState('');
+  const [imageUsedPrompt, setImageUsedPrompt] = useState('');
+  const [imageRegenerating, setImageRegenerating] = useState(false);
 
   // Form state
   const [title, setTitle] = useState('');
@@ -312,6 +315,8 @@ export function AIImagePage() {
       const data = await response.json();
       if (response.ok) {
         setGeneratedImage(data);
+        const usedP = data.used_prompt || data.enhanced_prompt || data.revised_prompt || '';
+        if (usedP) setImageUsedPrompt(usedP);
       } else {
         setError(data.error || 'Failed to generate image. Please check your API key in Settings.');
       }
@@ -321,6 +326,33 @@ export function AIImagePage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleImageRegenerate = async (editedPrompt: string) => {
+    setImageRegenerating(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', title || 'Untitled');
+      formData.append('prompt', editedPrompt);
+      formData.append('provider', provider);
+      formData.append('style', selectedStyle);
+      formData.append('size', selectedSize);
+      formData.append('quality', selectedQuality);
+      formData.append('enhance_prompt', 'false');
+
+      const response = await authFetch('/api/v1/ai-image/generate/', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setGeneratedImage(data);
+        const usedP = data.used_prompt || data.enhanced_prompt || data.revised_prompt || '';
+        if (usedP) setImageUsedPrompt(usedP);
+      }
+    } catch { /* keep existing */ }
+    setImageRegenerating(false);
   };
 
   const uploadLogo = async () => {
@@ -863,7 +895,10 @@ export function AIImagePage() {
               )}
 
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-text-primary">Generated Image</h3>
+                <h3 className="font-semibold text-text-primary flex items-center gap-2">
+                  Generated Image
+                  {imageUsedPrompt && <PromptInfoButton prompt={imageUsedPrompt} label="Image Generation Prompt" onRegenerate={handleImageRegenerate} regenerating={imageRegenerating} regenerateLabel="Regenerate Image" />}
+                </h3>
                 {generatedImage?.generated_image && (
                   <div className="flex items-center gap-2">
                     <button

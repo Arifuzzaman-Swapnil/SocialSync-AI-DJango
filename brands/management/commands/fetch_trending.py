@@ -1,7 +1,7 @@
 """
 Fetch trending topics for social media content ideation.
 
-Uses OpenAI to generate current trending topics per platform.
+Uses the unified LLM service to generate current trending topics per platform.
 Falls back to industry defaults when no API key is available.
 Populates the TrendingCache table used by the Ideas Hub sidebar.
 """
@@ -14,7 +14,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 
 from brands.models import TrendingCache
-from accounts.api_keys import get_openai_key
+from accounts.services.llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +68,10 @@ class Command(BaseCommand):
 
         if not options.get('fallback_only'):
             # Try LLM-based trending fetch
-            api_key = self._get_any_openai_key()
-            if api_key:
+            service = self._get_any_llm_service()
+            if service:
                 try:
-                    topics = self._fetch_via_llm(api_key)
+                    topics = self._fetch_via_llm(service)
                     if topics:
                         self._save_topics(topics, expires_at)
                         self.stdout.write(self.style.SUCCESS(f'Saved {len(topics)} LLM-generated trending topics.'))
@@ -84,23 +84,19 @@ class Command(BaseCommand):
         self._save_topics(FALLBACK_TOPICS, expires_at)
         self.stdout.write(self.style.SUCCESS(f'Saved {len(FALLBACK_TOPICS)} fallback trending topics.'))
 
-    def _get_any_openai_key(self):
-        """Get an OpenAI key from any user in the system."""
+    def _get_any_llm_service(self):
+        """Get an LLM service instance from any user with a configured API key."""
         for user in User.objects.filter(is_active=True)[:10]:
-            key = get_openai_key(user)
-            if key:
-                return key
+            service = get_llm_service(user)
+            if service._resolve_provider():
+                return service
         return None
 
-    def _fetch_via_llm(self, api_key):
-        """Use OpenAI to generate trending topics."""
-        import openai
-
-        client = openai.OpenAI(api_key=api_key)
+    def _fetch_via_llm(self, service):
+        """Use unified LLM service to generate trending topics."""
         today = timezone.now().strftime('%B %d, %Y')
 
-        response = client.chat.completions.create(
-            model='gpt-4o-mini',
+        result = service.chat_completion(
             messages=[
                 {
                     'role': 'system',
@@ -126,12 +122,16 @@ class Command(BaseCommand):
             response_format={'type': 'json_object'},
         )
 
-        result = json.loads(response.choices[0].message.content)
-        topics = result.get('topics', result.get('trending', []))
+        if not result.success:
+            logger.error(f'LLM call failed: {result.error}')
+            return []
+
+        parsed = json.loads(result.content)
+        topics = parsed.get('topics', parsed.get('trending', []))
 
         # If the LLM returned the array directly
-        if isinstance(result, list):
-            topics = result
+        if isinstance(parsed, list):
+            topics = parsed
 
         return topics if topics else []
 

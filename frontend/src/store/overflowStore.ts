@@ -41,6 +41,10 @@ interface OverflowState {
   selectedIdeaIds: number[];
   ideaMediaPreferences: Record<number, 'image' | 'video' | 'none'>;
 
+  // AI prompt visibility (survives step navigation)
+  ideasUsedPrompt: string;
+  trendingUsedPrompt: string;
+
   selectedCaptionIds: number[];
   generatedMediaIds: number[];
   generatedMediaUrl: string | null;
@@ -65,6 +69,8 @@ interface OverflowState {
   setSelectedTrendingTopics: (topics: string[]) => void;
   setBrandContext: (ctx: OverflowState['brandContext']) => void;
   setIdeasData: (ideas: IdeaData[]) => void;
+  setIdeasUsedPrompt: (prompt: string) => void;
+  setTrendingUsedPrompt: (prompt: string) => void;
   toggleIdeaSelection: (ideaId: number) => void;
   setIdeaSelection: (ids: number[]) => void;
   setMediaPreference: (ideaId: number, pref: 'image' | 'video' | 'none') => void;
@@ -97,6 +103,8 @@ export const useOverflowStore = create<OverflowState>()(
       ideasData: [],
       selectedIdeaIds: [],
       ideaMediaPreferences: {},
+      ideasUsedPrompt: '',
+      trendingUsedPrompt: '',
       selectedCaptionIds: [],
       generatedMediaIds: [],
       generatedMediaUrl: null,
@@ -139,6 +147,8 @@ export const useOverflowStore = create<OverflowState>()(
       setBrandContext: (ctx) => set({ brandContext: ctx }),
 
       setIdeasData: (ideas) => set({ ideasData: ideas }),
+      setIdeasUsedPrompt: (prompt) => set({ ideasUsedPrompt: prompt }),
+      setTrendingUsedPrompt: (prompt) => set({ trendingUsedPrompt: prompt }),
       toggleIdeaSelection: (ideaId) => {
         const { selectedIdeaIds } = get();
         if (selectedIdeaIds.includes(ideaId)) {
@@ -187,7 +197,7 @@ export const useOverflowStore = create<OverflowState>()(
         dnaCompleted: false, pillarsCompleted: false,
         competitorsCompleted: false, trendingCompleted: false,
         selectedTrendingTopics: [], brandContext: null,
-        ideasData: [], selectedIdeaIds: [], ideaMediaPreferences: {},
+        ideasData: [], selectedIdeaIds: [], ideaMediaPreferences: {}, ideasUsedPrompt: '', trendingUsedPrompt: '',
         selectedCaptionIds: [], generatedMediaIds: [], generatedMediaUrl: null,
         createdPostId: null, selectedCaptions: [], captionMediaMap: {},
         isCompleted: false, isSkipped: false,
@@ -242,6 +252,8 @@ export const useOverflowStore = create<OverflowState>()(
         brandId: state.brandId,
         selectedTrendingTopics: state.selectedTrendingTopics,
         ideasData: state.ideasData,
+        ideasUsedPrompt: state.ideasUsedPrompt,
+        trendingUsedPrompt: state.trendingUsedPrompt,
         selectedIdeaIds: state.selectedIdeaIds,
         ideaMediaPreferences: state.ideaMediaPreferences,
         selectedCaptionIds: state.selectedCaptionIds,

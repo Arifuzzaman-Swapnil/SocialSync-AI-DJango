@@ -4,9 +4,10 @@ Hashtag Generation Service
 - Banned hashtag filtering
 - Platform-specific count limits
 """
-import openai
 import json
 import logging
+
+from accounts.services.llm_service import get_llm_service, UnifiedLLMService
 
 from posts.models import PostHashtag, BannedHashtag
 
@@ -21,14 +22,19 @@ PLATFORM_LIMITS = {
 }
 
 
-def generate_hashtags(post, platform, api_key, count=None, topic=None):
+def generate_hashtags(post, platform, api_key=None, count=None, topic=None, override_prompt=None, user=None):
     """Generate hashtags for a post using LLM with tier distribution.
 
-    Returns list of created PostHashtag objects.
+    Returns tuple of (list of created PostHashtag objects, used_prompt string).
     """
-    if not api_key:
-        logger.warning("No OpenAI API key available for hashtag generation")
-        return []
+    # Build the LLM service: prefer user-based, fall back to raw key
+    if user:
+        service = get_llm_service(user)
+    elif api_key:
+        service = UnifiedLLMService(openai_key=api_key)
+    else:
+        logger.warning("No API key or user available for hashtag generation")
+        return [], ''
 
     # Determine count based on platform defaults
     if count is None:
@@ -98,26 +104,32 @@ Caption: {caption_text[:500]}
 - Return valid JSON only.
 </constraints>"""
 
+    if override_prompt:
+        prompt = override_prompt
+
     try:
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a social media growth strategist who engineers hashtag strategies for maximum discoverability. You understand that hashtag strategy is not just about relevance — it's about strategic placement across volume tiers to balance reach (high-volume) with discoverability (niche).\n\nYour approach:\n- High-volume tags (100k+ posts): Cast a wide net, ride popular conversations\n- Mid-volume tags (10k-100k): Sweet spot for appearing in top posts\n- Niche tags (<10k): Low competition, high chance of ranking at top\n\nYou never suggest banned, spam-flagged, or irrelevant hashtags.\n\nReturn ONLY valid JSON — no markdown, no commentary."},
-                {"role": "user", "content": prompt}
-            ],
+        messages = [
+            {"role": "system", "content": "You are a social media growth strategist who engineers hashtag strategies for maximum discoverability. You understand that hashtag strategy is not just about relevance — it's about strategic placement across volume tiers to balance reach (high-volume) with discoverability (niche).\n\nYour approach:\n- High-volume tags (100k+ posts): Cast a wide net, ride popular conversations\n- Mid-volume tags (10k-100k): Sweet spot for appearing in top posts\n- Niche tags (<10k): Low competition, high chance of ranking at top\n\nYou never suggest banned, spam-flagged, or irrelevant hashtags.\n\nReturn ONLY valid JSON — no markdown, no commentary."},
+            {"role": "user", "content": prompt}
+        ]
+
+        result = service.chat_completion(
+            messages=messages,
             temperature=0.7,
             max_tokens=1000,
             response_format={"type": "json_object"},
         )
 
-        result_text = response.choices[0].message.content
-        result = json.loads(result_text)
-        hashtags_data = result.get('hashtags', [])
+        if not result.success:
+            raise Exception(result.error)
+
+        result_text = result.content
+        parsed = json.loads(result_text)
+        hashtags_data = parsed.get('hashtags', [])
 
     except Exception as e:
         logger.error(f"Hashtag generation failed: {e}")
-        return []
+        return [], prompt
 
     # Clear existing hashtags for this platform
     PostHashtag.objects.filter(post=post, platform=platform).delete()
@@ -141,4 +153,4 @@ Caption: {caption_text[:500]}
 
     # Update post checklist
     post.update_checklist()
-    return created
+    return created, prompt

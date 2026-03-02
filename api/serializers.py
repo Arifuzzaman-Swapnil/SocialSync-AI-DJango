@@ -1201,6 +1201,9 @@ class GlobalAPIKeysSerializer(serializers.Serializer):
     masked_openai_key = serializers.CharField(read_only=True)
     has_gemini_key = serializers.BooleanField(read_only=True)
     masked_gemini_key = serializers.CharField(read_only=True)
+    default_llm_provider = serializers.ChoiceField(choices=['openai', 'gemini'], required=False)
+    default_model = serializers.CharField(required=False, allow_blank=True)
+    default_gemini_model = serializers.CharField(required=False, allow_blank=True)
 
 
 # ===================== BRAND DNA SERIALIZERS =====================

@@ -40,6 +40,7 @@ import type {
   GenerationStatus,
 } from '../types';
 import { authFetch } from '../services/api';
+import { PromptInfoButton } from '../components/ui/PromptInfoButton';
 
 // Style options
 const styles: { id: VideoStyle; label: string }[] = [
@@ -166,6 +167,8 @@ export function AIVideoPage() {
 
   // Error state
   const [error, setError] = useState<string | null>(null);
+  const [videoUsedPrompt, setVideoUsedPrompt] = useState('');
+  const [videoRegenerating, setVideoRegenerating] = useState(false);
 
   // Settings state
   const [geminiKey, setGeminiKey] = useState('');
@@ -317,6 +320,8 @@ export function AIVideoPage() {
 
       if (response.ok) {
         setGeneratedVideo(data);
+        const usedP = data.used_prompt || data.enhanced_prompt || '';
+        if (usedP) setVideoUsedPrompt(usedP);
       } else {
         setError(data.error || 'Failed to generate video');
       }
@@ -326,6 +331,34 @@ export function AIVideoPage() {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleVideoRegenerate = async (editedPrompt: string) => {
+    setVideoRegenerating(true);
+    try {
+      const formData = new FormData();
+      formData.append('title', title || 'Untitled');
+      formData.append('prompt', editedPrompt);
+      formData.append('style', selectedStyle);
+      formData.append('duration', String(selectedDuration));
+      formData.append('resolution', selectedResolution);
+      formData.append('aspect_ratio', selectedAspectRatio);
+      formData.append('fps', String(selectedFPS));
+      formData.append('enhance_prompt', 'false');
+
+      const response = await authFetch('/api/v1/ai-video/generate/', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setGeneratedVideo(data);
+        const usedP = data.used_prompt || data.enhanced_prompt || '';
+        if (usedP) setVideoUsedPrompt(usedP);
+      }
+    } catch { /* keep existing */ }
+    setVideoRegenerating(false);
   };
 
   const uploadLogo = async () => {
@@ -823,7 +856,10 @@ export function AIVideoPage() {
           <div className="space-y-6">
             <Card className="sticky top-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-text-primary">Generated Video</h3>
+                <h3 className="font-semibold text-text-primary flex items-center gap-2">
+                  Generated Video
+                  {videoUsedPrompt && <PromptInfoButton prompt={videoUsedPrompt} label="Video Generation Prompt" onRegenerate={handleVideoRegenerate} regenerating={videoRegenerating} regenerateLabel="Regenerate Video" />}
+                </h3>
                 {generatedVideo?.generated_video && (
                   <button
                     onClick={() => downloadVideo(generatedVideo.generated_video!, `${title || 'video'}.mp4`)}

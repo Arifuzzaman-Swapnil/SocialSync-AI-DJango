@@ -55,6 +55,13 @@ const openaiModels = [
   { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
 ];
 
+const geminiModels = [
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Recommended)' },
+  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (Faster)' },
+  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+];
+
 const themeOptions: { value: ThemeMode; label: string; icon: typeof MoonIcon }[] = [
   { value: 'light', label: 'Light', icon: SunIcon },
   { value: 'dark', label: 'Dark', icon: MoonIcon },
@@ -87,6 +94,8 @@ export function SettingsPage() {
     openai_api_key: '',
     gemini_api_key: '',
     default_model: 'gpt-4o',
+    default_llm_provider: 'openai',
+    default_gemini_model: 'gemini-2.0-flash',
   });
 
   // Load API key status on mount
@@ -99,6 +108,16 @@ export function SettingsPage() {
         if (response.data.has_openai_key || response.data.has_gemini_key) {
           setApiSettings(prev => ({ ...prev, api_mode: 'user' }));
         }
+        // Load LLM provider preferences from server
+        if (response.data.default_llm_provider) {
+          setApiSettings(prev => ({ ...prev, default_llm_provider: response.data.default_llm_provider }));
+        }
+        if (response.data.default_gemini_model) {
+          setApiSettings(prev => ({ ...prev, default_gemini_model: response.data.default_gemini_model }));
+        }
+        if (response.data.default_model) {
+          setApiSettings(prev => ({ ...prev, default_model: response.data.default_model }));
+        }
       } catch (err) {
         console.error('Failed to load API key status:', err);
       }
@@ -108,7 +127,7 @@ export function SettingsPage() {
 
   // Save API keys handler
   const handleSaveApiKeys = async () => {
-    if (!apiSettings.openai_api_key && !apiSettings.gemini_api_key) {
+    if (!apiSettings.openai_api_key && !apiSettings.gemini_api_key && !keyStatus.has_openai_key && !keyStatus.has_gemini_key) {
       setApiKeysError('Please enter at least one API key');
       return;
     }
@@ -120,6 +139,9 @@ export function SettingsPage() {
       const payload: Record<string, string> = {};
       if (apiSettings.openai_api_key) payload.openai_api_key = apiSettings.openai_api_key;
       if (apiSettings.gemini_api_key) payload.gemini_api_key = apiSettings.gemini_api_key;
+      payload.default_llm_provider = apiSettings.default_llm_provider;
+      payload.default_gemini_model = apiSettings.default_gemini_model;
+      payload.default_model = apiSettings.default_model;
 
       const response = await api.patch('/profile/api-keys/', payload);
       setKeyStatus(response.data);
@@ -524,21 +546,70 @@ export function SettingsPage() {
                 </p>
               </div>
 
-              {/* Default Model */}
-              <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Default OpenAI Model</label>
-                <select
-                  value={apiSettings.default_model}
-                  onChange={(e) => setApiSettings({ ...apiSettings, default_model: e.target.value })}
-                  className="w-full px-4 py-3 bg-dark-700 border border-white/10 rounded-xl text-text-primary focus:outline-none focus:border-primary"
-                >
-                  {openaiModels.map((model) => (
-                    <option key={model.value} value={model.value}>
-                      {model.label}
-                    </option>
-                  ))}
-                </select>
+              {/* Default AI Provider Toggle */}
+              <div className="p-4 bg-dark-700/50 rounded-xl border border-white/10">
+                <label className="block text-sm font-medium text-text-primary mb-3">Default AI Provider</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setApiSettings({ ...apiSettings, default_llm_provider: 'openai' })}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                      apiSettings.default_llm_provider === 'openai'
+                        ? 'bg-primary text-white ring-2 ring-primary/50 ring-offset-2 ring-offset-dark-800'
+                        : 'bg-dark-600 text-text-secondary hover:bg-dark-500 hover:text-text-primary'
+                    }`}
+                  >
+                    OpenAI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApiSettings({ ...apiSettings, default_llm_provider: 'gemini' })}
+                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                      apiSettings.default_llm_provider === 'gemini'
+                        ? 'bg-primary text-white ring-2 ring-primary/50 ring-offset-2 ring-offset-dark-800'
+                        : 'bg-dark-600 text-text-secondary hover:bg-dark-500 hover:text-text-primary'
+                    }`}
+                  >
+                    Google Gemini
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-text-muted">
+                  Applies to captions, strategy, ideas, and all AI text features. Falls back to the other provider if selected key is missing.
+                </p>
               </div>
+
+              {/* Conditional Model Selector */}
+              {apiSettings.default_llm_provider === 'openai' ? (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Default OpenAI Model</label>
+                  <select
+                    value={apiSettings.default_model}
+                    onChange={(e) => setApiSettings({ ...apiSettings, default_model: e.target.value })}
+                    className="w-full px-4 py-3 bg-dark-700 border border-white/10 rounded-xl text-text-primary focus:outline-none focus:border-primary"
+                  >
+                    {openaiModels.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">Default Gemini Model</label>
+                  <select
+                    value={apiSettings.default_gemini_model}
+                    onChange={(e) => setApiSettings({ ...apiSettings, default_gemini_model: e.target.value })}
+                    className="w-full px-4 py-3 bg-dark-700 border border-white/10 rounded-xl text-text-primary focus:outline-none focus:border-primary"
+                  >
+                    {geminiModels.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Gemini API Key */}
               <div>
@@ -575,7 +646,7 @@ export function SettingsPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
-                  Used for AI Image (Gemini) and AI Video generation
+                  Used for AI Image (Gemini), AI Video generation, and all AI text features (when Gemini is selected as default provider)
                 </p>
               </div>
 

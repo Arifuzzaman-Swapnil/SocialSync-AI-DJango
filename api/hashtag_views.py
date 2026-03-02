@@ -64,12 +64,14 @@ class GenerateHashtagsView(APIView):
 
         # Get API key and call the real hashtag service
         api_key = get_openai_key(request.user)
-        created = generate_hashtags(
+        override_prompt = request.data.get('override_prompt', '')
+        created, used_prompt = generate_hashtags(
             post=post,
             platform=platform,
             api_key=api_key,
             count=count,
             topic=topic,
+            override_prompt=override_prompt or None,
         )
 
         # V1.2.1 — Increment generation count
@@ -85,7 +87,10 @@ class GenerateHashtagsView(APIView):
                     notify_daily_limit_warning(request.user, usage_pct)
 
         result = PostHashtagSerializer(created, many=True)
-        return Response(result.data, status=status.HTTP_201_CREATED)
+        return Response({
+            'hashtags': result.data,
+            'used_prompt': used_prompt,
+        }, status=status.HTTP_201_CREATED)
 
 
 class ToggleHashtagView(APIView):

@@ -102,8 +102,8 @@ export const analyticsService = {
   },
 
   // AI reply to comment
-  async aiReplyToComment(commentId: number) {
-    const res = await api.post(`/comments/${commentId}/ai-reply/`);
+  async aiReplyToComment(commentId: number, overridePrompt?: string) {
+    const res = await api.post(`/comments/${commentId}/ai-reply/`, overridePrompt ? { override_prompt: overridePrompt } : {});
     return res.data;
   },
 

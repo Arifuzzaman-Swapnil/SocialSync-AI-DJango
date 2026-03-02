@@ -4,6 +4,7 @@ import {
   BookmarkIcon,
 } from '@heroicons/react/24/outline';
 import hashtagService from '../services/hashtagService';
+import { PromptInfoButton } from './ui/PromptInfoButton';
 
 interface Hashtag {
   id: number;
@@ -39,6 +40,8 @@ export function HashtagManager({ postId, brandId, platform }: Props) {
   const [generating, setGenerating] = useState(false);
   const [showGroupSave, setShowGroupSave] = useState(false);
   const [groupName, setGroupName] = useState('');
+  const [hashtagUsedPrompt, setHashtagUsedPrompt] = useState('');
+  const [hashtagRegenerating, setHashtagRegenerating] = useState(false);
 
   useEffect(() => {
     loadHashtags();
@@ -58,12 +61,25 @@ export function HashtagManager({ postId, brandId, platform }: Props) {
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const data = await hashtagService.generateHashtags(postId, { platform });
-      setHashtags(data);
+      const res = await hashtagService.generateHashtags(postId, { platform });
+      const data = res?.hashtags || res;
+      setHashtags(Array.isArray(data) ? data : []);
+      if (res?.used_prompt) setHashtagUsedPrompt(res.used_prompt);
     } catch (err) {
       console.error('Failed to generate hashtags:', err);
     }
     setGenerating(false);
+  };
+
+  const handleHashtagRegenerate = async (editedPrompt: string) => {
+    setHashtagRegenerating(true);
+    try {
+      const res = await hashtagService.generateHashtags(postId, { platform, override_prompt: editedPrompt });
+      const data = res?.hashtags || res;
+      setHashtags(Array.isArray(data) ? data : []);
+      if (res?.used_prompt) setHashtagUsedPrompt(res.used_prompt);
+    } catch { /* keep existing */ }
+    setHashtagRegenerating(false);
   };
 
   const handleToggle = async (hashtagId: number, isSelected: boolean) => {
@@ -111,6 +127,7 @@ export function HashtagManager({ postId, brandId, platform }: Props) {
           <HashtagIcon className="w-5 h-5 text-primary-400" />
           Hashtags
           <span className="text-xs text-text-secondary">({selectedCount} selected)</span>
+          {hashtagUsedPrompt && <PromptInfoButton prompt={hashtagUsedPrompt} label="Hashtag Generation Prompt" onRegenerate={handleHashtagRegenerate} regenerating={hashtagRegenerating} regenerateLabel="Regenerate Hashtags" />}
         </h3>
         <div className="flex gap-2">
           {hashtags.length > 0 && (

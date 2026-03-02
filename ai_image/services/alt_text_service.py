@@ -3,25 +3,32 @@ Alt Text Generation Service
 - LLM vision-based alt text generation
 - Max 125 characters for accessibility compliance
 """
-import openai
 import logging
+
+from accounts.services.llm_service import get_llm_service, UnifiedLLMService
 
 logger = logging.getLogger(__name__)
 
 MAX_ALT_TEXT_LENGTH = 125
 
 
-def generate_alt_text(image_generation, api_key):
+def generate_alt_text(image_generation, api_key=None, user=None):
     """Generate accessibility alt text for an image using LLM vision.
 
     Args:
         image_generation: ImageGeneration model instance
-        api_key: OpenAI API key
+        api_key: OpenAI API key (legacy, used as fallback)
+        user: Django user instance (preferred — uses unified LLM service)
 
     Returns:
         str: Generated alt text (max 125 chars)
     """
-    if not api_key:
+    # Build the LLM service: prefer user-based, fall back to raw key
+    if user:
+        service = get_llm_service(user)
+    elif api_key:
+        service = UnifiedLLMService(openai_key=api_key)
+    else:
         return _fallback_alt_text(image_generation)
 
     # Build context from the image's prompt and title
@@ -47,18 +54,21 @@ Generate accessible alt text for an image.
 </rules>"""
 
     try:
-        client = openai.OpenAI(api_key=api_key)
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a web accessibility specialist who writes alt text that meets WCAG 2.1 guidelines. Your alt text is concise, descriptive, and useful for screen reader users who cannot see the image.\n\nYour alt text:\n- Describes the CONTENT and FUNCTION of the image\n- Prioritizes the most important visual information first\n- Uses specific, concrete language\n- Stays under 125 characters\n- Never starts with \"Image of,\" \"Photo of,\" or \"Picture of\"\n- Conveys the same information a sighted user would get from the image"},
-                {"role": "user", "content": prompt}
-            ],
+        messages = [
+            {"role": "system", "content": "You are a web accessibility specialist who writes alt text that meets WCAG 2.1 guidelines. Your alt text is concise, descriptive, and useful for screen reader users who cannot see the image.\n\nYour alt text:\n- Describes the CONTENT and FUNCTION of the image\n- Prioritizes the most important visual information first\n- Uses specific, concrete language\n- Stays under 125 characters\n- Never starts with \"Image of,\" \"Photo of,\" or \"Picture of\"\n- Conveys the same information a sighted user would get from the image"},
+            {"role": "user", "content": prompt}
+        ]
+
+        result = service.chat_completion(
+            messages=messages,
             temperature=0.3,
             max_tokens=100,
         )
 
-        alt_text = response.choices[0].message.content.strip().strip('"')
+        if not result.success:
+            raise Exception(result.error)
+
+        alt_text = result.content.strip().strip('"')
 
         # Enforce character limit
         if len(alt_text) > MAX_ALT_TEXT_LENGTH:

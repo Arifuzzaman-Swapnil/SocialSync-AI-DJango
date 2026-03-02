@@ -1,5 +1,5 @@
 """
-Trending topic generation service using pytrends (Google Trends) + OpenAI.
+Trending topic generation service using pytrends (Google Trends) + unified LLM service.
 Generates brand-relevant trending topics based on Brand DNA, Content Pillars,
 Competitors, and CURRENT seasonal/cultural context.
 """
@@ -158,7 +158,7 @@ def _format_seasonal_context(events):
     return '\n'.join(lines)
 
 
-def generate_trending_for_brand(brand_id, user):
+def generate_trending_for_brand(brand_id, user, override_prompt=None):
     """
     Generate trending topics for a brand using pytrends + OpenAI filtering.
 
@@ -169,7 +169,6 @@ def generate_trending_for_brand(brand_id, user):
     5. Save results to TrendingCache with brand FK
     """
     from brands.models import Brand, TrendingCache, CompetitorInsight
-    from accounts.api_keys import get_openai_key
 
     brand = Brand.objects.get(id=brand_id)
     pillars = brand.content_pillars.filter(is_active=True)
@@ -261,16 +260,15 @@ def generate_trending_for_brand(brand_id, user):
 
     logger.info(f"pytrends returned {len(all_trends)} trends for brand {brand.brand_name}")
 
-    # --- Step 4: Use OpenAI to filter + rank with seasonal awareness ---
-    api_key = get_openai_key(user)
-    if not api_key:
-        logger.warning(f"No OpenAI key for user {user.id} — using raw trends fallback")
+    # --- Step 4: Use unified LLM service to filter + rank with seasonal awareness ---
+    from accounts.services.llm_service import get_llm_service
+    service = get_llm_service(user)
+
+    if not service._resolve_provider():
+        logger.warning(f"No AI API key for user {user.id} — using raw trends fallback")
         return _save_raw_trends(brand, all_trends, keywords, geo, seasonal_events)
 
     try:
-        import openai
-        client = openai.OpenAI(api_key=api_key)
-
         pillar_names = [p.name for p in pillars]
         competitor_insights = CompetitorInsight.objects.filter(
             competitor_profile__brand=brand
@@ -348,8 +346,10 @@ Google Trends data: {trend_list}
 - Return valid JSON only.
 </constraints>"""
 
-        response = client.chat.completions.create(
-            model='gpt-4o-mini',
+        if override_prompt:
+            prompt = override_prompt
+
+        llm_result = service.chat_completion(
             messages=[
                 {'role': 'system', 'content': system_prompt},
                 {'role': 'user', 'content': prompt},
@@ -359,7 +359,10 @@ Google Trends data: {trend_list}
             response_format={'type': 'json_object'},
         )
 
-        content = response.choices[0].message.content.strip()
+        if not llm_result.success:
+            raise Exception(llm_result.error)
+
+        content = llm_result.content.strip()
         parsed = json.loads(content)
 
         # Handle both direct array and wrapped object
@@ -376,7 +379,7 @@ Google Trends data: {trend_list}
             topics = parsed if isinstance(parsed, list) else []
 
         if not topics:
-            logger.warning(f"OpenAI returned no topics for brand {brand.brand_name}")
+            logger.warning(f"LLM returned no topics for brand {brand.brand_name}")
             return _save_raw_trends(brand, all_trends, keywords, geo, seasonal_events)
 
         # --- Step 5: Save to TrendingCache ---
@@ -409,16 +412,16 @@ Google Trends data: {trend_list}
             'success': True,
             'brand_id': brand.id,
             'count': len(created),
-            'source': 'pytrends+openai' if all_trends else 'openai',
+            'source': 'pytrends+llm' if all_trends else 'llm',
             'topics': created,
             'used_prompt': prompt,
         }
 
     except json.JSONDecodeError as e:
-        logger.error(f"OpenAI returned invalid JSON: {e}")
+        logger.error(f"LLM returned invalid JSON: {e}")
         return _save_raw_trends(brand, all_trends, keywords, geo, seasonal_events)
     except Exception as e:
-        logger.error(f"OpenAI trending generation failed: {e}", exc_info=True)
+        logger.error(f"LLM trending generation failed: {e}", exc_info=True)
         return _save_raw_trends(brand, all_trends, keywords, geo, seasonal_events)
 
 

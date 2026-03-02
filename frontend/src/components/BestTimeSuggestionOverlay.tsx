@@ -8,6 +8,7 @@ import {
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
 import calendarService from '../services/calendarService';
+import { PromptInfoButton } from './ui/PromptInfoButton';
 
 interface TimeSlot {
   day_of_week: number;
@@ -58,6 +59,8 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
   } | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState(platform || '');
   const [computing, setComputing] = useState(false);
+  const [timesUsedPrompt, setTimesUsedPrompt] = useState('');
+  const [timesRegenerating, setTimesRegenerating] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,8 +126,9 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
             <ClockIcon className="w-5 h-5 text-green-400" />
           </div>
           <div>
-            <h3 className="font-semibold text-text-primary text-sm">
+            <h3 className="font-semibold text-text-primary text-sm flex items-center gap-2">
               Best Posting Times
+              {timesUsedPrompt && <PromptInfoButton prompt={timesUsedPrompt} label="Best Times Computation Prompt" size="sm" onRegenerate={async (ep) => { setTimesRegenerating(true); try { const r = await calendarService.computeRecommendedTimes(brandId, selectedPlatform ? [selectedPlatform] : [], ep); if (r?.used_prompt) setTimesUsedPrompt(r.used_prompt); await loadBestTimes(); } catch {} setTimesRegenerating(false); }} regenerating={timesRegenerating} regenerateLabel="Recompute Times" />}
             </h3>
             <p className="text-xs text-text-muted">
               Optimal time slots based on engagement data
@@ -147,10 +151,11 @@ export function BestTimeSuggestionOverlay({ brandId, platform }: Props) {
             onClick={async () => {
               setComputing(true);
               try {
-                await calendarService.computeRecommendedTimes(
+                const result = await calendarService.computeRecommendedTimes(
                   brandId,
                   selectedPlatform ? [selectedPlatform] : [],
                 );
+                if (result?.used_prompt) setTimesUsedPrompt(result.used_prompt);
                 await loadBestTimes();
               } catch (err) {
                 console.error('Compute times failed:', err);

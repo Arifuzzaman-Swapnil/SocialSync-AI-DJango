@@ -14,6 +14,7 @@ import {
   CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
 import api from '../services/api';
+import { PromptInfoButton } from './ui/PromptInfoButton';
 
 interface Comment {
   id: number;
@@ -94,6 +95,8 @@ export function PostCommentInbox({ postId }: Props) {
   const [replyText, setReplyText] = useState('');
   const [sendingReply, setSendingReply] = useState<number | null>(null);
   const [generatingAI, setGeneratingAI] = useState<number | null>(null);
+  const [aiReplyUsedPrompts, setAiReplyUsedPrompts] = useState<Record<number, string>>({});
+  const [aiReplyRegenerating, setAiReplyRegenerating] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     loadComments();
@@ -144,24 +147,43 @@ export function PostCommentInbox({ postId }: Props) {
     setGeneratingAI(commentId);
     try {
       const res = await api.post(`/comments/${commentId}/ai-reply/`);
+      const replyData = res.data;
       setComments(
         comments.map((c) =>
           c.id === commentId
             ? {
                 ...c,
-                reply_body: res.data.reply_body,
+                reply_body: replyData.reply_body,
                 reply_type: 'ai',
                 replied_at: new Date().toISOString(),
               }
             : c
         )
       );
+      if (replyData.used_prompt) setAiReplyUsedPrompts(p => ({ ...p, [commentId]: replyData.used_prompt }));
       setExpandedReply(null);
       setReplyText('');
     } catch (err) {
       console.error('Failed to generate AI reply:', err);
     }
     setGeneratingAI(null);
+  };
+
+  const handleAIReplyRegenerate = async (commentId: number, editedPrompt: string) => {
+    setAiReplyRegenerating(p => ({ ...p, [commentId]: true }));
+    try {
+      const res = await api.post(`/comments/${commentId}/ai-reply/`, { override_prompt: editedPrompt });
+      const replyData = res.data;
+      setComments(
+        comments.map((c) =>
+          c.id === commentId
+            ? { ...c, reply_body: replyData.reply_body, reply_type: 'ai', replied_at: new Date().toISOString() }
+            : c
+        )
+      );
+      if (replyData.used_prompt) setAiReplyUsedPrompts(p => ({ ...p, [commentId]: replyData.used_prompt }));
+    } catch { /* keep existing */ }
+    setAiReplyRegenerating(p => ({ ...p, [commentId]: false }));
   };
 
   const filteredComments = comments.filter((c) => {
@@ -346,6 +368,9 @@ export function PostCommentInbox({ postId }: Props) {
                               >
                                 {comment.reply_type === 'ai' ? 'AI' : 'Human'}
                               </span>
+                              {comment.reply_type === 'ai' && aiReplyUsedPrompts[comment.id] && (
+                                <PromptInfoButton prompt={aiReplyUsedPrompts[comment.id]} label="AI Reply Prompt" size="sm" onRegenerate={(ep) => handleAIReplyRegenerate(comment.id, ep)} regenerating={aiReplyRegenerating[comment.id] || false} regenerateLabel="Regenerate Reply" />
+                              )}
                             </div>
                             <p className="text-xs text-text-secondary leading-relaxed">
                               {comment.reply_body}

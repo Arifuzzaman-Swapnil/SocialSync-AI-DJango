@@ -34,8 +34,10 @@ export const strategyService = {
   async deleteCompetitor(id: number) {
     await api.delete(`/competitor-profiles/${id}/`);
   },
-  async triggerCrawl(brandId: number, competitorId?: number) {
-    const data = competitorId ? { competitor_id: competitorId } : {};
+  async triggerCrawl(brandId: number, competitorId?: number, overridePrompt?: string) {
+    const data: Record<string, unknown> = {};
+    if (competitorId) data.competitor_id = competitorId;
+    if (overridePrompt) data.override_prompt = overridePrompt;
     const res = await api.post(`/brands/${brandId}/competitors/crawl/`, data);
     return res.data;
   },
@@ -56,12 +58,12 @@ export const strategyService = {
   },
 
   // Ideas
-  async generateIdeas(data: { brand_id: number; pillar_id?: number; platform?: string; count?: number; trending_topics?: string[] }) {
+  async generateIdeas(data: { brand_id: number; pillar_id?: number; platform?: string; count?: number; trending_topics?: string[]; override_prompt?: string }) {
     const res = await api.post('/ideas/generate/', data);
     return res.data;
   },
-  async regenerateIdea(ideaId: number) {
-    const res = await api.post(`/ideas/${ideaId}/regenerate/`);
+  async regenerateIdea(ideaId: number, overridePrompt?: string) {
+    const res = await api.post(`/ideas/${ideaId}/regenerate/`, overridePrompt ? { override_prompt: overridePrompt } : {});
     return res.data;
   },
   async addIdeaToCalendar(ideaId: number) {
@@ -75,8 +77,8 @@ export const strategyService = {
   },
 
   // Brand DNA
-  async generateDNA(brandId: number, websiteUrl: string) {
-    const res = await api.post(`/brands/${brandId}/generate-dna/`, { website_url: websiteUrl });
+  async generateDNA(brandId: number, websiteUrl: string, overridePrompt?: string) {
+    const res = await api.post(`/brands/${brandId}/generate-dna/`, { website_url: websiteUrl, ...(overridePrompt ? { override_prompt: overridePrompt } : {}) });
     return res.data;
   },
   async getDNAStatus(brandId: number) {
@@ -84,8 +86,8 @@ export const strategyService = {
     return res.data;
   },
 
-  async regenerateDNAFromInputs(brandId: number, inputs: Record<string, unknown>) {
-    const res = await api.post(`/brands/${brandId}/regenerate-dna-inputs/`, inputs);
+  async regenerateDNAFromInputs(brandId: number, inputs: Record<string, unknown>, overridePrompt?: string) {
+    const res = await api.post(`/brands/${brandId}/regenerate-dna-inputs/`, { ...inputs, ...(overridePrompt ? { override_prompt: overridePrompt } : {}) });
     return res.data;
   },
 
@@ -100,8 +102,8 @@ export const strategyService = {
   },
 
   // V1.3 — Brand-specific Trending
-  async generateTrending(brandId: number) {
-    const res = await api.post(`/brands/${brandId}/trending/generate/`);
+  async generateTrending(brandId: number, overridePrompt?: string) {
+    const res = await api.post(`/brands/${brandId}/trending/generate/`, overridePrompt ? { override_prompt: overridePrompt } : {});
     return res.data;
   },
   async getBrandTrending(brandId: number) {
@@ -130,16 +132,17 @@ export const strategyService = {
   },
 
   // V1.4 — Competitor Suggestions
-  async suggestCompetitors(brandId: number, count?: number) {
-    const res = await api.post('/competitors/suggest/', { brand_id: brandId, count: count || 5 });
+  async suggestCompetitors(brandId: number, count?: number, overridePrompt?: string) {
+    const res = await api.post('/competitors/suggest/', { brand_id: brandId, count: count || 5, ...(overridePrompt ? { override_prompt: overridePrompt } : {}) });
     return res.data;
   },
 
   // V1.4 — Pillar Generation
-  async generatePillars(brandId: number, count?: number, focusAreas?: string[]) {
+  async generatePillars(brandId: number, count?: number, focusAreas?: string[], overridePrompt?: string) {
     const res = await api.post(`/brands/${brandId}/pillars/generate/`, {
       count: count || 5,
       focus_areas: focusAreas || [],
+      ...(overridePrompt ? { override_prompt: overridePrompt } : {}),
     });
     return res.data;
   },

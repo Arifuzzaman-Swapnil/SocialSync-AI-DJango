@@ -18,6 +18,7 @@ from django.utils import timezone
 from ..models import MessengerConnection, Conversation, Message, Notification
 from .rag_engine import RAGEngine
 from .openai_client import OpenAIClient
+from accounts.services.llm_service import get_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -351,9 +352,8 @@ class MessageHandler:
     def _ai_detect_importance(self, message_text: str) -> Optional[Dict]:
         """Use AI to detect if message is important"""
         try:
-            import openai
-            openai.api_key = self.connection.ai_config.openai_api_key
-            
+            service = get_llm_service(self.connection.user)
+
             system_prompt = """You are a message triage system for a business's Facebook Messenger inbox. Your job is to classify incoming messages quickly and accurately to determine if they require business attention.
 
 You are optimized for:
@@ -395,18 +395,22 @@ NOT IMPORTANT (is_important: false):
 }}
 </output_format>"""
 
-            response = openai.chat.completions.create(
-                model="gpt-4o-mini",
+            result = service.chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": detection_prompt.format(message=message_text)}
                 ],
+                model="gpt-4o-mini",
                 max_tokens=200,
-                temperature=0.1
+                temperature=0.1,
             )
-            
-            result_text = response.choices[0].message.content.strip()
-            
+
+            if not result.success:
+                logger.warning(f"AI detection failed: {result.error}")
+                return None
+
+            result_text = result.content.strip()
+
             # Parse JSON from response
             import json
             # Clean up response if needed
@@ -415,10 +419,10 @@ NOT IMPORTANT (is_important: false):
                 if result_text.startswith('json'):
                     result_text = result_text[4:]
             result_text = result_text.strip()
-            
-            result = json.loads(result_text)
-            return result
-        
+
+            parsed = json.loads(result_text)
+            return parsed
+
         except Exception as e:
             logger.warning(f"AI detection failed, using keyword fallback: {e}")
             return None
@@ -623,19 +627,16 @@ NOT IMPORTANT (is_important: false):
             return None
     
     def _get_detailed_image_description(self, image_url: str) -> Optional[str]:
-        """Get detailed image description using GPT-4o Vision"""
+        """Get detailed image description using vision via the unified LLM service"""
         try:
-            import openai
-            openai.api_key = self.connection.ai_config.openai_api_key
-            
             # Download image and convert to base64 for Facebook CDN images
             image_data = self._get_image_for_openai(image_url)
             if not image_data:
                 logger.warning("[MH] Could not load image for analysis")
                 return None
-            
-            response = openai.chat.completions.create(
-                model="gpt-4o",
+
+            service = get_llm_service(self.connection.user)
+            result = service.chat_completion(
                 messages=[
                     {"role": "system", "content": "You are a visual analysis system for a business chatbot. When customers send images via Messenger, you analyze them to extract information that helps the business respond accurately.\n\nYour analysis is structured for downstream processing — clear, specific, and factual. You prioritize extracting actionable information (product identification, text extraction, inquiry intent) over aesthetic description."},
                     {
@@ -660,10 +661,16 @@ Be specific and factual — extract only what is visible.
                         {"type": "image_url", "image_url": image_data}
                     ]
                 }],
-                max_tokens=1000
+                model="gpt-4o",
+                max_tokens=1000,
             )
+
+            if not result.success:
+                logger.error(f"[MH] Image description LLM error: {result.error}")
+                return None
+
             logger.info("[MH] Image analyzed successfully")
-            return response.choices[0].message.content
+            return result.content
         except Exception as e:
             logger.error(f"[MH] Image description error: {e}")
             return None
@@ -856,14 +863,13 @@ Be specific and factual — extract only what is visible.
         self, image_url: str, image_description: str,
         user_question: str, knowledge_context: str, conversation: Conversation
     ) -> Dict:
-        """Generate response combining image analysis with knowledge base"""
+        """Generate response combining image analysis with knowledge base via unified LLM service"""
         try:
-            import openai
-            openai.api_key = self.connection.ai_config.openai_api_key
-            
+            service = get_llm_service(self.connection.user)
+
             active_prompt = self.connection.prompts.filter(is_active=True).first()
             system_prompt = active_prompt.system_prompt if active_prompt else "You are a helpful business assistant."
-            
+
             if knowledge_context:
                 user_content = f"""<customer_inquiry>
 Customer message: "{user_question}"
@@ -894,40 +900,41 @@ Provide a helpful response based on the image analysis. If you need more
 information to assist the customer, ask a specific clarifying question.
 Do NOT use markdown formatting.
 </instructions>"""
-            
+
             # Get image data for OpenAI
             image_data = self._get_image_for_openai(image_url)
-            
+
             if image_data:
                 # Use image in response
-                response = openai.chat.completions.create(
-                    model=self.connection.ai_config.openai_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": [
-                            {"type": "text", "text": user_content},
-                            {"type": "image_url", "image_url": image_data}
-                        ]}
-                    ],
-                    temperature=self.connection.ai_config.temperature,
-                    max_tokens=self.connection.ai_config.max_tokens
-                )
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": [
+                        {"type": "text", "text": user_content},
+                        {"type": "image_url", "image_url": image_data}
+                    ]}
+                ]
             else:
                 # No image data - text only response
-                response = openai.chat.completions.create(
-                    model=self.connection.ai_config.openai_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    temperature=self.connection.ai_config.temperature,
-                    max_tokens=self.connection.ai_config.max_tokens
-                )
-            
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content}
+                ]
+
+            result = service.chat_completion(
+                messages=messages,
+                model=self.connection.ai_config.openai_model,
+                temperature=self.connection.ai_config.temperature,
+                max_tokens=self.connection.ai_config.max_tokens,
+            )
+
+            if not result.success:
+                logger.error(f"[MH] Image response LLM error: {result.error}")
+                return {'content': "I see your image. How can I help?", 'model': 'error', 'tokens': 0}
+
             return {
-                'content': response.choices[0].message.content,
-                'model': response.model,
-                'tokens': response.usage.total_tokens
+                'content': result.content,
+                'model': result.model,
+                'tokens': result.tokens_used,
             }
         except Exception as e:
             logger.error(f"[MH] Image response error: {e}")
