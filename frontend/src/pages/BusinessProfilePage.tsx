@@ -18,9 +18,11 @@ import {
 import onboardingService from '../services/onboardingService';
 import { platformService } from '../services/platformService';
 import type { Workspace, Brand, LaunchPlan, SocialAccount } from '../types';
+import { useAuthStore } from '../store';
 
 export function BusinessProfilePage() {
   const navigate = useNavigate();
+  const { user, fetchUser } = useAuthStore();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [connectedAccounts, setConnectedAccounts] = useState<SocialAccount[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -73,6 +75,15 @@ export function BusinessProfilePage() {
         } catch { /* no plan yet */ }
       }
       setLaunchPlans(plans);
+
+      // If workspace + brand already exist but needs_onboarding is still true,
+      // the user is stuck in a redirect loop — unblock them automatically
+      if (ws.length > 0 && br.length > 0 && user?.onboarding_status?.needs_onboarding) {
+        try {
+          await onboardingService.skipOnboarding();
+          await fetchUser();
+        } catch { /* already skipped or completed, ignore */ }
+      }
     } catch { /* ok */ }
     setLoading(false);
   };
@@ -92,7 +103,7 @@ export function BusinessProfilePage() {
       setWsLang('en');
       setWsTeamSize('');
       setShowWorkspaceForm(false);
-      loadData();
+      await loadData();
     } catch {
       alert('Failed to create workspace');
     } finally {
@@ -118,7 +129,11 @@ export function BusinessProfilePage() {
       setBrandGoals([]);
       setBrandAudiences([]);
       setShowBrandForm(false);
-      loadData();
+      await loadData();
+      // Mark onboarding as done so the redirect loop stops, then go to the app
+      await onboardingService.skipOnboarding();
+      await fetchUser();
+      navigate('/overflow');
     } catch {
       alert('Failed to create brand');
     } finally {

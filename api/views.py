@@ -2462,7 +2462,18 @@ class WorkspaceViewSet(viewsets.ModelViewSet):
         return Workspace.objects.filter(owner=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        workspace = serializer.save(owner=self.request.user)
+
+        # Mark onboarding step 1 complete if user is in onboarding
+        try:
+            from onboarding.models import OnboardingProgress
+            progress, _ = OnboardingProgress.objects.get_or_create(user=self.request.user)
+            if progress.needs_onboarding and 1 not in progress.completed_steps:
+                progress.mark_step_completed(1)
+        except Exception:
+            pass  # Don't fail workspace creation if onboarding update fails
+
+        return workspace
 
 
 # ===================== BRAND VIEWS =====================
@@ -2481,7 +2492,33 @@ class BrandViewSet(viewsets.ModelViewSet):
         return queryset
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        from django.utils import timezone
+        brand = serializer.save(user=self.request.user)
+
+        # Mark onboarding step 2 complete and skip if minimum requirements met
+        try:
+            from onboarding.models import OnboardingProgress
+            from brands.models import Workspace
+
+            progress, _ = OnboardingProgress.objects.get_or_create(user=self.request.user)
+
+            if progress.needs_onboarding:
+                # Mark step 2 complete
+                if 2 not in progress.completed_steps:
+                    progress.mark_step_completed(2)
+
+                # Check if user has both workspace and brand (minimum requirements)
+                has_workspace = Workspace.objects.filter(owner=self.request.user).exists()
+
+                # If both exist, mark onboarding as skipped so user can proceed
+                if has_workspace and not progress.is_completed and not progress.is_skipped:
+                    progress.is_skipped = True
+                    progress.skipped_at = timezone.now()
+                    progress.save()
+        except Exception:
+            pass  # Don't fail brand creation if onboarding update fails
+
+        return brand
 
     @action(detail=True, methods=['post'])
     def set_primary(self, request, pk=None):
