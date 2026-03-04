@@ -1,6 +1,12 @@
 # accounts/services/llm_service.py
 """
-Unified LLM Service — Routes text/chat completions to OpenAI or Gemini.
+Unified LLM Service — Routes text/chat completions to Claude, OpenAI, or Gemini.
+
+Architecture:
+    - Claude (Anthropic) is the DEFAULT provider for all text/chat AI workflows.
+      The Claude API key is a global admin key (from settings/env), shared by all users.
+    - OpenAI and Gemini are FALLBACK providers for text, and remain the primary
+      providers for image generation, video, voice, and embeddings.
 
 Usage:
     from accounts.services.llm_service import get_llm_service
@@ -38,6 +44,22 @@ OPENAI_TO_GEMINI = {
 
 GEMINI_TO_OPENAI = {v: k for k, v in OPENAI_TO_GEMINI.items()}
 
+OPENAI_TO_CLAUDE = {
+    'gpt-4o': 'claude-sonnet-4-20250514',
+    'gpt-4o-mini': 'claude-haiku-4-5-20251001',
+    'gpt-4-turbo': 'claude-sonnet-4-20250514',
+}
+
+CLAUDE_TO_OPENAI = {v: k for k, v in OPENAI_TO_CLAUDE.items()}
+
+GEMINI_TO_CLAUDE = {
+    'gemini-2.0-flash': 'claude-sonnet-4-20250514',
+    'gemini-2.0-flash-lite': 'claude-haiku-4-5-20251001',
+    'gemini-1.5-pro': 'claude-sonnet-4-20250514',
+}
+
+CLAUDE_TO_GEMINI = {v: k for k, v in GEMINI_TO_CLAUDE.items()}
+
 
 # ── Normalised Response ────────────────────────────────────────────
 
@@ -54,11 +76,47 @@ class LLMResponse:
     raw_response: Any = None
 
 
+# ── Message Order Helper ──────────────────────────────────────────
+
+def _ensure_valid_claude_message_order(messages: List[Dict]) -> List[Dict]:
+    """
+    Ensure messages follow Anthropic's alternating user/assistant pattern.
+    - Must start with 'user'
+    - Consecutive messages with the same role are merged
+    """
+    if not messages:
+        return [{'role': 'user', 'content': 'Hello'}]
+
+    # Merge consecutive same-role messages
+    merged = []
+    for msg in messages:
+        if merged and merged[-1]['role'] == msg['role']:
+            prev_content = merged[-1]['content']
+            new_content = msg['content']
+            if isinstance(prev_content, str) and isinstance(new_content, str):
+                merged[-1]['content'] = prev_content + '\n\n' + new_content
+            elif isinstance(prev_content, list) and isinstance(new_content, list):
+                merged[-1]['content'] = prev_content + new_content
+            elif isinstance(prev_content, str) and isinstance(new_content, list):
+                merged[-1]['content'] = [{'type': 'text', 'text': prev_content}] + new_content
+            elif isinstance(prev_content, list) and isinstance(new_content, str):
+                merged[-1]['content'] = prev_content + [{'type': 'text', 'text': new_content}]
+        else:
+            merged.append(msg.copy())
+
+    # Ensure first message is 'user'
+    if merged and merged[0]['role'] != 'user':
+        merged.insert(0, {'role': 'user', 'content': 'Begin.'})
+
+    return merged
+
+
 # ── Unified Service ────────────────────────────────────────────────
 
 class UnifiedLLMService:
     """
     Accepts OpenAI-format messages and routes to the user's preferred provider.
+    Claude is the default for all text/chat workflows.
     Handles model mapping, message format conversion, JSON mode, and vision.
     """
 
@@ -66,15 +124,19 @@ class UnifiedLLMService:
         self,
         openai_key: Optional[str] = None,
         gemini_key: Optional[str] = None,
-        preferred_provider: str = 'openai',
+        claude_key: Optional[str] = None,
+        preferred_provider: str = 'claude',
         openai_model: str = 'gpt-4o-mini',
         gemini_model: str = 'gemini-2.0-flash',
+        claude_model: str = 'claude-sonnet-4-20250514',
     ):
         self.openai_key = openai_key
         self.gemini_key = gemini_key
+        self.claude_key = claude_key
         self.preferred_provider = preferred_provider
         self.openai_model = openai_model
         self.gemini_model = gemini_model
+        self.claude_model = claude_model
 
     # ── Public API ─────────────────────────────────────────────────
 
@@ -101,12 +163,17 @@ class UnifiedLLMService:
         if not provider:
             return LLMResponse(
                 success=False,
-                error='No AI API key configured. Go to Settings to add your OpenAI or Gemini key.',
+                error='No AI API key configured. Please contact the administrator.',
             )
 
         resolved_model = self._resolve_model(provider, model)
 
-        if provider == 'openai':
+        if provider == 'claude':
+            return self._claude_completion(
+                messages, resolved_model, temperature, max_tokens,
+                response_format,
+            )
+        elif provider == 'openai':
             return self._openai_completion(
                 messages, resolved_model, temperature, max_tokens,
                 response_format, **kwargs,
@@ -119,15 +186,31 @@ class UnifiedLLMService:
     # ── Provider Resolution ────────────────────────────────────────
 
     def _resolve_provider(self) -> Optional[str]:
-        if self.preferred_provider == 'gemini':
+        """Resolve provider with fallback chain. Claude is preferred default."""
+        if self.preferred_provider == 'claude':
+            if self.claude_key:
+                return 'claude'
+            if self.openai_key:
+                logger.info('Claude key missing, falling back to OpenAI')
+                return 'openai'
+            if self.gemini_key:
+                logger.info('Claude key missing, falling back to Gemini')
+                return 'gemini'
+        elif self.preferred_provider == 'gemini':
             if self.gemini_key:
                 return 'gemini'
+            if self.claude_key:
+                logger.info('Gemini key missing, falling back to Claude')
+                return 'claude'
             if self.openai_key:
                 logger.info('Gemini key missing, falling back to OpenAI')
                 return 'openai'
-        else:  # openai (default)
+        else:  # openai
             if self.openai_key:
                 return 'openai'
+            if self.claude_key:
+                logger.info('OpenAI key missing, falling back to Claude')
+                return 'claude'
             if self.gemini_key:
                 logger.info('OpenAI key missing, falling back to Gemini')
                 return 'gemini'
@@ -135,16 +218,89 @@ class UnifiedLLMService:
 
     def _resolve_model(self, provider: str, requested: Optional[str] = None) -> str:
         if not requested:
+            if provider == 'claude':
+                return self.claude_model
             return self.gemini_model if provider == 'gemini' else self.openai_model
 
-        if provider == 'openai':
+        if provider == 'claude':
+            if requested.startswith('claude'):
+                return requested
+            return OPENAI_TO_CLAUDE.get(requested, GEMINI_TO_CLAUDE.get(requested, self.claude_model))
+        elif provider == 'openai':
             if requested.startswith('gpt'):
                 return requested
-            return GEMINI_TO_OPENAI.get(requested, self.openai_model)
-        else:
+            return GEMINI_TO_OPENAI.get(requested, CLAUDE_TO_OPENAI.get(requested, self.openai_model))
+        else:  # gemini
             if requested.startswith('gemini'):
                 return requested
-            return OPENAI_TO_GEMINI.get(requested, self.gemini_model)
+            return OPENAI_TO_GEMINI.get(requested, CLAUDE_TO_GEMINI.get(requested, self.gemini_model))
+
+    # ── Claude (Anthropic SDK) ────────────────────────────────────
+
+    def _claude_completion(self, messages, model, temperature, max_tokens,
+                           response_format) -> LLMResponse:
+        try:
+            import anthropic
+            client = anthropic.Anthropic(api_key=self.claude_key)
+
+            # Convert OpenAI-format messages to Anthropic format
+            system_text, claude_messages = self._to_claude_messages(messages)
+
+            # Handle JSON mode: inject system instruction for Claude
+            if response_format and response_format.get('type') == 'json_object':
+                json_instruction = (
+                    "\n\nIMPORTANT: You MUST respond with ONLY valid JSON. "
+                    "No markdown code fences, no explanatory text, no comments. "
+                    "Start your response with { or [ and end with } or ]."
+                )
+                if system_text:
+                    system_text += json_instruction
+                else:
+                    system_text = json_instruction.strip()
+
+            params: Dict[str, Any] = {
+                'model': model,
+                'messages': claude_messages,
+                'temperature': temperature,
+                'max_tokens': max_tokens,
+            }
+
+            if system_text:
+                params['system'] = system_text
+
+            resp = client.messages.create(**params)
+
+            # Extract text content from response
+            content = ''
+            for block in resp.content:
+                if hasattr(block, 'text'):
+                    content += block.text
+
+            # Strip markdown code fences if present (especially for JSON responses)
+            content = content.strip()
+            if content.startswith('```'):
+                content = content.split('\n', 1)[1] if '\n' in content else content[3:]
+                if content.endswith('```'):
+                    content = content[:-3]
+                content = content.strip()
+
+            # Calculate token usage
+            tokens_used = 0
+            if resp.usage:
+                tokens_used = resp.usage.input_tokens + resp.usage.output_tokens
+
+            return LLMResponse(
+                success=True,
+                content=content,
+                model=resp.model,
+                provider='claude',
+                tokens_used=tokens_used,
+                finish_reason=resp.stop_reason or '',
+                raw_response=resp,
+            )
+        except Exception as e:
+            logger.error('Claude completion failed: %s', e)
+            return LLMResponse(success=False, error=str(e), provider='claude')
 
     # ── OpenAI ─────────────────────────────────────────────────────
 
@@ -257,7 +413,83 @@ class UnifiedLLMService:
             logger.error('Gemini completion failed: %s', e)
             return LLMResponse(success=False, error=str(e), provider='gemini')
 
-    # ── Message Format Conversion ──────────────────────────────────
+    # ── Message Format Conversion — Claude ────────────────────────
+
+    @staticmethod
+    def _to_claude_messages(messages: List[Dict]):
+        """
+        Convert OpenAI message format → Anthropic format.
+
+        Key differences:
+        - Anthropic: system message is a top-level 'system' parameter, NOT in messages
+        - Anthropic: messages alternate user/assistant (no system role in messages)
+        - Anthropic: vision uses 'source' with 'type': 'base64' instead of 'image_url'
+
+        Returns (system_text, claude_messages)
+        """
+        system_parts: List[str] = []
+        claude_messages: List[Dict] = []
+
+        for msg in messages:
+            role = msg['role']
+            content = msg['content']
+
+            if role == 'system':
+                system_parts.append(content if isinstance(content, str) else str(content))
+                continue
+
+            claude_role = 'assistant' if role == 'assistant' else 'user'
+
+            if isinstance(content, str):
+                claude_messages.append({
+                    'role': claude_role,
+                    'content': content,
+                })
+            elif isinstance(content, list):
+                # Vision content: convert from OpenAI format to Anthropic format
+                claude_content = []
+                for item in content:
+                    if item.get('type') == 'text':
+                        claude_content.append({
+                            'type': 'text',
+                            'text': item['text'],
+                        })
+                    elif item.get('type') == 'image_url':
+                        image_url = item['image_url']['url']
+                        if image_url.startswith('data:'):
+                            # Base64 encoded image
+                            header, data = image_url.split(',', 1)
+                            mime = header.split(':')[1].split(';')[0]
+                            claude_content.append({
+                                'type': 'image',
+                                'source': {
+                                    'type': 'base64',
+                                    'media_type': mime,
+                                    'data': data,
+                                }
+                            })
+                        else:
+                            # URL-based image
+                            claude_content.append({
+                                'type': 'image',
+                                'source': {
+                                    'type': 'url',
+                                    'url': image_url,
+                                }
+                            })
+                if claude_content:
+                    claude_messages.append({
+                        'role': claude_role,
+                        'content': claude_content,
+                    })
+
+        # Ensure valid alternating message order for Anthropic
+        claude_messages = _ensure_valid_claude_message_order(claude_messages)
+
+        system_text = '\n\n'.join(system_parts) if system_parts else None
+        return system_text, claude_messages
+
+    # ── Message Format Conversion — Gemini ────────────────────────
 
     @staticmethod
     def _to_gemini_messages(messages: List[Dict]):
@@ -318,29 +550,38 @@ def get_llm_service(user) -> UnifiedLLMService:
     """
     Build a UnifiedLLMService from user settings.
     Primary entry point for all AI call sites.
+
+    Claude is ALWAYS the preferred provider for text/chat (global admin key).
+    OpenAI/Gemini are used as fallback for text, and remain primary for
+    image generation, video, voice, and embeddings.
     """
-    from accounts.api_keys import get_openai_key, get_gemini_key
+    from accounts.api_keys import get_openai_key, get_gemini_key, get_claude_key
 
     openai_key = get_openai_key(user)
     gemini_key = get_gemini_key(user)
+    claude_key = get_claude_key(user)  # Always returns the global admin key
 
-    preferred_provider = 'openai'
+    # Claude is always preferred for text workflows
+    preferred_provider = 'claude'
     openai_model = 'gpt-4o-mini'
     gemini_model = 'gemini-2.0-flash'
+    claude_model = 'claude-sonnet-4-20250514'
 
     try:
         from ai_caption.models import UserAPISettings
         settings = UserAPISettings.objects.get(user=user)
-        preferred_provider = getattr(settings, 'default_llm_provider', 'openai')
         openai_model = settings.default_model or 'gpt-4o-mini'
         gemini_model = getattr(settings, 'default_gemini_model', 'gemini-2.0-flash')
+        claude_model = getattr(settings, 'default_claude_model', 'claude-sonnet-4-20250514')
     except Exception:
         pass
 
     return UnifiedLLMService(
         openai_key=openai_key,
         gemini_key=gemini_key,
+        claude_key=claude_key,
         preferred_provider=preferred_provider,
         openai_model=openai_model,
         gemini_model=gemini_model,
+        claude_model=claude_model,
     )

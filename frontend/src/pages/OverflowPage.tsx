@@ -595,7 +595,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
           </div>
 
           {/* Products & Services */}
-          {dnaData.products_services?.length > 0 && (
+          {Array.isArray(dnaData.products_services) && dnaData.products_services.length > 0 && (
             <div className="card p-6 transition-all">
               <h3 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Products & Services <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h3>
               <div className="flex flex-wrap gap-2">{dnaData.products_services.map((item: string, idx: number) => (<span key={idx} className="bg-primary-500/10 text-primary-400 px-3 py-1 rounded-full text-sm">{item}</span>))}</div>
@@ -604,19 +604,19 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
 
           {/* USP + Values + Content Themes */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {dnaData.unique_selling_points?.length > 0 && (
+            {Array.isArray(dnaData.unique_selling_points) && dnaData.unique_selling_points.length > 0 && (
               <div className="card p-5 transition-all">
                 <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">USPs <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                 <ul className="space-y-2">{dnaData.unique_selling_points.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-green-400 mt-0.5">&#10003;</span> {item}</li>))}</ul>
               </div>
             )}
-            {dnaData.brand_values?.length > 0 && (
+            {Array.isArray(dnaData.brand_values) && dnaData.brand_values.length > 0 && (
               <div className="card p-5 transition-all">
                 <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Brand Values <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                 <ul className="space-y-2">{dnaData.brand_values.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-primary-400 mt-0.5">&#9679;</span> {item}</li>))}</ul>
               </div>
             )}
-            {dnaData.content_themes?.length > 0 && (
+            {Array.isArray(dnaData.content_themes) && dnaData.content_themes.length > 0 && (
               <div className="card p-5 transition-all">
                 <h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Content Themes <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4>
                 <ul className="space-y-2">{dnaData.content_themes.map((item: string, idx: number) => (<li key={idx} className="text-sm flex items-start gap-2"><span className="text-yellow-400 mt-0.5">&#9733;</span> {item}</li>))}</ul>
@@ -626,9 +626,9 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
 
           {/* Keywords + Colors + Social */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {dnaData.keywords?.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Keywords <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-1.5">{dnaData.keywords.map((kw: string, idx: number) => (<span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>))}</div></div>)}
-            {dnaData.color_theme?.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Color Theme <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-2">{dnaData.color_theme.map((c: string, idx: number) => (<span key={idx} className="flex items-center gap-1.5 text-sm"><span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c.toLowerCase() }} />{c}</span>))}</div></div>)}
-            {dnaData.social_platforms?.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Social Platforms <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-2">{dnaData.social_platforms.map((p: string, idx: number) => (<span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>))}</div></div>)}
+            {Array.isArray(dnaData.keywords) && dnaData.keywords.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Keywords <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-1.5">{dnaData.keywords.map((kw: string, idx: number) => (<span key={idx} className="bg-dark-600 text-text-secondary px-2 py-0.5 rounded text-xs">{kw}</span>))}</div></div>)}
+            {Array.isArray(dnaData.color_theme) && dnaData.color_theme.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Color Theme <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-2">{dnaData.color_theme.map((c: string, idx: number) => (<span key={idx} className="flex items-center gap-1.5 text-sm"><span className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: c.toLowerCase() }} />{c}</span>))}</div></div>)}
+            {Array.isArray(dnaData.social_platforms) && dnaData.social_platforms.length > 0 && (<div className="card p-5 transition-all"><h4 className="text-sm font-semibold mb-3 uppercase tracking-wide text-text-secondary flex items-center justify-between">Social Platforms <button onClick={enterEditMode} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-3.5 h-3.5" /></button></h4><div className="flex flex-wrap gap-2">{dnaData.social_platforms.map((p: string, idx: number) => (<span key={idx} className="badge badge-primary text-xs capitalize">{p}</span>))}</div></div>)}
           </div>
 
           {/* Custom Fields */}

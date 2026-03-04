@@ -1,4 +1,5 @@
 annotated-types==0.7.0
+anthropic>=0.52.0
 anyio==4.12.0
 APScheduler==3.11.1
 asgiref==3.11.0

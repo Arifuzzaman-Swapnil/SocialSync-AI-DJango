@@ -89,6 +89,15 @@ Additional guidance: Ensure smooth transitions, consistent lighting throughout t
 
         return enhanced
     
+    # Image-to-video requires Veo 3.x; text-only works on Veo 2.0+
+    VEO_IMAGE_MODELS = [
+        'veo-3.1-generate-preview',
+    ]
+    VEO_TEXT_MODELS = [
+        'veo-3.1-generate-preview',
+        'veo-2.0-generate-001',
+    ]
+
     def generate_video(self, prompt, style='realistic', duration=5, resolution='1080p',
                        aspect_ratio='16:9', fps=30, negative_prompt=None,
                        camera_motion=None, motion_intensity=None, enhance=True, seed=None,
@@ -101,45 +110,42 @@ Additional guidance: Ensure smooth transitions, consistent lighting throughout t
                 'success': False,
                 'error': 'Gemini API key not configured'
             }
-        
+
         start_time = time.time()
-        
+
         try:
             # Enhance prompt if requested
             if enhance:
                 final_prompt = self.enhance_prompt(prompt, style, camera_motion, motion_intensity)
             else:
                 final_prompt = prompt
-            
+
             # Add negative prompt
             if negative_prompt:
                 final_prompt += f". Avoid: {negative_prompt}"
-            
-            # Add duration and aspect ratio to prompt
-            final_prompt += f". Duration: {duration} seconds, aspect ratio: {aspect_ratio}"
-            
-            # Try Veo model first
-            result = self._generate_with_veo(final_prompt, duration, resolution, aspect_ratio, reference_image=reference_image)
-            
-            if result.get('success'):
-                result['enhanced_prompt'] = final_prompt
-                result['processing_time'] = time.time() - start_time
-                return result
-            
-            # Fallback: Try imagen for video (if available)
-            result = self._generate_with_imagen_video(final_prompt, duration, resolution, aspect_ratio)
-            
-            if result.get('success'):
-                result['enhanced_prompt'] = final_prompt
-                result['processing_time'] = time.time() - start_time
-                return result
-            
+
+            # Pick model list: image-to-video needs Veo 3.x
+            models_to_try = self.VEO_IMAGE_MODELS if reference_image else self.VEO_TEXT_MODELS
+
+            last_error = None
+            for model in models_to_try:
+                result = self._generate_with_veo(
+                    final_prompt, duration, resolution, aspect_ratio,
+                    reference_image=reference_image, model=model,
+                )
+                if result.get('success'):
+                    result['enhanced_prompt'] = final_prompt
+                    result['processing_time'] = time.time() - start_time
+                    result['model_used'] = model
+                    return result
+                last_error = result.get('error', '')
+
             return {
                 'success': False,
-                'error': result.get('error', 'Video generation failed. This feature may not be available in your region yet.'),
-                'processing_time': time.time() - start_time
+                'error': last_error or 'Video generation failed. This feature may not be available in your region yet.',
+                'processing_time': time.time() - start_time,
             }
-                
+
         except Exception as e:
             return {
                 'success': False,
@@ -147,184 +153,161 @@ Additional guidance: Ensure smooth transitions, consistent lighting throughout t
                 'processing_time': time.time() - start_time
             }
     
-    def _generate_with_veo(self, prompt, duration, resolution, aspect_ratio, reference_image=None):
-        """Generate using Veo model"""
+    def _generate_with_veo(self, prompt, duration, resolution, aspect_ratio,
+                           reference_image=None, model='veo-2.0-generate-001'):
+        """Generate using Veo model via predictLongRunning endpoint.
+
+        Image-to-video (reference_image) is only supported on Veo 3.x models.
+        """
         try:
-            # Veo 2 model endpoint
-            url = f"{self.base_url}/models/veo-2.0-generate-001:predictLongRunning"
+            url = f"{self.base_url}/models/{model}:predictLongRunning"
 
             headers = {
                 'Content-Type': 'application/json',
+                'x-goog-api-key': self.api_key,
             }
 
-            # Get resolution dimensions
-            resolutions = {
-                '480p': {'width': 854, 'height': 480},
-                '720p': {'width': 1280, 'height': 720},
-                '1080p': {'width': 1920, 'height': 1080},
-                '4k': {'width': 3840, 'height': 2160},
-            }
-            res = resolutions.get(resolution, resolutions['1080p'])
+            is_veo3 = 'veo-3' in model
 
-            # Build instance with optional reference image
+            # Build instance with optional reference image (Veo 3.x only)
             instance = {'prompt': prompt}
-            if reference_image:
+            if reference_image and is_veo3:
+                # Detect MIME type from first bytes
+                mime = 'image/png'
+                if reference_image[:3] == b'\xff\xd8\xff':
+                    mime = 'image/jpeg'
+                elif reference_image[:4] == b'RIFF':
+                    mime = 'image/webp'
+
                 instance['image'] = {
-                    'bytesBase64Encoded': base64.b64encode(reference_image).decode(),
-                    'mimeType': 'image/png'
+                    'inlineData': {
+                        'data': base64.b64encode(reference_image).decode(),
+                        'mimeType': mime,
+                    }
                 }
+
+            params = {
+                'aspectRatio': aspect_ratio,
+                'personGeneration': 'allow_adult',
+                'sampleCount': 1,
+            }
+            if resolution in ('720p', '1080p', '4k'):
+                params['resolution'] = resolution
 
             payload = {
                 'instances': [instance],
-                'parameters': {
-                    'aspectRatio': aspect_ratio,
-                    'durationSeconds': duration,
-                    'personGeneration': 'allow_adult',
-                    'sampleCount': 1,
-                }
+                'parameters': params,
             }
-            
+
             response = requests.post(
-                f"{url}?key={self.api_key}",
+                url,
                 headers=headers,
                 json=payload,
-                timeout=300  # 5 minutes timeout for video
+                timeout=300,
             )
-            
+
             if response.status_code == 200:
                 result = response.json()
-                
-                # Check for video in response
-                if 'predictions' in result and len(result['predictions']) > 0:
-                    prediction = result['predictions'][0]
-                    video_b64 = prediction.get('bytesBase64Encoded')
-                    
-                    if video_b64:
-                        video_data = base64.b64decode(video_b64)
-                        return {
-                            'success': True,
-                            'video_data': video_data,
-                            'format': 'mp4'
-                        }
-                
-                # Check if it's a long-running operation
+
+                # Veo always returns a long-running operation
                 if 'name' in result:
-                    # Poll for completion
-                    operation_name = result['name']
-                    return self._poll_operation(operation_name)
-                
-                return {'success': False, 'error': 'No video in response'}
+                    return self._poll_operation(result['name'])
+
+                return {'success': False, 'error': 'Unexpected response format'}
             else:
                 error_msg = f"API Error: {response.status_code}"
                 try:
                     error_data = response.json()
                     if 'error' in error_data:
                         error_msg = error_data['error'].get('message', error_msg)
-                except:
+                except Exception:
                     pass
                 return {'success': False, 'error': error_msg}
-                
+
         except requests.exceptions.Timeout:
             return {'success': False, 'error': 'Request timed out'}
         except Exception as e:
             return {'success': False, 'error': str(e)}
     
-    def _generate_with_imagen_video(self, prompt, duration, resolution, aspect_ratio):
-        """Generate using Imagen Video (if available)"""
+    def _poll_operation(self, operation_name, max_attempts=60, interval=10):
+        """Poll a long-running operation for completion.
+
+        Veo returns ``generateVideoResponse.generatedSamples[].video.uri``
+        which must be downloaded with the API key header.
+        """
         try:
-            # Try imagen-video model
-            url = f"{self.base_url}/models/imagen-video-001:predict"
-            
-            headers = {
-                'Content-Type': 'application/json',
-            }
-            
-            payload = {
-                'instances': [{'prompt': prompt}],
-                'parameters': {
-                    'sampleCount': 1,
-                    'aspectRatio': aspect_ratio.replace(':', 'x'),
-                    'durationSeconds': duration,
-                }
-            }
-            
-            response = requests.post(
-                f"{url}?key={self.api_key}",
-                headers=headers,
-                json=payload,
-                timeout=300
-            )
-            
-            if response.status_code == 200:
+            url = f"{self.base_url}/{operation_name}"
+            headers = {'x-goog-api-key': self.api_key}
+
+            for attempt in range(max_attempts):
+                response = requests.get(url, headers=headers, timeout=30)
+
+                if response.status_code != 200:
+                    return {'success': False, 'error': f'Poll failed: {response.status_code}'}
+
                 result = response.json()
-                
-                if 'predictions' in result and len(result['predictions']) > 0:
-                    prediction = result['predictions'][0]
-                    video_b64 = prediction.get('bytesBase64Encoded')
-                    
-                    if video_b64:
-                        video_data = base64.b64decode(video_b64)
+
+                if not result.get('done'):
+                    time.sleep(interval)
+                    continue
+
+                # Check for error
+                if 'error' in result:
+                    return {'success': False, 'error': result['error'].get('message', 'Operation failed')}
+
+                # Extract video URI from response
+                resp = result.get('response', {})
+                video_uri = None
+
+                # Format 1: generateVideoResponse (Veo API)
+                gen_resp = resp.get('generateVideoResponse', {})
+                samples = gen_resp.get('generatedSamples', [])
+                if samples:
+                    video_uri = samples[0].get('video', {}).get('uri')
+
+                # Format 2: legacy predictions (older API versions)
+                if not video_uri and 'predictions' in resp:
+                    for pred in resp['predictions']:
+                        if 'bytesBase64Encoded' in pred:
+                            video_data = base64.b64decode(pred['bytesBase64Encoded'])
+                            return {
+                                'success': True,
+                                'video_data': video_data,
+                                'format': 'mp4',
+                            }
+
+                if video_uri:
+                    # Download the video from the URI
+                    video_data = self._download_video(video_uri)
+                    if video_data:
                         return {
                             'success': True,
                             'video_data': video_data,
-                            'format': 'mp4'
+                            'format': 'mp4',
                         }
-                
-                return {'success': False, 'error': 'No video in response'}
-            else:
-                error_msg = f"API Error: {response.status_code}"
-                try:
-                    error_data = response.json()
-                    if 'error' in error_data:
-                        error_msg = error_data['error'].get('message', error_msg)
-                except:
-                    pass
-                return {'success': False, 'error': error_msg}
-                
+                    return {'success': False, 'error': 'Failed to download generated video'}
+
+                return {'success': False, 'error': 'No video in completed operation'}
+
+            return {'success': False, 'error': 'Operation timed out (10 minutes)'}
+
         except Exception as e:
             return {'success': False, 'error': str(e)}
-    
-    def _poll_operation(self, operation_name, max_attempts=60, interval=10):
-        """Poll a long-running operation for completion"""
+
+    def _download_video(self, uri):
+        """Download video bytes from a Veo-returned URI."""
         try:
-            url = f"{self.base_url}/{operation_name}"
-            
-            for attempt in range(max_attempts):
-                response = requests.get(
-                    f"{url}?key={self.api_key}",
-                    timeout=30
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    
-                    if result.get('done'):
-                        if 'response' in result:
-                            resp = result['response']
-                            if 'predictions' in resp:
-                                for pred in resp['predictions']:
-                                    if 'bytesBase64Encoded' in pred:
-                                        video_data = base64.b64decode(pred['bytesBase64Encoded'])
-                                        return {
-                                            'success': True,
-                                            'video_data': video_data,
-                                            'format': 'mp4'
-                                        }
-                        
-                        if 'error' in result:
-                            return {'success': False, 'error': result['error'].get('message', 'Operation failed')}
-                        
-                        return {'success': False, 'error': 'No video in completed operation'}
-                    
-                    # Not done yet, wait and retry
-                    time.sleep(interval)
-                else:
-                    return {'success': False, 'error': f'Poll failed: {response.status_code}'}
-            
-            return {'success': False, 'error': 'Operation timed out'}
-            
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
+            headers = {'x-goog-api-key': self.api_key}
+            resp = requests.get(uri, headers=headers, timeout=120)
+            if resp.status_code == 200:
+                return resp.content
+            # Some URIs don't need auth
+            resp2 = requests.get(uri, timeout=120)
+            if resp2.status_code == 200:
+                return resp2.content
+            return None
+        except Exception:
+            return None
     
     def add_logo_to_video(self, video_path, logo_path, output_path, position='bottom_right',
                           size_percent=10, opacity=100):
@@ -497,7 +480,7 @@ Additional guidance: Ensure smooth transitions, consistent lighting throughout t
                 for model in data.get('models', []):
                     name = model.get('name', '')
                     # Filter for video-related models
-                    if any(x in name.lower() for x in ['video', 'veo']):
+                    if any(x in name.lower() for x in ['video', 'veo', 'generate']):
                         models.append({
                             'name': name,
                             'displayName': model.get('displayName', ''),

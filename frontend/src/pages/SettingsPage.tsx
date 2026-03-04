@@ -49,19 +49,6 @@ const languages = [
 ];
 
 
-const openaiModels = [
-  { value: 'gpt-4o', label: 'GPT-4o (Recommended)' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-];
-
-const geminiModels = [
-  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Recommended)' },
-  { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (Faster)' },
-  { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-  { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-];
-
 const themeOptions: { value: ThemeMode; label: string; icon: typeof MoonIcon }[] = [
   { value: 'light', label: 'Light', icon: SunIcon },
   { value: 'dark', label: 'Dark', icon: MoonIcon },
@@ -86,15 +73,15 @@ export function SettingsPage() {
     masked_openai_key: '',
     has_gemini_key: false,
     masked_gemini_key: '',
+    claude_active: false,
   });
 
-  // API Keys state
+  // API Keys state (OpenAI/Gemini only — for image/video/voice generation)
   const [apiSettings, setApiSettings] = useState({
     api_mode: (user?.profile?.api_mode as 'admin' | 'user') || 'user',
     openai_api_key: '',
     gemini_api_key: '',
     default_model: 'gpt-4o',
-    default_llm_provider: 'openai',
     default_gemini_model: 'gemini-2.0-flash',
   });
 
@@ -108,10 +95,7 @@ export function SettingsPage() {
         if (response.data.has_openai_key || response.data.has_gemini_key) {
           setApiSettings(prev => ({ ...prev, api_mode: 'user' }));
         }
-        // Load LLM provider preferences from server
-        if (response.data.default_llm_provider) {
-          setApiSettings(prev => ({ ...prev, default_llm_provider: response.data.default_llm_provider }));
-        }
+        // Load image/video model preferences from server
         if (response.data.default_gemini_model) {
           setApiSettings(prev => ({ ...prev, default_gemini_model: response.data.default_gemini_model }));
         }
@@ -125,10 +109,10 @@ export function SettingsPage() {
     loadKeyStatus();
   }, []);
 
-  // Save API keys handler
+  // Save API keys handler (OpenAI/Gemini for image/video/voice only)
   const handleSaveApiKeys = async () => {
     if (!apiSettings.openai_api_key && !apiSettings.gemini_api_key && !keyStatus.has_openai_key && !keyStatus.has_gemini_key) {
-      setApiKeysError('Please enter at least one API key');
+      setApiKeysError('Please enter at least one API key for image/video generation');
       return;
     }
 
@@ -139,7 +123,6 @@ export function SettingsPage() {
       const payload: Record<string, string> = {};
       if (apiSettings.openai_api_key) payload.openai_api_key = apiSettings.openai_api_key;
       if (apiSettings.gemini_api_key) payload.gemini_api_key = apiSettings.gemini_api_key;
-      payload.default_llm_provider = apiSettings.default_llm_provider;
       payload.default_gemini_model = apiSettings.default_gemini_model;
       payload.default_model = apiSettings.default_model;
 
@@ -542,72 +525,20 @@ export function SettingsPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
-                  Used for AI Caption, AI Voice, AI Image (DALL-E), and Messenger bot
+                  Used for AI Image (DALL-E) and AI Voice generation
                 </p>
               </div>
 
-              {/* Default AI Provider Toggle */}
-              <div className="p-4 bg-dark-700/50 rounded-xl border border-white/10">
-                <label className="block text-sm font-medium text-text-primary mb-3">Default AI Provider</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setApiSettings({ ...apiSettings, default_llm_provider: 'openai' })}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-                      apiSettings.default_llm_provider === 'openai'
-                        ? 'bg-primary text-white ring-2 ring-primary/50 ring-offset-2 ring-offset-dark-800'
-                        : 'bg-dark-600 text-text-secondary hover:bg-dark-500 hover:text-text-primary'
-                    }`}
-                  >
-                    OpenAI
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setApiSettings({ ...apiSettings, default_llm_provider: 'gemini' })}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
-                      apiSettings.default_llm_provider === 'gemini'
-                        ? 'bg-primary text-white ring-2 ring-primary/50 ring-offset-2 ring-offset-dark-800'
-                        : 'bg-dark-600 text-text-secondary hover:bg-dark-500 hover:text-text-primary'
-                    }`}
-                  >
-                    Google Gemini
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-text-muted">
-                  Applies to captions, strategy, ideas, and all AI text features. Falls back to the other provider if selected key is missing.
-                </p>
-              </div>
-
-              {/* Conditional Model Selector */}
-              {apiSettings.default_llm_provider === 'openai' ? (
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">Default OpenAI Model</label>
-                  <select
-                    value={apiSettings.default_model}
-                    onChange={(e) => setApiSettings({ ...apiSettings, default_model: e.target.value })}
-                    className="w-full px-4 py-3 bg-dark-700 border border-white/10 rounded-xl text-text-primary focus:outline-none focus:border-primary"
-                  >
-                    {openaiModels.map((model) => (
-                      <option key={model.value} value={model.value}>
-                        {model.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-medium text-text-secondary mb-2">Default Gemini Model</label>
-                  <select
-                    value={apiSettings.default_gemini_model}
-                    onChange={(e) => setApiSettings({ ...apiSettings, default_gemini_model: e.target.value })}
-                    className="w-full px-4 py-3 bg-dark-700 border border-white/10 rounded-xl text-text-primary focus:outline-none focus:border-primary"
-                  >
-                    {geminiModels.map((model) => (
-                      <option key={model.value} value={model.value}>
-                        {model.label}
-                      </option>
-                    ))}
-                  </select>
+              {/* Claude AI Status Banner */}
+              {keyStatus.claude_active && (
+                <div className="p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                    <p className="text-sm text-purple-400 font-medium">Claude AI Active</p>
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                    Claude AI powers all text features automatically — captions, strategy, content ideas, competitor analysis, trending topics, and more. No setup needed.
+                  </p>
                 </div>
               )}
 
@@ -646,7 +577,7 @@ export function SettingsPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-text-muted">
-                  Used for AI Image (Gemini), AI Video generation, and all AI text features (when Gemini is selected as default provider)
+                  Used for AI Image (Gemini/Imagen) and AI Video generation
                 </p>
               </div>
 
@@ -682,7 +613,9 @@ export function SettingsPage() {
                 <div>
                   <p className="text-sm text-blue-400 font-medium">Enter once, works everywhere</p>
                   <p className="text-xs text-text-secondary mt-1">
-                    Your API keys are securely stored and automatically synced to all AI features (Caption, Voice, Image, Video). No need to enter them separately in each feature.
+                    Claude AI handles all text features (captions, strategy, analysis) automatically.
+                    Your OpenAI key is used for DALL-E image generation and voice.
+                    Your Gemini key is used for Imagen image and video generation.
                   </p>
                 </div>
               </div>

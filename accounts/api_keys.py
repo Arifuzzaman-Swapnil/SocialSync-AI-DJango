@@ -115,6 +115,14 @@ def get_gemini_key(user):
     return fallback if fallback else None
 
 
+def get_claude_key(user=None):
+    """Get Claude API key from Django settings (global admin key).
+    Claude key is NOT per-user — it's a fixed platform-wide key
+    shared by all users for text AI workflows."""
+    key = getattr(django_settings, 'ANTHROPIC_API_KEY', '')
+    return key if key else None
+
+
 def mask_key(key):
     """Return masked version of API key for display"""
     if not key:

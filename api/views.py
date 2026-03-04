@@ -109,7 +109,7 @@ from .serializers import (
     BrandDNAStatusSerializer,
 )
 
-from accounts.api_keys import sync_openai_key, sync_gemini_key, get_openai_key, get_gemini_key, mask_key
+from accounts.api_keys import sync_openai_key, sync_gemini_key, get_openai_key, get_gemini_key, get_claude_key, mask_key
 
 
 # ===================== AUTH VIEWS =====================
@@ -821,20 +821,21 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 
 
 class GlobalAPIKeysView(APIView):
-    """Centralized API key management - enter once, works everywhere"""
+    """Centralized API key management - enter once, works everywhere.
+    Claude is the fixed admin provider for text AI (key from env).
+    OpenAI/Gemini keys are user-managed for image/video/voice generation."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         openai_key = get_openai_key(request.user)
         gemini_key = get_gemini_key(request.user)
+        claude_key = get_claude_key(request.user)
 
-        # LLM preferences
-        llm_provider = 'openai'
+        # Image/video model preferences
         default_model = 'gpt-4o'
         gemini_model = 'gemini-2.0-flash'
         try:
             s = request.user.api_settings
-            llm_provider = getattr(s, 'default_llm_provider', 'openai')
             default_model = s.default_model or 'gpt-4o'
             gemini_model = getattr(s, 'default_gemini_model', 'gemini-2.0-flash')
         except Exception:
@@ -845,7 +846,7 @@ class GlobalAPIKeysView(APIView):
             'masked_openai_key': mask_key(openai_key) if openai_key else '',
             'has_gemini_key': bool(gemini_key),
             'masked_gemini_key': mask_key(gemini_key) if gemini_key else '',
-            'default_llm_provider': llm_provider,
+            'claude_active': bool(claude_key),
             'default_model': default_model,
             'default_gemini_model': gemini_model,
         })
@@ -863,15 +864,12 @@ class GlobalAPIKeysView(APIView):
         if gemini_key:
             sync_gemini_key(request.user, gemini_key)
 
-        # Save LLM preferences
-        llm_provider = data.get('default_llm_provider', '')
+        # Save image/video model preferences
         default_model = data.get('default_model', '')
         gemini_model = data.get('default_gemini_model', '')
-        if llm_provider or default_model or gemini_model:
+        if default_model or gemini_model:
             from ai_caption.models import UserAPISettings
             settings, _ = UserAPISettings.objects.get_or_create(user=request.user)
-            if llm_provider:
-                settings.default_llm_provider = llm_provider
             if default_model:
                 settings.default_model = default_model
             if gemini_model:
@@ -881,13 +879,12 @@ class GlobalAPIKeysView(APIView):
         # Return updated status
         new_openai = get_openai_key(request.user)
         new_gemini = get_gemini_key(request.user)
+        claude_key = get_claude_key(request.user)
 
-        ret_provider = 'openai'
         ret_model = 'gpt-4o'
         ret_gemini = 'gemini-2.0-flash'
         try:
             s = request.user.api_settings
-            ret_provider = s.default_llm_provider
             ret_model = s.default_model
             ret_gemini = s.default_gemini_model
         except Exception:
@@ -899,7 +896,7 @@ class GlobalAPIKeysView(APIView):
             'masked_openai_key': mask_key(new_openai) if new_openai else '',
             'has_gemini_key': bool(new_gemini),
             'masked_gemini_key': mask_key(new_gemini) if new_gemini else '',
-            'default_llm_provider': ret_provider,
+            'claude_active': bool(claude_key),
             'default_model': ret_model,
             'default_gemini_model': ret_gemini,
         })
@@ -3083,6 +3080,18 @@ Return ONLY a single JSON object with all 15 fields as keys.
                 raw = raw.strip()
 
             dna_data = json.loads(raw)
+
+            # Normalize array fields — LLM may return strings instead of arrays
+            _array_fields = [
+                'products_services', 'unique_selling_points', 'brand_values',
+                'content_themes', 'keywords', 'color_theme', 'social_platforms',
+            ]
+            for _field in _array_fields:
+                val = dna_data.get(_field)
+                if isinstance(val, str) and val:
+                    dna_data[_field] = [item.strip() for item in val.split(',') if item.strip()]
+                elif not isinstance(val, list):
+                    dna_data[_field] = []
 
             # Save to brand
             dna_data['website_url'] = url

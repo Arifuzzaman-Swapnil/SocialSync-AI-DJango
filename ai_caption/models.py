@@ -23,8 +23,9 @@ class UserAPISettings(models.Model):
     # Encrypted API key storage (simple base64 encoding for now)
     _openai_api_key = models.TextField(blank=True, null=True, db_column='openai_api_key')
     
-    # LLM provider preference
-    default_llm_provider = models.CharField(max_length=20, default='openai', choices=[
+    # LLM provider preference (Claude is default for text, managed globally)
+    default_llm_provider = models.CharField(max_length=20, default='claude', choices=[
+        ('claude', 'Anthropic Claude'),
         ('openai', 'OpenAI'),
         ('gemini', 'Google Gemini'),
     ])
@@ -42,6 +43,12 @@ class UserAPISettings(models.Model):
         ('gemini-2.0-flash-lite', 'Gemini 2.0 Flash Lite'),
         ('gemini-1.5-pro', 'Gemini 1.5 Pro'),
         ('gemini-1.5-flash', 'Gemini 1.5 Flash'),
+    ])
+
+    # Claude model preference (Claude key is global/admin-managed, not per-user)
+    default_claude_model = models.CharField(max_length=80, default='claude-sonnet-4-20250514', choices=[
+        ('claude-sonnet-4-20250514', 'Claude Sonnet 4 (Recommended)'),
+        ('claude-haiku-4-5-20251001', 'Claude Haiku 4.5 (Faster & Cheaper)'),
     ])
     
     # Usage tracking

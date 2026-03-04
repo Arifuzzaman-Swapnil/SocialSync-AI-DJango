@@ -235,6 +235,13 @@ class VideoGeneration(models.Model):
     logo_size = models.IntegerField(default=10, help_text="Logo size as percentage (5-25)")
     logo_opacity = models.IntegerField(default=100, help_text="Logo opacity (10-100)")
     
+    # Reference image (product photo for image-to-video)
+    reference_image = models.ImageField(
+        upload_to='video_references/%Y/%m/',
+        blank=True, null=True,
+        help_text="Product photo used as reference for video generation"
+    )
+
     # Advanced Options
     seed = models.IntegerField(blank=True, null=True, help_text="Seed for reproducibility")
     enhance_prompt = models.BooleanField(default=True, help_text="AI-enhance the prompt")

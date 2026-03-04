@@ -1194,14 +1194,15 @@ class GenerateVoiceSerializer(serializers.Serializer):
 # ===================== GLOBAL API KEYS SERIALIZER =====================
 
 class GlobalAPIKeysSerializer(serializers.Serializer):
-    """Serializer for centralized API key management"""
+    """Serializer for centralized API key management.
+    Claude is the fixed admin provider for text AI (key from env).
+    OpenAI/Gemini keys are user-managed for image/video/voice generation."""
     openai_api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
     gemini_api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
     has_openai_key = serializers.BooleanField(read_only=True)
     masked_openai_key = serializers.CharField(read_only=True)
     has_gemini_key = serializers.BooleanField(read_only=True)
     masked_gemini_key = serializers.CharField(read_only=True)
-    default_llm_provider = serializers.ChoiceField(choices=['openai', 'gemini'], required=False)
     default_model = serializers.CharField(required=False, allow_blank=True)
     default_gemini_model = serializers.CharField(required=False, allow_blank=True)
 
