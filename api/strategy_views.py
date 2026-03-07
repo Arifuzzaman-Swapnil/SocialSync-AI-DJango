@@ -298,6 +298,7 @@ class CompetitorCrawlView(APIView):
             return Response({'error': 'No competitor profiles configured'}, status=status.HTTP_400_BAD_REQUEST)
 
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         try:
             from accounts.services.llm_service import get_llm_service
@@ -460,7 +461,8 @@ Return ONLY valid JSON array — no markdown, no commentary."""},
                         {'role': 'user', 'content': prompt},
                     ],
                     temperature=0.5,
-                    max_tokens=4500,
+                    max_tokens=9000 if think_harder else 4500,
+                    thinking_budget=10000 if think_harder else 0,
                 )
 
                 if not result.success:
@@ -795,6 +797,7 @@ Return ONLY a JSON array of exactly {count} objects:
 </constraints>"""
 
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
         if override_prompt:
             prompt = override_prompt
 
@@ -808,7 +811,8 @@ Return ONLY a JSON array of exactly {count} objects:
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.85,
-                max_tokens=3000,
+                max_tokens=6000 if think_harder else 3000,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -915,6 +919,7 @@ class RegenerateIdeaView(APIView):
 
         additional_instructions = request.data.get("instructions", "")
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         prompt = f"""<task>
 Regenerate this content idea with a completely fresh creative direction.
@@ -965,8 +970,9 @@ Return ONLY this JSON:
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.9,
-                max_tokens=500,
+                max_tokens=1000 if think_harder else 500,
                 response_format={'type': 'json_object'},
+                thinking_budget=10000 if think_harder else 0,
             )
             if not llm_result.success:
                 return Response({'error': llm_result.error}, status=status.HTTP_400_BAD_REQUEST)
@@ -1055,7 +1061,8 @@ class GenerateTrendingView(APIView):
         try:
             from .trending_service import generate_trending_for_brand
             override_prompt = request.data.get('override_prompt', '')
-            result = generate_trending_for_brand(brand_id, request.user, override_prompt=override_prompt or None)
+            think_harder = request.data.get('think_harder', False)
+            result = generate_trending_for_brand(brand_id, request.user, override_prompt=override_prompt or None, think_harder=think_harder)
             return Response(result)
         except Exception as e:
             logger.error(f"Trending generation failed for brand {brand_id}: {e}", exc_info=True)
@@ -1274,6 +1281,7 @@ class SuggestCompetitorsView(APIView):
         dna = brand.brand_dna or {}
         existing = list(CompetitorProfile.objects.filter(brand=brand).values_list('handle_or_url', flat=True))
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         try:
             service = get_llm_service(request.user)
@@ -1346,8 +1354,9 @@ IMPORTANT: Only suggest companies you are confident are real. If unsure about a 
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.3,
-                max_tokens=1500,
+                max_tokens=3000 if think_harder else 1500,
                 response_format={'type': 'json_object'},
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not llm_result.success:
@@ -1387,6 +1396,7 @@ class GeneratePillarsView(APIView):
         count = request.data.get('count', 5)
         focus_areas = request.data.get('focus_areas', [])
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         from accounts.services.llm_service import get_llm_service
 
@@ -1526,8 +1536,9 @@ Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pi
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.5,
-                max_tokens=1500,
+                max_tokens=3000 if think_harder else 1500,
                 response_format={'type': 'json_object'},
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not llm_result.success:

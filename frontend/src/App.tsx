@@ -31,6 +31,8 @@ import {
   // V1.3
   OverflowPage,
   IdeaHistoryPage,
+  // Dev / Test
+  APITestPage,
 } from './pages';
 import {
   AdminDashboardPage,
@@ -173,6 +175,9 @@ function App() {
           {/* V1.3 Routes */}
           <Route path="/overflow" element={<OverflowPage />} />
           <Route path="/ideas/history" element={<IdeaHistoryPage />} />
+
+          {/* Dev / Test */}
+          <Route path="/test-api" element={<APITestPage />} />
 
           {/* Info Pages */}
           <Route path="/about" element={<AboutPage />} />

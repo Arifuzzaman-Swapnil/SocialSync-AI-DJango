@@ -500,6 +500,11 @@ export interface ImageGeneration {
   processing_time: number;
   created_at: string;
   updated_at: string;
+  // Prompt engineering metadata
+  brand_style_anchor?: string;
+  prompt_engineering_used?: boolean;
+  failure_codes?: string[] | null;
+  reprompt_attempt?: number;
 }
 
 export interface SavedImage {

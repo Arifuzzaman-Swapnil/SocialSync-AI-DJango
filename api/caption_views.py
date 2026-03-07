@@ -91,6 +91,7 @@ class GenerateCaptionsView(APIView):
 
         original_text = (post.caption or post.hook or 'No caption provided')[:500]
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         prompt = f"""<context>
 You are generating caption variants for a social media draft post. Each variant must also include a DALL-E 3 image prompt that visually complements the caption.
@@ -176,8 +177,9 @@ Output:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.8,
-                max_tokens=2000,
+                max_tokens=4000 if think_harder else 2000,
                 response_format={"type": "json_object"},
+                thinking_budget=10000 if think_harder else 0,
             )
             if not llm_result.success:
                 return Response(
@@ -266,11 +268,12 @@ class AdaptCaptionView(APIView):
 
         brand = post.brand
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         adapted = []
         all_used_prompts = []
         for platform in data['target_platforms']:
-            adapted_caption, used_prompt = adapt_caption(source, platform, brand=brand, override_prompt=override_prompt or None, user=request.user)
+            adapted_caption, used_prompt = adapt_caption(source, platform, brand=brand, override_prompt=override_prompt or None, user=request.user, think_harder=think_harder)
             adapted.append(adapted_caption)
             all_used_prompts.append(used_prompt)
 

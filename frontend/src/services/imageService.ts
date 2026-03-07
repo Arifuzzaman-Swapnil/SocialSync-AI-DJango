@@ -6,6 +6,22 @@ import type {
   PromptTemplate,
   UserImageSettings,
 } from '../types';
+import type {
+  PromptEngineerGenerateRequest,
+  PromptEngineerGenerateResponse,
+  PromptEngineerDiagnoseRequest,
+  PromptEngineerDiagnoseResponse,
+  PromptEngineerRepromptRequest,
+  PromptEngineerRepromptResponse,
+} from '../types/promptEngineering';
+import type {
+  CopyOverlayGenerateRequest,
+  CopyOverlayGenerateResponse,
+  CopyOverlayApplyRequest,
+  CopyOverlayApplyResponse,
+  AIStylesRequest,
+  AIStylesResponse,
+} from '../types/copyOverlay';
 
 export interface GenerateImageRequest {
   prompt: string;
@@ -157,6 +173,70 @@ export const imageService = {
 
   async deleteTemplate(id: number): Promise<void> {
     await api.delete(`/ai-image/templates/${id}/`);
+  },
+
+  // Prompt Engineering
+  async generateEngineeredPrompt(
+    data: PromptEngineerGenerateRequest
+  ): Promise<PromptEngineerGenerateResponse> {
+    const response = await api.post<PromptEngineerGenerateResponse>(
+      '/prompt-engineer/generate/',
+      data
+    );
+    return response.data;
+  },
+
+  async diagnoseImage(
+    data: PromptEngineerDiagnoseRequest
+  ): Promise<PromptEngineerDiagnoseResponse> {
+    const response = await api.post<PromptEngineerDiagnoseResponse>(
+      '/prompt-engineer/diagnose/',
+      data
+    );
+    return response.data;
+  },
+
+  async repromptImage(
+    data: PromptEngineerRepromptRequest
+  ): Promise<PromptEngineerRepromptResponse> {
+    const response = await api.post<PromptEngineerRepromptResponse>(
+      '/prompt-engineer/reprompt/',
+      data
+    );
+    return response.data;
+  },
+
+  // Copy Overlay
+  async generateCopySuggestions(
+    data: CopyOverlayGenerateRequest
+  ): Promise<CopyOverlayGenerateResponse> {
+    const response = await api.post<CopyOverlayGenerateResponse>(
+      '/copy-overlay/generate-text/',
+      data
+    );
+    return response.data;
+  },
+
+  async applyCopyOverlay(
+    assetId: number,
+    data: CopyOverlayApplyRequest
+  ): Promise<CopyOverlayApplyResponse> {
+    const response = await api.post<CopyOverlayApplyResponse>(
+      `/assets/${assetId}/copy-overlay/`,
+      data
+    );
+    return response.data;
+  },
+
+  async generateAIStyles(
+    assetId: number,
+    data: AIStylesRequest
+  ): Promise<AIStylesResponse> {
+    const response = await api.post<AIStylesResponse>(
+      `/assets/${assetId}/copy-overlay/ai-styles/`,
+      data
+    );
+    return response.data;
   },
 };
 

@@ -312,7 +312,12 @@ class ImageGeneration(models.Model):
     product_position = models.CharField(max_length=20, choices=PRODUCT_POSITION_CHOICES, default='center', help_text="Product placement in scene")
     product_scale = models.IntegerField(default=50, help_text="Product size as percentage (20-90)")
     composited_image = models.ImageField(upload_to=generated_image_path, blank=True, null=True, help_text="Final composited image with product")
-    
+
+    # Copy Overlay
+    copy_overlay_image = models.ImageField(upload_to=generated_image_path, blank=True, null=True, help_text="Image with copy text overlay applied")
+    copy_overlay_text = models.CharField(max_length=200, blank=True, default='', help_text="The copy text overlaid on the image")
+    copy_overlay_settings = models.JSONField(blank=True, null=True, help_text="Overlay styling settings (position, font, color, etc.)")
+
     # Advanced Options
     seed = models.IntegerField(blank=True, null=True, help_text="Seed for reproducibility")
     enhance_prompt = models.BooleanField(default=True, help_text="AI-enhance the prompt")
@@ -338,6 +343,12 @@ class ImageGeneration(models.Model):
         ('macro', 'Macro'),
     ])
     
+    # Prompt Engineering metadata
+    brand_style_anchor = models.TextField(blank=True, null=True, help_text="Reusable brand visual DNA summary")
+    prompt_engineering_used = models.BooleanField(default=False, help_text="Whether 9-layer prompt engineering was applied")
+    failure_codes = models.JSONField(blank=True, null=True, help_text="Failure taxonomy codes e.g. ['C1','L2']")
+    reprompt_attempt = models.IntegerField(default=0, help_text="Re-prompt attempt number (max 3)")
+
     # Output
     generated_image = models.ImageField(upload_to=generated_image_path, blank=True, null=True)
     generated_image_with_logo = models.ImageField(upload_to=generated_image_path, blank=True, null=True)
@@ -363,6 +374,8 @@ class ImageGeneration(models.Model):
         return f"{self.title} - {self.user.username} ({self.provider})"
     
     def get_display_image(self):
+        if self.copy_overlay_image:
+            return self.copy_overlay_image
         if self.composited_image:
             return self.composited_image
         if self.generated_image_with_logo:

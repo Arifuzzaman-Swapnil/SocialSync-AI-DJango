@@ -100,6 +100,7 @@ class AIReplyToCommentView(APIView):
         # Build context
         post = comment.post
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
         brand_voice = ''
         if post.brand and post.brand.voice_tone:
             brand_voice = f"Brand voice: {post.brand.voice_tone}"
@@ -134,7 +135,8 @@ Post caption: {(post.caption or '')[:300]}
                 {"role": "user", "content": prompt},
             ],
             temperature=0.7,
-            max_tokens=200,
+            max_tokens=500 if think_harder else 400,
+            thinking_budget=10000 if think_harder else 0,
         )
         if result.success:
             ai_reply = result.content.strip().strip('"')

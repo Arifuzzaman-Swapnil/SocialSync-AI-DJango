@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 MAX_ALT_TEXT_LENGTH = 125
 
 
-def generate_alt_text(image_generation, api_key=None, user=None):
+def generate_alt_text(image_generation, api_key=None, user=None, think_harder=False):
     """Generate accessibility alt text for an image using LLM vision.
 
     Args:
@@ -62,7 +62,8 @@ Generate accessible alt text for an image.
         result = service.chat_completion(
             messages=messages,
             temperature=0.3,
-            max_tokens=100,
+            max_tokens=300 if think_harder else 150,
+            thinking_budget=10000 if think_harder else 0,
         )
 
         if not result.success:

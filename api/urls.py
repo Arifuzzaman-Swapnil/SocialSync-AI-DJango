@@ -166,6 +166,9 @@ urlpatterns = [
     # Support Chat
     path('support-chat/', views.SupportChatView.as_view(), name='api-support-chat'),
 
+    # API Test
+    path('test-claude/', views.TestClaudeAPIView.as_view(), name='api-test-claude'),
+
     # ============================
     # V1.2.1 NEW ENDPOINTS
     # ============================
@@ -258,6 +261,16 @@ urlpatterns = [
 
     # Clone Draft (V1.2.1)
     path('drafts/<int:post_id>/clone/', creative_views.CloneDraftView.as_view(), name='api-clone-draft'),
+
+    # Prompt Engineering
+    path('prompt-engineer/generate/', creative_views.PromptEngineerGenerateView.as_view(), name='api-prompt-engineer-generate'),
+    path('prompt-engineer/diagnose/', creative_views.PromptEngineerDiagnoseView.as_view(), name='api-prompt-engineer-diagnose'),
+    path('prompt-engineer/reprompt/', creative_views.PromptEngineerRepromptView.as_view(), name='api-prompt-engineer-reprompt'),
+
+    # Copy Overlay (V1.2.2)
+    path('copy-overlay/generate-text/', creative_views.GenerateCopyOverlayTextView.as_view(), name='api-copy-overlay-generate'),
+    path('assets/<int:asset_id>/copy-overlay/', creative_views.ApplyCopyOverlayView.as_view(), name='api-apply-copy-overlay'),
+    path('assets/<int:asset_id>/copy-overlay/ai-styles/', creative_views.GenerateAIStylesView.as_view(), name='api-copy-overlay-ai-styles'),
 
     # Notifications (V1.2.1)
     path('notifications/', notification_views.NotificationListView.as_view(), name='api-notifications'),

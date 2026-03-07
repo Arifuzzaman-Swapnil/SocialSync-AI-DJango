@@ -42,6 +42,12 @@ import type {
 } from '../types';
 import { authFetch } from '../services/api';
 import { PromptInfoButton } from '../components/ui/PromptInfoButton';
+import { PromptPreviewPanel } from '../components/ai-image/PromptPreviewPanel';
+import { ImageDiagnosisModal } from '../components/ai-image/ImageDiagnosisModal';
+import { RepromptPanel } from '../components/ai-image/RepromptPanel';
+import onboardingService from '../services/onboardingService';
+import type { Brand } from '../types';
+import type { PromptEngineerDiagnoseResponse } from '../types/promptEngineering';
 
 // Style options
 const styles: { id: ImageStyle; label: string }[] = [
@@ -171,6 +177,20 @@ export function AIImagePage() {
   const [openaiImagesGenerated, setOpenaiImagesGenerated] = useState(0);
   const [geminiImagesGenerated, setGeminiImagesGenerated] = useState(0);
 
+  // Brand & prompt engineering state
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
+  const [showPromptPreview, setShowPromptPreview] = useState(false);
+  const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false);
+  const [currentDiagnosis, setCurrentDiagnosis] = useState<PromptEngineerDiagnoseResponse | null>(null);
+  const [showRepromptPanel, setShowRepromptPanel] = useState(false);
+
+  const canUsePromptEngineering = !!(
+    selectedBrand?.brand_dna &&
+    Object.keys(selectedBrand.brand_dna).length > 0 &&
+    enhancePrompt
+  );
+
   // Logo upload state
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [newLogoName, setNewLogoName] = useState('');
@@ -184,6 +204,20 @@ export function AIImagePage() {
     if (activeTab === 'templates') fetchTemplates();
     if (activeTab === 'settings') fetchSettings();
   }, [activeTab]);
+
+  useEffect(() => {
+    const loadBrands = async () => {
+      try {
+        const brandList = await onboardingService.getBrands();
+        setBrands(brandList);
+        const primary = brandList.find((b: Brand) => b.is_primary) || brandList[0];
+        if (primary) setSelectedBrand(primary);
+      } catch (err) {
+        console.error('Failed to fetch brands:', err);
+      }
+    };
+    loadBrands();
+  }, []);
 
   const fetchHistory = async () => {
     setIsLoading(true);
@@ -481,6 +515,36 @@ export function AIImagePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Input Section */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Brand Context */}
+            {brands.length > 0 && (
+              <Card>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-text-primary text-sm">Brand Context</h3>
+                    <p className="text-xs text-text-muted">Used for AI prompt engineering</p>
+                  </div>
+                  {brands.length > 1 ? (
+                    <select
+                      value={selectedBrand?.id || ''}
+                      onChange={(e) => {
+                        const brand = brands.find(b => b.id === Number(e.target.value));
+                        setSelectedBrand(brand || null);
+                      }}
+                      className="px-3 py-2 bg-dark-700 border border-white/10 rounded-xl text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    >
+                      {brands.map(b => (
+                        <option key={b.id} value={b.id}>{b.brand_name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-lg text-purple-400 text-xs font-medium">
+                      {selectedBrand?.brand_name}
+                    </span>
+                  )}
+                </div>
+              </Card>
+            )}
+
             {/* Title & Prompt */}
             <Card>
               <div className="space-y-4">
@@ -871,6 +935,40 @@ export function AIImagePage() {
               )}
             </AnimatePresence>
 
+            {/* Prompt Preview */}
+            {canUsePromptEngineering && prompt.trim() && !showPromptPreview && (
+              <Button
+                fullWidth
+                size="md"
+                variant="secondary"
+                onClick={() => setShowPromptPreview(true)}
+                leftIcon={<EyeIcon className="w-5 h-5" />}
+              >
+                Preview Engineered Prompt
+              </Button>
+            )}
+
+            <AnimatePresence>
+              {showPromptPreview && canUsePromptEngineering && prompt.trim() && (
+                <PromptPreviewPanel
+                  brandId={selectedBrand!.id}
+                  subject={prompt}
+                  platform="instagram"
+                  mood={selectedStyle}
+                  onUsePrompt={(p) => {
+                    setPrompt(p);
+                    setEnhancePrompt(false);
+                    setShowPromptPreview(false);
+                  }}
+                  onGenerateWithPrompt={(p) => {
+                    setShowPromptPreview(false);
+                    handleImageRegenerate(p);
+                  }}
+                  onClose={() => setShowPromptPreview(false)}
+                />
+              )}
+            </AnimatePresence>
+
             {/* Generate Button */}
             <Button
               fullWidth
@@ -959,6 +1057,20 @@ export function AIImagePage() {
                       <p className="text-xs text-text-muted">Time</p>
                     </div>
                   </div>
+
+                  {/* Diagnose Issues */}
+                  {generatedImage.status === 'completed' && selectedBrand && (
+                    <div className="pt-3 border-t border-white/5 text-center">
+                      <p className="text-xs text-text-muted mb-2">Not happy with the result?</p>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setDiagnosisModalOpen(true)}
+                      >
+                        Diagnose Issues
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -969,8 +1081,40 @@ export function AIImagePage() {
                 </div>
               )}
             </Card>
+
+            {/* Re-prompt Panel */}
+            {showRepromptPanel && generatedImage && selectedBrand && (
+              <RepromptPanel
+                generatedImage={generatedImage}
+                brandId={selectedBrand.id}
+                diagnosis={currentDiagnosis || undefined}
+                onRegenerate={(correctedPrompt) => {
+                  handleImageRegenerate(correctedPrompt);
+                  setShowRepromptPanel(false);
+                  setCurrentDiagnosis(null);
+                }}
+                onClose={() => {
+                  setShowRepromptPanel(false);
+                  setCurrentDiagnosis(null);
+                }}
+              />
+            )}
           </div>
         </div>
+      )}
+
+      {/* Diagnosis Modal */}
+      {generatedImage && (
+        <ImageDiagnosisModal
+          isOpen={diagnosisModalOpen}
+          onClose={() => setDiagnosisModalOpen(false)}
+          generatedImage={generatedImage}
+          onStartReprompt={(diagnosis) => {
+            setCurrentDiagnosis(diagnosis);
+            setShowRepromptPanel(true);
+            setDiagnosisModalOpen(false);
+          }}
+        />
       )}
 
       {/* History Tab */}

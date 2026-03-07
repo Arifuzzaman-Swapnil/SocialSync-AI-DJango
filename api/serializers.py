@@ -637,12 +637,14 @@ class ImageGenerationSerializer(serializers.ModelSerializer):
             'style', 'size', 'quality', 'logo', 'logo_position', 'logo_size', 'logo_opacity',
             'product_image', 'product_position', 'product_scale', 'composited_image',
             'seed', 'enhance_prompt', 'add_lighting', 'camera_angle',
+            'brand_style_anchor', 'prompt_engineering_used', 'failure_codes', 'reprompt_attempt',
             'generated_image', 'generated_image_with_logo', 'enhanced_prompt', 'revised_prompt',
             'processing_time', 'status', 'error_message',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'generated_image', 'generated_image_with_logo',
                            'enhanced_prompt', 'revised_prompt', 'processing_time',
+                           'brand_style_anchor', 'prompt_engineering_used', 'failure_codes', 'reprompt_attempt',
                            'status', 'error_message', 'created_at', 'updated_at']
 
 
@@ -736,7 +738,7 @@ class VideoGenerationSerializer(serializers.ModelSerializer):
             'duration', 'resolution', 'aspect_ratio', 'fps',
             'camera_motion', 'motion_intensity',
             'logo', 'logo_position', 'logo_size', 'logo_opacity',
-            'seed', 'enhance_prompt',
+            'seed', 'enhance_prompt', 'reference_image',
             'generated_video', 'generated_video_with_logo', 'thumbnail', 'enhanced_prompt',
             'processing_time', 'file_size', 'status', 'error_message',
             'created_at', 'updated_at',
@@ -1689,3 +1691,64 @@ class AssignRoleSerializer(serializers.Serializer):
 class RemoveRoleSerializer(serializers.Serializer):
     user_id = serializers.IntegerField()
     role = serializers.ChoiceField(choices=['admin', 'creator', 'approver', 'publisher', 'viewer'])
+
+
+# ─── Prompt Engineering Serializers ─────────────────────────
+
+class PromptEngineerGenerateSerializer(serializers.Serializer):
+    """Input for generating an optimized image prompt"""
+    brand_id = serializers.IntegerField()
+    subject = serializers.CharField()
+    platform = serializers.CharField(default='instagram')
+    mood = serializers.CharField(required=False, default='')
+    key_message = serializers.CharField(required=False, default='')
+    must_include = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    must_exclude = serializers.ListField(child=serializers.CharField(), required=False, default=list)
+    text_overlay_position = serializers.CharField(required=False, default='')
+
+
+class PromptEngineerDiagnoseSerializer(serializers.Serializer):
+    """Input for diagnosing a failed image"""
+    image_description = serializers.CharField()
+    original_prompt = serializers.CharField()
+    revised_prompt = serializers.CharField(required=False, default='')
+
+
+class PromptEngineerRepromptSerializer(serializers.Serializer):
+    """Input for re-prompting a failed image"""
+    brand_id = serializers.IntegerField()
+    original_prompt = serializers.CharField()
+    failure_description = serializers.CharField()
+    attempt_number = serializers.IntegerField(default=1)
+
+
+# ── Copy Overlay (V1.2.2) ──────────────────────────────────
+
+class CopyOverlayGenerateSerializer(serializers.Serializer):
+    """Input for generating AI copy suggestions for image overlay"""
+    brand_id = serializers.IntegerField(required=False)
+    caption_text = serializers.CharField(required=False, default='')
+    image_description = serializers.CharField(required=False, default='')
+    cta_text = serializers.CharField(required=False, default='')
+    count = serializers.IntegerField(required=False, default=5, min_value=1, max_value=10)
+
+
+class CopyOverlayApplySerializer(serializers.Serializer):
+    """Input for applying text overlay on an image"""
+    copy_text = serializers.CharField(max_length=200)
+    position = serializers.ChoiceField(
+        choices=['center', 'bottom_banner', 'top_banner', 'top_bottom_split'],
+        default='bottom_banner',
+    )
+    font_style = serializers.ChoiceField(
+        choices=['montserrat_bold', 'montserrat_regular', 'playfair_bold', 'roboto_bold', 'bebas_neue'],
+        default='montserrat_bold',
+    )
+    text_color = serializers.CharField(default='#FFFFFF', max_length=7)
+    overlay_opacity = serializers.IntegerField(default=60, min_value=0, max_value=100)
+    font_size = serializers.IntegerField(default=0, min_value=0, max_value=200)
+    text_alignment = serializers.ChoiceField(
+        choices=['left', 'center', 'right'],
+        default='center',
+    )
+    add_text_shadow = serializers.BooleanField(default=True)

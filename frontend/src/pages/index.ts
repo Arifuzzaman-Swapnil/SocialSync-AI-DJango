@@ -28,3 +28,6 @@ export { PermissionsPage } from './PermissionsPage';
 // V1.3 pages
 export { OverflowPage } from './OverflowPage';
 export { IdeaHistoryPage } from './IdeaHistoryPage';
+
+// Dev / Test
+export { APITestPage } from './APITestPage';

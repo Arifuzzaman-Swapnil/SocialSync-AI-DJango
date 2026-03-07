@@ -22,7 +22,7 @@ PLATFORM_LIMITS = {
 }
 
 
-def generate_hashtags(post, platform, api_key=None, count=None, topic=None, override_prompt=None, user=None):
+def generate_hashtags(post, platform, api_key=None, count=None, topic=None, override_prompt=None, user=None, think_harder=False):
     """Generate hashtags for a post using LLM with tier distribution.
 
     Returns tuple of (list of created PostHashtag objects, used_prompt string).
@@ -116,8 +116,9 @@ Caption: {caption_text[:500]}
         result = service.chat_completion(
             messages=messages,
             temperature=0.7,
-            max_tokens=1000,
+            max_tokens=2000 if think_harder else 1500,
             response_format={"type": "json_object"},
+            thinking_budget=10000 if think_harder else 0,
         )
 
         if not result.success:

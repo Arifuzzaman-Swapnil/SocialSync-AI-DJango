@@ -227,12 +227,43 @@ class DraftAssetGenerateView(APIView):
             status='pending',
         )
 
+        # 9-layer prompt engineering via Claude (if brand available)
+        final_prompt = prompt
+        brand = None
+        try:
+            from brands.models import Brand
+            brand = Brand.objects.filter(user=request.user, is_primary=True).first()
+        except Exception:
+            pass
+
+        if brand and brand.brand_dna:
+            try:
+                from ai_image.services.prompt_engineering_service import ImagePromptEngineerService
+                pe_service = ImagePromptEngineerService()
+                pe_result = pe_service.generate_image_prompt(
+                    brand=brand,
+                    content_context={
+                        'subject': prompt,
+                        'key_message': (post.caption or '')[:200],
+                        'mood': style,
+                    },
+                    platform='instagram',
+                    user=request.user,
+                )
+                if pe_result and pe_result.get('primary_prompt'):
+                    final_prompt = pe_result['primary_prompt']
+                    asset.brand_style_anchor = pe_result.get('brand_style_anchor', '')
+                    asset.prompt_engineering_used = True
+                    asset.save()
+            except Exception as pe_err:
+                logger.warning(f"Prompt engineering skipped for draft asset: {pe_err}")
+
         # Trigger generation (async in production, inline here)
         try:
             client = openai.OpenAI(api_key=api_key)
             response = client.images.generate(
                 model='dall-e-3',
-                prompt=prompt,
+                prompt=final_prompt,
                 size=size if size in ('1024x1024', '1024x1792', '1792x1024') else '1024x1024',
                 quality='standard',
                 n=1,
@@ -598,3 +629,324 @@ class CarouselSplitView(APIView):
             'total_slides': len(slides),
             'slides': created_assets,
         }, status=status.HTTP_201_CREATED)
+
+
+# ═══════════════════════════════════════════════════════════
+# Prompt Engineering API Views
+# ═══════════════════════════════════════════════════════════
+
+class PromptEngineerGenerateView(APIView):
+    """Generate an optimized 9-layer image prompt using Claude"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from api.serializers import PromptEngineerGenerateSerializer
+        from brands.models import Brand
+        from ai_image.services.prompt_engineering_service import ImagePromptEngineerService
+
+        serializer = PromptEngineerGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            brand = Brand.objects.get(id=data['brand_id'], user=request.user)
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not brand.brand_dna:
+            return Response({'error': 'Brand DNA not generated yet. Generate Brand DNA first.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        think_harder = request.data.get('think_harder', False)
+        pe_service = ImagePromptEngineerService()
+        result = pe_service.generate_image_prompt(
+            brand=brand,
+            content_context={
+                'subject': data['subject'],
+                'key_message': data.get('key_message', ''),
+                'mood': data.get('mood', ''),
+                'must_include': data.get('must_include', []),
+                'must_exclude': data.get('must_exclude', []),
+                'text_overlay_position': data.get('text_overlay_position', ''),
+            },
+            platform=data.get('platform', 'instagram'),
+            user=request.user,
+            think_harder=think_harder,
+        )
+
+        if result:
+            return Response(result)
+        return Response({'error': 'Failed to generate prompt'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PromptEngineerDiagnoseView(APIView):
+    """Diagnose why an AI-generated image failed"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from api.serializers import PromptEngineerDiagnoseSerializer
+        from ai_image.services.prompt_engineering_service import ImagePromptEngineerService
+
+        serializer = PromptEngineerDiagnoseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        think_harder = request.data.get('think_harder', False)
+        pe_service = ImagePromptEngineerService()
+        result = pe_service.diagnose_failure(
+            image_description=data['image_description'],
+            original_prompt=data['original_prompt'],
+            revised_prompt=data.get('revised_prompt', ''),
+            user=request.user,
+            think_harder=think_harder,
+        )
+
+        if result:
+            return Response(result)
+        return Response({'error': 'Failed to diagnose'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PromptEngineerRepromptView(APIView):
+    """Fix a failed image with targeted correction patches"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from api.serializers import PromptEngineerRepromptSerializer
+        from brands.models import Brand
+        from ai_image.services.prompt_engineering_service import ImagePromptEngineerService
+
+        serializer = PromptEngineerRepromptSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            brand = Brand.objects.get(id=data['brand_id'], user=request.user)
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        think_harder = request.data.get('think_harder', False)
+        pe_service = ImagePromptEngineerService()
+        result = pe_service.reprompt_image(
+            original_prompt=data['original_prompt'],
+            failure_description=data['failure_description'],
+            brand=brand,
+            attempt_number=data.get('attempt_number', 1),
+            user=request.user,
+            think_harder=think_harder,
+        )
+
+        if result:
+            return Response(result)
+        return Response({'error': 'Failed to generate corrected prompt'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ═══════════════════════════════════════════════════════════
+# Copy Overlay (V1.2.2) — Text overlay on images
+# ═══════════════════════════════════════════════════════════
+
+class GenerateCopyOverlayTextView(APIView):
+    """Generate AI copy suggestions for image text overlay"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from api.serializers import CopyOverlayGenerateSerializer
+        from ai_image.services.copy_generation_service import generate_copy_suggestions
+
+        serializer = CopyOverlayGenerateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Build brand context
+        brand_context = {}
+        if data.get('brand_id'):
+            from brands.models import Brand
+            try:
+                brand = Brand.objects.get(id=data['brand_id'], user=request.user)
+                brand_context = {
+                    'brand_name': brand.brand_name,
+                    'industry': brand.industry or '',
+                    'target_audience': str(getattr(brand, 'audiences', '') or ''),
+                    'voice_tone': getattr(brand, 'voice_tone', '') or '',
+                }
+            except Brand.DoesNotExist:
+                pass
+
+        suggestions = generate_copy_suggestions(
+            user=request.user,
+            caption_text=data.get('caption_text', ''),
+            brand_context=brand_context,
+            image_description=data.get('image_description', ''),
+            cta_text=data.get('cta_text', ''),
+            count=data.get('count', 5),
+        )
+
+        return Response({'suggestions': suggestions})
+
+
+class ApplyCopyOverlayView(APIView):
+    """Render text overlay on an image and return the result"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, asset_id):
+        from api.serializers import CopyOverlayApplySerializer
+        from ai_image.services.copy_overlay_service import render_copy_overlay
+        from django.core.files.base import ContentFile
+        import requests as http_requests
+
+        try:
+            asset = ImageGeneration.objects.get(id=asset_id, user=request.user)
+        except ImageGeneration.DoesNotExist:
+            return Response({'error': 'Asset not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = CopyOverlayApplySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        # Get source image bytes — try file field first, then URL
+        image_data = None
+        source_field = asset.composited_image or asset.generated_image_with_logo or asset.generated_image
+        if source_field:
+            try:
+                source_field.open('rb')
+                image_data = source_field.read()
+                source_field.close()
+            except Exception as e:
+                logger.warning(f"Failed to read image file: {e}")
+
+        # Fallback: try to fetch from URL if file read failed
+        if not image_data and asset.enhanced_prompt and asset.enhanced_prompt.startswith('http'):
+            try:
+                resp = http_requests.get(asset.enhanced_prompt, timeout=30)
+                if resp.status_code == 200:
+                    image_data = resp.content
+            except Exception as e:
+                logger.warning(f"Failed to fetch image from URL: {e}")
+
+        if not image_data:
+            return Response({'error': 'No source image available'}, status=status.HTTP_400_BAD_REQUEST)
+
+        result_bytes = render_copy_overlay(
+            image_data=image_data,
+            copy_text=data['copy_text'],
+            position=data.get('position', 'bottom_banner'),
+            font_style=data.get('font_style', 'montserrat_bold'),
+            text_color=data.get('text_color', '#FFFFFF'),
+            overlay_opacity=data.get('overlay_opacity', 60),
+            font_size_override=data.get('font_size', 0),
+            text_alignment=data.get('text_alignment', 'center'),
+            add_text_shadow=data.get('add_text_shadow', True),
+        )
+
+        if result_bytes is None:
+            return Response({'error': 'Failed to render overlay'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        # Save to model
+        filename = f"copy_overlay_{asset.id}.png"
+        asset.copy_overlay_image.save(filename, ContentFile(result_bytes), save=False)
+        asset.copy_overlay_text = data['copy_text']
+        asset.copy_overlay_settings = {
+            'position': data.get('position', 'bottom_banner'),
+            'font_style': data.get('font_style', 'montserrat_bold'),
+            'text_color': data.get('text_color', '#FFFFFF'),
+            'overlay_opacity': data.get('overlay_opacity', 60),
+            'font_size': data.get('font_size', 0),
+            'text_alignment': data.get('text_alignment', 'center'),
+            'add_text_shadow': data.get('add_text_shadow', True),
+        }
+        asset.save()
+
+        return Response({
+            'asset_id': asset.id,
+            'overlay_image_url': asset.copy_overlay_image.url if asset.copy_overlay_image else None,
+        })
+
+
+class GenerateAIStylesView(APIView):
+    """Generate multiple AI-designed typography style variants for copy overlay"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, asset_id):
+        from ai_image.services.copy_generation_service import generate_ai_styles
+        from ai_image.services.copy_overlay_service import render_copy_overlay
+        from django.core.files.base import ContentFile
+        import requests as http_requests
+        import base64
+
+        try:
+            asset = ImageGeneration.objects.get(id=asset_id, user=request.user)
+        except ImageGeneration.DoesNotExist:
+            return Response({'error': 'Asset not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        copy_text = request.data.get('copy_text', '').strip()
+        if not copy_text:
+            return Response({'error': 'copy_text is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Build brand context
+        brand_context = {}
+        brand_id = request.data.get('brand_id')
+        if brand_id:
+            from brands.models import Brand
+            try:
+                brand = Brand.objects.get(id=brand_id, user=request.user)
+                brand_context = {
+                    'brand_name': brand.brand_name,
+                    'industry': brand.industry or '',
+                }
+            except Brand.DoesNotExist:
+                pass
+
+        # Step 1: Get source image bytes
+        image_data = None
+        source_field = asset.composited_image or asset.generated_image_with_logo or asset.generated_image
+        if source_field:
+            try:
+                source_field.open('rb')
+                image_data = source_field.read()
+                source_field.close()
+            except Exception as e:
+                logger.warning(f"Failed to read image file: {e}")
+
+        if not image_data and asset.enhanced_prompt and asset.enhanced_prompt.startswith('http'):
+            try:
+                resp = http_requests.get(asset.enhanced_prompt, timeout=30)
+                if resp.status_code == 200:
+                    image_data = resp.content
+            except Exception as e:
+                logger.warning(f"Failed to fetch image from URL: {e}")
+
+        if not image_data:
+            return Response({'error': 'No source image available'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Step 2: AI generates 4 different style configs
+        styles = generate_ai_styles(
+            user=request.user,
+            copy_text=copy_text,
+            brand_context=brand_context,
+            count=4,
+        )
+
+        # Step 3: Render each style variant with Pillow
+        variants = []
+        for i, style in enumerate(styles):
+            rendered = render_copy_overlay(
+                image_data=image_data,
+                copy_text=copy_text,
+                position=style.get('position', 'bottom_banner'),
+                font_style=style.get('font_style', 'montserrat_bold'),
+                text_color=style.get('text_color', '#FFFFFF'),
+                overlay_opacity=style.get('overlay_opacity', 60),
+                font_size_override=0,
+                text_alignment=style.get('text_alignment', 'center'),
+                add_text_shadow=style.get('add_text_shadow', True),
+            )
+            if rendered:
+                # Return as base64 data URL for preview (no save to disk yet)
+                b64 = base64.b64encode(rendered).decode('utf-8')
+                variants.append({
+                    'index': i,
+                    'name': style.get('name', f'Style {i+1}'),
+                    'description': style.get('description', ''),
+                    'preview': f'data:image/png;base64,{b64}',
+                    'settings': style,
+                })
+
+        return Response({'variants': variants})

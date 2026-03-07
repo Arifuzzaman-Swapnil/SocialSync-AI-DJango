@@ -61,8 +61,8 @@ class BrandDNAService:
 
                 soup = BeautifulSoup(response.text, 'html.parser')
 
-                # Remove script, style, nav, footer, header tags
-                for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'noscript', 'iframe']):
+                # Remove script, style, and non-content tags (keep nav, footer, header for full content)
+                for tag in soup(['script', 'style', 'noscript', 'iframe']):
                     tag.decompose()
 
                 # Get page title
@@ -112,19 +112,9 @@ class BrandDNAService:
         return pages
 
     def _should_skip_url(self, url: str) -> bool:
-        """Skip URLs that are unlikely to contain useful content."""
-        skip_extensions = (
-            '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp',
-            '.mp3', '.mp4', '.avi', '.zip', '.tar', '.gz',
-            '.css', '.js', '.xml', '.json', '.ico'
-        )
-        skip_patterns = (
-            '/login', '/signup', '/register', '/cart', '/checkout',
-            '/admin', '/wp-admin', '/feed', '/rss'
-        )
-        lower_url = url.lower()
-        return (any(lower_url.endswith(ext) for ext in skip_extensions)
-                or any(pattern in lower_url for pattern in skip_patterns))
+        """Skip only non-HTML asset files."""
+        skip_extensions = ('.css', '.js', '.zip', '.tar', '.gz', '.ico')
+        return url.lower().endswith(skip_extensions)
 
     def _clean_text(self, text: str) -> str:
         """Clean extracted text."""

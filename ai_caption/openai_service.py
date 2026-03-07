@@ -150,7 +150,7 @@ general | facebook | instagram | twitter | linkedin | tiktok | youtube | pintere
     
     def generate_from_text(self, topic, tone='professional', length='medium', platform='general',
                            include_hashtags=True, include_emojis=True, include_cta=True,
-                           custom_instructions=None, override_prompt=None):
+                           custom_instructions=None, override_prompt=None, think_harder=False):
         """
         Generate caption from text/topic
         
@@ -209,7 +209,8 @@ Generate the caption now."""
                 ],
                 model="gpt-4o",
                 temperature=0.8,
-                max_tokens=500,
+                max_tokens=1500 if think_harder else 800,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -218,7 +219,7 @@ Generate the caption now."""
             caption = result.content.strip()
             tokens_used = result.tokens_used
             processing_time = time.time() - start_time
-            
+
             # Extract hashtags if present
             hashtags = ""
             if include_hashtags and '#' in caption:
@@ -400,7 +401,7 @@ Examine the image systematically. For each aspect, provide specific observations
     def generate_from_image(self, image_path, additional_context=None, tone='professional',
                             length='medium', platform='general', include_hashtags=True,
                             include_emojis=True, include_cta=True, custom_instructions=None,
-                            override_prompt=None):
+                            override_prompt=None, think_harder=False):
         """
         Generate caption from image using GPT-4o Vision
         
@@ -472,7 +473,8 @@ CAPTION: [The generated social media caption]
                 ],
                 model="gpt-4o",
                 temperature=0.8,
-                max_tokens=800,
+                max_tokens=1500 if think_harder else 800,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -481,11 +483,11 @@ CAPTION: [The generated social media caption]
             full_response = result.content.strip()
             tokens_used = result.tokens_used
             processing_time = time.time() - start_time
-            
+
             # Parse response
             analysis = ""
             caption = full_response
-            
+
             if "ANALYSIS:" in full_response and "CAPTION:" in full_response:
                 parts = full_response.split("CAPTION:")
                 analysis = parts[0].replace("ANALYSIS:", "").strip()
@@ -521,7 +523,7 @@ CAPTION: [The generated social media caption]
     def generate_from_video(self, video_path, additional_context=None, tone='professional',
                             length='medium', platform='general', include_hashtags=True,
                             include_emojis=True, include_cta=True, custom_instructions=None,
-                            override_prompt=None):
+                            override_prompt=None, think_harder=False):
         """
         Generate caption from video by extracting and analyzing frames
         
@@ -608,7 +610,8 @@ CAPTION: [The generated social media caption]
                 ],
                 model="gpt-4o",
                 temperature=0.8,
-                max_tokens=800,
+                max_tokens=1500 if think_harder else 800,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -617,7 +620,7 @@ CAPTION: [The generated social media caption]
             full_response = result.content.strip()
             tokens_used = result.tokens_used
             processing_time = time.time() - start_time
-            
+
             # Cleanup temp files
             if temp_dir:
                 import shutil
@@ -663,7 +666,7 @@ CAPTION: [The generated social media caption]
 
     def regenerate_with_feedback(self, original_caption, feedback, tone='professional',
                                   platform='general', include_hashtags=True,
-                                  include_emojis=True, include_cta=True):
+                                  include_emojis=True, include_cta=True, think_harder=False):
         """
         Regenerate caption based on user feedback
         
@@ -712,7 +715,8 @@ Think step by step:
                 ],
                 model="gpt-4o",
                 temperature=0.8,
-                max_tokens=500,
+                max_tokens=1500 if think_harder else 500,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -750,7 +754,7 @@ Think step by step:
 
     def generate_multiple_variations(self, topic_or_analysis, num_variations=3, tone='professional',
                                       length='medium', platform='general', include_hashtags=True,
-                                      include_emojis=True, include_cta=True):
+                                      include_emojis=True, include_cta=True, think_harder=False):
         """
         Generate multiple caption variations at once
         
@@ -814,7 +818,8 @@ Generate {num_variations} distinct captions now."""
                 ],
                 model="gpt-4o",
                 temperature=0.9,
-                max_tokens=1000,
+                max_tokens=2000 if think_harder else 1000,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -823,7 +828,7 @@ Generate {num_variations} distinct captions now."""
             full_response = result.content.strip()
             tokens_used = result.tokens_used
             processing_time = time.time() - start_time
-            
+
             # Parse variations
             captions = []
             lines = full_response.split('\n')

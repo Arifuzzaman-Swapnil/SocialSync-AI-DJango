@@ -1196,6 +1196,7 @@ def refine_image_prompt(request):
         user_prompt = request.data.get('user_prompt', '')
         style = request.data.get('style', '')
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         if not user_prompt:
             return Response(
@@ -1254,7 +1255,8 @@ def refine_image_prompt(request):
                 {"role": "user", "content": user_message},
             ],
             temperature=0.7,
-            max_tokens=300,
+            max_tokens=600 if think_harder else 300,
+            thinking_budget=10000 if think_harder else 0,
         )
         if not result.success:
             return Response({'error': result.error}, status=status.HTTP_400_BAD_REQUEST)
@@ -1396,6 +1398,44 @@ def generate_image(request):
                 gen_negative = get_product_negative_prompt(negative_prompt)
             except ImportError:
                 pass
+
+        # 9-layer prompt engineering via Claude (if brand available + enhance enabled)
+        brand = None
+        brand_id = request.data.get('brand_id')
+        if brand_id:
+            try:
+                brand = Brand.objects.get(id=int(brand_id), user=request.user)
+            except (Brand.DoesNotExist, ValueError, TypeError):
+                pass
+        if not brand:
+            brand = Brand.objects.filter(user=request.user, is_primary=True).first()
+
+        if brand and enhance and brand.brand_dna:
+            try:
+                from ai_image.services.prompt_engineering_service import ImagePromptEngineerService
+                pe_service = ImagePromptEngineerService()
+                platform = request.data.get('platform', 'instagram')
+                pe_result = pe_service.generate_image_prompt(
+                    brand=brand,
+                    content_context={
+                        'subject': gen_prompt,
+                        'key_message': '',
+                        'mood': style,
+                        'must_include': [],
+                        'must_exclude': [x.strip() for x in (gen_negative or '').split(',') if x.strip()],
+                        'text_overlay_position': request.data.get('text_overlay_position', ''),
+                    },
+                    platform=platform,
+                    user=request.user,
+                )
+                if pe_result and pe_result.get('primary_prompt'):
+                    gen_prompt = pe_result['primary_prompt']
+                    generation.brand_style_anchor = pe_result.get('brand_style_anchor', '')
+                    generation.prompt_engineering_used = True
+                    generation.save()
+            except Exception as pe_err:
+                import logging
+                logging.getLogger(__name__).warning(f"Prompt engineering skipped: {pe_err}")
 
         # Get image service with centralized API keys
         service = ImageService(
@@ -1597,11 +1637,12 @@ def generate_video(request):
         logo_size = int(request.data.get('logo_size', 10))
         logo_opacity = int(request.data.get('logo_opacity', 100))
 
-        # Reference image
+        # Reference image (product photo for image-to-video)
         reference_file = request.FILES.get('reference_image')
         reference_image_data = None
         if reference_file:
             reference_image_data = reference_file.read()
+            reference_file.seek(0)  # Reset for saving to model
 
         # Advanced settings
         camera_motion = request.data.get('camera_motion', '')
@@ -1639,6 +1680,10 @@ def generate_video(request):
             seed=seed,
             status='processing'
         )
+
+        # Save reference image to model for history
+        if reference_file:
+            generation.reference_image.save(reference_file.name, reference_file, save=True)
 
         # Generate video
         api_key = video_settings.get_gemini_api_key()
@@ -2983,6 +3028,7 @@ class GenerateBrandDNAView(APIView):
         service = get_llm_service(request.user)
 
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         try:
             from api.strategy_views import _crawl_site_pages, _fetch_page_content
@@ -3066,7 +3112,8 @@ Return ONLY a single JSON object with all 15 fields as keys.
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.3,
-                max_tokens=2500,
+                max_tokens=5000 if think_harder else 2500,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -3214,6 +3261,7 @@ class RegenerateBrandDNAFromInputsView(APIView):
         source = 'manual'
         used_prompt = ''
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         if use_ai:
             service = get_llm_service(request.user)
@@ -3247,7 +3295,8 @@ Return ONLY a single JSON object with all 15 Brand DNA fields.
                         {'role': 'user', 'content': prompt},
                     ],
                     temperature=0.3,
-                    max_tokens=2500,
+                    max_tokens=5000 if think_harder else 2500,
+                    thinking_budget=10000 if think_harder else 0,
                 )
                 if not result.success:
                     return Response(
@@ -3503,6 +3552,7 @@ class SupportChatView(APIView):
 
     def post(self, request):
         messages = request.data.get('messages', [])
+        think_harder = request.data.get('think_harder', False)
         if not messages:
             return Response(
                 {'error': 'No messages provided'},
@@ -3543,7 +3593,8 @@ class SupportChatView(APIView):
             result = service.chat_completion(
                 messages=api_messages,
                 temperature=0.7,
-                max_tokens=1000,
+                max_tokens=2000 if think_harder else 1000,
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not result.success:
@@ -3560,3 +3611,41 @@ class SupportChatView(APIView):
                 {'error': 'Failed to generate response. Please try again.'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class TestClaudeAPIView(APIView):
+    """Simple endpoint to verify Claude API connectivity."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            service = get_llm_service(request.user)
+            result = service.chat_completion(
+                messages=[
+                    {"role": "user", "content": "Say 'Claude API is working!' in exactly those words."}
+                ],
+                temperature=0,
+                max_tokens=50,
+            )
+
+            if not result.success:
+                return Response({
+                    'status': 'error',
+                    'error': result.error,
+                    'provider': 'claude',
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({
+                'status': 'ok',
+                'response': result.content,
+                'model': result.model,
+                'provider': result.provider,
+                'tokens_used': result.tokens_used,
+            })
+
+        except Exception as e:
+            logger.error(f"Claude API test failed: {e}")
+            return Response({
+                'status': 'error',
+                'error': str(e),
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

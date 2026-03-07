@@ -74,6 +74,7 @@ class LLMResponse:
     finish_reason: str = ''
     error: str = ''
     raw_response: Any = None
+    thinking: str = ''  # Claude extended thinking output
 
 
 # ── Message Order Helper ──────────────────────────────────────────
@@ -147,6 +148,7 @@ class UnifiedLLMService:
         temperature: float = 0.7,
         max_tokens: int = 500,
         response_format: Optional[Dict] = None,
+        thinking_budget: int = 0,
         **kwargs,
     ) -> LLMResponse:
         """
@@ -157,6 +159,7 @@ class UnifiedLLMService:
             model:     Requested model (auto-mapped to active provider)
             temperature, max_tokens:  Generation parameters
             response_format:  {"type": "json_object"} to enable JSON mode
+            thinking_budget:  Claude extended thinking budget (>= 1024 to enable)
             **kwargs:  Extra provider-specific params forwarded to OpenAI only
         """
         provider = self._resolve_provider()
@@ -171,7 +174,7 @@ class UnifiedLLMService:
         if provider == 'claude':
             return self._claude_completion(
                 messages, resolved_model, temperature, max_tokens,
-                response_format,
+                response_format, thinking_budget,
             )
         elif provider == 'openai':
             return self._openai_completion(
@@ -238,7 +241,7 @@ class UnifiedLLMService:
     # ── Claude (Anthropic SDK) ────────────────────────────────────
 
     def _claude_completion(self, messages, model, temperature, max_tokens,
-                           response_format) -> LLMResponse:
+                           response_format, thinking_budget=0) -> LLMResponse:
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=self.claude_key)
@@ -261,19 +264,34 @@ class UnifiedLLMService:
             params: Dict[str, Any] = {
                 'model': model,
                 'messages': claude_messages,
-                'temperature': temperature,
                 'max_tokens': max_tokens,
             }
+
+            # Extended thinking: when budget >= 1024, enable thinking mode
+            if thinking_budget >= 1024:
+                params['thinking'] = {
+                    'type': 'enabled',
+                    'budget_tokens': thinking_budget,
+                }
+                # API requirement: temperature must be omitted when thinking
+                # Also ensure max_tokens > thinking_budget
+                if max_tokens <= thinking_budget:
+                    params['max_tokens'] = thinking_budget + max_tokens
+            else:
+                params['temperature'] = temperature
 
             if system_text:
                 params['system'] = system_text
 
             resp = client.messages.create(**params)
 
-            # Extract text content from response
+            # Extract text and thinking content from response
             content = ''
+            thinking_text = ''
             for block in resp.content:
-                if hasattr(block, 'text'):
+                if hasattr(block, 'thinking'):
+                    thinking_text += block.thinking
+                elif hasattr(block, 'text'):
                     content += block.text
 
             # Strip markdown code fences if present (especially for JSON responses)
@@ -297,6 +315,7 @@ class UnifiedLLMService:
                 tokens_used=tokens_used,
                 finish_reason=resp.stop_reason or '',
                 raw_response=resp,
+                thinking=thinking_text,
             )
         except Exception as e:
             logger.error('Claude completion failed: %s', e)

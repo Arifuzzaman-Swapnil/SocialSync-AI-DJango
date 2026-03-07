@@ -34,6 +34,7 @@ import postService from '../services/postService';
 import api from '../services/api';
 import type { ContentIdea, TrendingTopic, PlatformType } from '../types';
 import { PromptInfoButton } from '../components/ui/PromptInfoButton';
+import { CopyOverlayModal } from '../components/ai-image/CopyOverlayModal';
 
 // ─── Step indicator ────────────────────────────────────────
 const STEPS = [
@@ -1957,6 +1958,7 @@ function MediaStep() {
   const [providers, setProviders] = useState<Record<string, 'openai' | 'gemini' | 'both'>>({});
   const [bothResults, setBothResults] = useState<Record<string, { openai?: any; gemini?: any }>>({});
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [copyOverlayOpen, setCopyOverlayOpen] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const captions = overflow.selectedCaptions;
@@ -2493,6 +2495,9 @@ function MediaStep() {
                         <button onClick={() => setPreviewImage(mediaUrl)} className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
                           <EyeIcon className="w-3 h-3" /> View
                         </button>
+                        <button onClick={() => setCopyOverlayOpen(cap.id)} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                          <PencilSquareIcon className="w-3 h-3" /> Add Copy
+                        </button>
                         <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
                           <TrashIcon className="w-3 h-3" /> Remove
                         </button>
@@ -2559,7 +2564,10 @@ function MediaStep() {
                         })}
                       </div>
                       {media?.mediaId && (
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center justify-center gap-4">
+                          <button onClick={() => setCopyOverlayOpen(cap.id)} className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1">
+                            <PencilSquareIcon className="w-3 h-3" /> Add Copy
+                          </button>
                           <button onClick={() => handleRemoveMedia(cap.id)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
                             <TrashIcon className="w-3 h-3" /> Remove Selection
                           </button>
@@ -2587,6 +2595,27 @@ function MediaStep() {
           <p className="text-xs text-yellow-400">{captions.length - doneCount} caption{captions.length - doneCount > 1 ? 's' : ''} still need media before you can proceed.</p>
         </div>
       )}
+
+      {/* Copy Overlay Modal */}
+      {copyOverlayOpen && (() => {
+        const cap = captions.find(c => c.id === copyOverlayOpen);
+        const media = overflow.captionMediaMap[copyOverlayOpen];
+        const mediaUrl = toMediaUrl(media?.mediaUrl);
+        return cap && mediaUrl && media?.mediaId ? (
+          <CopyOverlayModal
+            isOpen={true}
+            onClose={() => setCopyOverlayOpen(null)}
+            assetId={media.mediaId}
+            captionText={cap.text}
+            imageUrl={mediaUrl}
+            brandId={overflow.brandId}
+            onOverlayApplied={(newUrl) => {
+              overflow.setCaptionMedia(copyOverlayOpen, newUrl, media.mediaId);
+              setCopyOverlayOpen(null);
+            }}
+          />
+        ) : null;
+      })()}
 
       {/* Image preview lightbox */}
       {previewImage && (

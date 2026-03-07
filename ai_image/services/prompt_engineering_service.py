@@ -230,6 +230,7 @@ class ImagePromptEngineerService:
         content_context: Dict,
         platform: str = 'instagram_feed',
         user=None,
+        think_harder: bool = False,
     ) -> Dict:
         """
         Generate a 9-layer structured image prompt using Claude.
@@ -283,8 +284,9 @@ BRAND CONTEXT:
         result = service.chat_completion(
             messages=messages,
             temperature=0.7,
-            max_tokens=2000,
+            max_tokens=4000 if think_harder else 2000,
             response_format={'type': 'json_object'},
+            thinking_budget=10000 if think_harder else 0,
         )
 
         if result.success:
@@ -327,6 +329,7 @@ BRAND CONTEXT:
         brand=None,
         attempt_number: int = 1,
         user=None,
+        think_harder: bool = False,
     ) -> Dict:
         """
         Apply targeted correction patches to fix a failed image prompt.
@@ -377,8 +380,9 @@ Diagnose the failure, classify it, and generate a corrected prompt with targeted
         result = service.chat_completion(
             messages=messages,
             temperature=0.4,
-            max_tokens=2000,
+            max_tokens=4000 if think_harder else 2000,
             response_format={'type': 'json_object'},
+            thinking_budget=10000 if think_harder else 0,
         )
 
         if result.success:
@@ -408,6 +412,7 @@ Diagnose the failure, classify it, and generate a corrected prompt with targeted
         original_prompt: str,
         revised_prompt: Optional[str] = None,
         user=None,
+        think_harder: bool = False,
     ) -> Dict:
         """
         Use Claude to analyze a failed image and classify the failure.
@@ -456,8 +461,9 @@ Classify the failure using the taxonomy codes. Respond with JSON:
         result = service.chat_completion(
             messages=messages,
             temperature=0.3,
-            max_tokens=500,
+            max_tokens=1000 if think_harder else 500,
             response_format={'type': 'json_object'},
+            thinking_budget=10000 if think_harder else 0,
         )
 
         if result.success:

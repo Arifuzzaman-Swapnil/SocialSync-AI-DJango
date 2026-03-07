@@ -230,6 +230,7 @@ class ComputeRecommendedTimesView(APIView):
         service = get_llm_service(request.user)
 
         override_prompt = request.data.get('override_prompt', '')
+        think_harder = request.data.get('think_harder', False)
 
         from brands.models import CompetitorInsight
         insights = CompetitorInsight.objects.filter(
@@ -310,8 +311,9 @@ Region: {brand.target_region}
                     {'role': 'user', 'content': prompt},
                 ],
                 temperature=0.3,
-                max_tokens=2000,
+                max_tokens=4000 if think_harder else 2000,
                 response_format={'type': 'json_object'},
+                thinking_budget=10000 if think_harder else 0,
             )
 
             if not llm_result.success:

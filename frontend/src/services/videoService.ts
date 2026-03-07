@@ -17,11 +17,14 @@ export interface GenerateVideoRequest {
   aspect_ratio?: string;
   fps?: number;
   camera_motion?: string;
+  motion_intensity?: string;
   logo_id?: number | null;
   logo_position?: string;
   logo_size?: number;
   logo_opacity?: number;
   enhance_prompt?: boolean;
+  seed?: number | null;
+  reference_image?: File;
 }
 
 export const videoService = {
