@@ -116,8 +116,8 @@ Ensure professional quality with clear composition, consistent lighting, and a c
             # Parse size
             width, height = map(int, size.split('x'))
             
-            # Try Gemini 2.0 Flash Experimental (supports image generation)
-            result = self._generate_with_gemini_2_flash(final_prompt, width, height)
+            # Try Gemini Flash (latest first, then fallback)
+            result = self._generate_with_gemini_flash(final_prompt, width, height)
             
             if result.get('success'):
                 result['enhanced_prompt'] = final_prompt
@@ -145,83 +145,100 @@ Ensure professional quality with clear composition, consistent lighting, and a c
                 'processing_time': time.time() - start_time
             }
     
-    def _generate_with_gemini_2_flash(self, prompt, width, height):
-        """Generate using Gemini 2.0 Flash Experimental with image output"""
-        try:
-            # Use experimental model that supports image generation
-            url = f"{self.base_url}/models/gemini-2.0-flash-exp-image-generation:generateContent"
-            
-            headers = {
-                'Content-Type': 'application/json',
-            }
-            
-            payload = {
-                'contents': [{
-                    'parts': [{
-                        'text': prompt
-                    }]
-                }],
-                'generationConfig': {
-                    'responseModalities': ['TEXT', 'IMAGE']
+    def _generate_with_gemini_flash(self, prompt, width, height):
+        """Generate using Gemini Flash with image output (tries latest first)"""
+        models_to_try = [
+            'gemini-2.5-flash-preview-image-generation',
+            'gemini-2.0-flash-exp-image-generation',
+        ]
+
+        last_error = 'No models available'
+
+        for model_name in models_to_try:
+            try:
+                url = f"{self.base_url}/models/{model_name}:generateContent"
+
+                headers = {
+                    'Content-Type': 'application/json',
                 }
-            }
-            
-            response = requests.post(
-                f"{url}?key={self.api_key}",
-                headers=headers,
-                json=payload,
-                timeout=120
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                
-                # Extract image from response
-                if 'candidates' in result:
-                    for candidate in result['candidates']:
-                        content = candidate.get('content', {})
-                        parts = content.get('parts', [])
-                        
-                        for part in parts:
-                            # Check for inline image data
-                            if 'inlineData' in part:
-                                inline_data = part['inlineData']
-                                mime_type = inline_data.get('mimeType', '')
-                                
-                                if mime_type.startswith('image/'):
-                                    image_b64 = inline_data.get('data', '')
-                                    
-                                    if image_b64:
-                                        image_data = base64.b64decode(image_b64)
-                                        
-                                        # Resize if needed
-                                        img = Image.open(io.BytesIO(image_data))
-                                        if img.size != (width, height):
-                                            img = img.resize((width, height), Image.Resampling.LANCZOS)
-                                            buffer = io.BytesIO()
-                                            img.save(buffer, format='PNG', quality=95)
-                                            image_data = buffer.getvalue()
-                                        
-                                        return {
-                                            'success': True,
-                                            'image_data': image_data
-                                        }
-                
-                return {'success': False, 'error': 'No image in response'}
-            else:
-                error_msg = f"API Error: {response.status_code}"
-                try:
-                    error_data = response.json()
-                    if 'error' in error_data:
-                        error_msg = error_data['error'].get('message', error_msg)
-                except:
-                    pass
-                return {'success': False, 'error': error_msg}
-                
-        except requests.exceptions.Timeout:
-            return {'success': False, 'error': 'Request timed out'}
-        except Exception as e:
-            return {'success': False, 'error': str(e)}
+
+                payload = {
+                    'contents': [{
+                        'parts': [{
+                            'text': prompt
+                        }]
+                    }],
+                    'generationConfig': {
+                        'responseModalities': ['TEXT', 'IMAGE']
+                    }
+                }
+
+                response = requests.post(
+                    f"{url}?key={self.api_key}",
+                    headers=headers,
+                    json=payload,
+                    timeout=120
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+
+                    # Extract image from response
+                    if 'candidates' in result:
+                        for candidate in result['candidates']:
+                            content = candidate.get('content', {})
+                            parts = content.get('parts', [])
+
+                            for part in parts:
+                                if 'inlineData' in part:
+                                    inline_data = part['inlineData']
+                                    mime_type = inline_data.get('mimeType', '')
+
+                                    if mime_type.startswith('image/'):
+                                        image_b64 = inline_data.get('data', '')
+
+                                        if image_b64:
+                                            image_data = base64.b64decode(image_b64)
+
+                                            # Resize if needed
+                                            img = Image.open(io.BytesIO(image_data))
+                                            if img.size != (width, height):
+                                                img = img.resize((width, height), Image.Resampling.LANCZOS)
+                                                buffer = io.BytesIO()
+                                                img.save(buffer, format='PNG', quality=95)
+                                                image_data = buffer.getvalue()
+
+                                            return {
+                                                'success': True,
+                                                'image_data': image_data,
+                                                'model_used': model_name,
+                                            }
+
+                    last_error = f'No image in response from {model_name}'
+                    continue
+                elif response.status_code == 404:
+                    # Model not available, try next
+                    last_error = f'{model_name} not available'
+                    continue
+                else:
+                    error_msg = f"API Error: {response.status_code}"
+                    try:
+                        error_data = response.json()
+                        if 'error' in error_data:
+                            error_msg = error_data['error'].get('message', error_msg)
+                    except:
+                        pass
+                    last_error = error_msg
+                    continue
+
+            except requests.exceptions.Timeout:
+                last_error = 'Request timed out'
+                continue
+            except Exception as e:
+                last_error = str(e)
+                continue
+
+        return {'success': False, 'error': last_error}
     
     def _generate_with_imagen(self, prompt, width, height):
         """Generate using Imagen API"""
@@ -358,7 +375,7 @@ Ensure professional quality with clear composition, consistent lighting, and a c
         
         try:
             # Simple test with text generation
-            url = f"{self.base_url}/models/gemini-2.0-flash:generateContent"
+            url = f"{self.base_url}/models/gemini-2.5-flash:generateContent"
             
             headers = {
                 'Content-Type': 'application/json',

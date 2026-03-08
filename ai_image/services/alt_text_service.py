@@ -27,7 +27,8 @@ def generate_alt_text(image_generation, api_key=None, user=None, think_harder=Fa
     if user:
         service = get_llm_service(user)
     elif api_key:
-        service = UnifiedLLMService(openai_key=api_key)
+        from accounts.api_keys import get_claude_key
+        service = UnifiedLLMService(openai_key=api_key, claude_key=get_claude_key())
     else:
         return _fallback_alt_text(image_generation)
 

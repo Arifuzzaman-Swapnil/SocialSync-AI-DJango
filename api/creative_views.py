@@ -34,8 +34,7 @@ class GenerateAltTextView(APIView):
         except ImageGeneration.DoesNotExist:
             return Response({'error': 'Asset not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        api_key = get_openai_key(request.user)
-        alt_text = generate_alt_text(asset, api_key)
+        alt_text = generate_alt_text(asset, user=request.user)
 
         return Response({
             'asset_id': asset.id,
@@ -262,14 +261,14 @@ class DraftAssetGenerateView(APIView):
         try:
             client = openai.OpenAI(api_key=api_key)
             response = client.images.generate(
-                model='dall-e-3',
+                model='gpt-image-1.5',
                 prompt=final_prompt,
-                size=size if size in ('1024x1024', '1024x1792', '1792x1024') else '1024x1024',
+                size=size if size in ('1024x1024', '1024x1536', '1536x1024') else '1024x1024',
                 quality='standard',
                 n=1,
             )
             image_url = response.data[0].url
-            asset.revised_prompt = response.data[0].revised_prompt or ''
+            asset.revised_prompt = getattr(response.data[0], 'revised_prompt', '') or ''
             asset.status = 'completed'
             # Save URL reference (actual file download would be handled by a service)
             asset.enhanced_prompt = image_url
@@ -371,9 +370,9 @@ class AssetRegenerateView(APIView):
         try:
             client = openai.OpenAI(api_key=api_key)
             response = client.images.generate(
-                model='dall-e-3',
+                model='gpt-image-1.5',
                 prompt=new_prompt,
-                size=asset.size if asset.size in ('1024x1024', '1024x1792', '1792x1024') else '1024x1024',
+                size=asset.size if asset.size in ('1024x1024', '1024x1536', '1536x1024') else '1024x1024',
                 quality='standard',
                 n=1,
             )
@@ -596,14 +595,14 @@ class CarouselSplitView(APIView):
 
             try:
                 response = dalle_client.images.generate(
-                    model='dall-e-3',
+                    model='gpt-image-1.5',
                     prompt=f"Clean {style} carousel slide design: {slide_prompt}",
                     size='1024x1024',
                     quality='standard',
                     n=1,
                 )
                 asset.enhanced_prompt = response.data[0].url
-                asset.revised_prompt = response.data[0].revised_prompt or ''
+                asset.revised_prompt = getattr(response.data[0], 'revised_prompt', '') or ''
                 asset.status = 'completed'
                 asset.save()
             except Exception as e:

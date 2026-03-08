@@ -53,7 +53,7 @@ class ImageService:
             camera_angle: Camera angle (front, aerial, closeup, etc.)
             enhance: Whether to enhance the prompt with style details
             seed: Random seed for reproducibility (Gemini only)
-            model: Specific model to use (dall-e-3, dall-e-2 for OpenAI)
+            model: Specific model to use (gpt-image-1.5, dall-e-3, dall-e-2 for OpenAI)
         
         Returns:
             dict with success status, image_data, and metadata
@@ -68,9 +68,9 @@ class ImageService:
         
         # Call the appropriate service
         if isinstance(service, OpenAIImageService):
-            # Default to dall-e-3 if not specified
+            # Default to gpt-image-1.5 if not specified
             if not model:
-                model = 'dall-e-3'
+                model = 'gpt-image-1.5'
             
             result = service.generate_image(
                 prompt=prompt,
@@ -100,7 +100,7 @@ class ImageService:
                 seed=seed
             )
             result['provider'] = 'gemini'
-            result['model_used'] = 'gemini-2.0-flash'
+            result['model_used'] = result.get('model_used', 'gemini-2.5-flash')
         
         return result
     
@@ -145,14 +145,21 @@ class ImageService:
         """Get information about available providers"""
         return {
             'openai': {
-                'name': 'OpenAI DALL-E',
+                'name': 'OpenAI Image',
                 'models': [
+                    {
+                        'id': 'gpt-image-1.5',
+                        'name': 'GPT Image 1.5',
+                        'description': 'Latest and most capable model',
+                        'sizes': ['1024x1024', '1536x1024', '1024x1536', 'auto'],
+                        'default': True
+                    },
                     {
                         'id': 'dall-e-3',
                         'name': 'DALL-E 3',
-                        'description': 'Best quality, supports HD',
+                        'description': 'High quality image generation',
                         'sizes': ['1024x1024', '1792x1024', '1024x1792'],
-                        'default': True
+                        'default': False
                     },
                     {
                         'id': 'dall-e-2',
@@ -163,20 +170,27 @@ class ImageService:
                     }
                 ],
                 'features': ['HD Quality', 'Prompt Enhancement', 'Multiple Sizes'],
-                'pricing': '$0.04-0.12 per image'
+                'pricing': 'Based on usage'
             },
             'gemini': {
                 'name': 'Google Gemini',
                 'models': [
                     {
-                        'id': 'gemini-2.0-flash-exp',
-                        'name': 'Gemini 2.0 Flash',
-                        'description': 'Experimental image generation',
+                        'id': 'gemini-2.5-flash',
+                        'name': 'Gemini 2.5 Flash',
+                        'description': 'Latest image generation model',
                         'sizes': ['Any size'],
                         'default': True
+                    },
+                    {
+                        'id': 'gemini-2.0-flash-exp',
+                        'name': 'Gemini 2.0 Flash',
+                        'description': 'Experimental image generation (fallback)',
+                        'sizes': ['Any size'],
+                        'default': False
                     }
                 ],
-                'features': ['Flexible Sizes', 'Fast Generation'],
+                'features': ['Flexible Sizes', 'Fast Generation', 'Auto Fallback'],
                 'pricing': 'Based on usage'
             }
         }

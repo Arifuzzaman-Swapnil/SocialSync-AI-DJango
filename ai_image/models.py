@@ -64,8 +64,9 @@ class UserImageSettings(models.Model):
     ])
     
     # OpenAI specific settings
-    openai_model = models.CharField(max_length=50, default='dall-e-3', choices=[
-        ('dall-e-3', 'DALL-E 3 (Best Quality)'),
+    openai_model = models.CharField(max_length=50, default='gpt-image-1.5', choices=[
+        ('gpt-image-1.5', 'GPT Image 1.5 (Best)'),
+        ('dall-e-3', 'DALL-E 3'),
         ('dall-e-2', 'DALL-E 2 (Faster)'),
     ])
     openai_quality = models.CharField(max_length=20, default='standard', choices=[

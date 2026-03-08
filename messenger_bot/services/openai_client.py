@@ -33,7 +33,14 @@ class OpenAIClient:
         """
         self.api_key = api_key
         openai.api_key = api_key
-        self.llm_service = llm_service or UnifiedLLMService(openai_key=api_key)
+        if llm_service:
+            self.llm_service = llm_service
+        else:
+            from accounts.api_keys import get_claude_key
+            self.llm_service = UnifiedLLMService(
+                openai_key=api_key,
+                claude_key=get_claude_key(),
+            )
     
     def create_embedding(self, text: str, model: str = "text-embedding-3-small") -> List[float]:
         """

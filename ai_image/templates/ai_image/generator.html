@@ -1148,9 +1148,10 @@
                             
                             <!-- OpenAI Model Selection (shown when OpenAI selected) -->
                             <div id="openaiModelSection" style="margin-top:0.75rem; display:{% if img_settings.default_provider == 'openai' %}block{% else %}none{% endif %};">
-                                <label class="form-label" style="font-size:0.8rem;">DALL-E Model</label>
+                                <label class="form-label" style="font-size:0.8rem;">Image Model</label>
                                 <select name="model" class="form-control" style="padding:0.75rem 1rem;">
-                                    <option value="dall-e-3" {% if img_settings.openai_model == 'dall-e-3' %}selected{% endif %}>DALL-E 3 (Best Quality)</option>
+                                    <option value="gpt-image-1.5" {% if img_settings.openai_model == 'gpt-image-1.5' %}selected{% endif %}>GPT Image 1.5 (Best)</option>
+                                    <option value="dall-e-3" {% if img_settings.openai_model == 'dall-e-3' %}selected{% endif %}>DALL-E 3</option>
                                     <option value="dall-e-2" {% if img_settings.openai_model == 'dall-e-2' %}selected{% endif %}>DALL-E 2 (Faster)</option>
                                 </select>
                             </div>

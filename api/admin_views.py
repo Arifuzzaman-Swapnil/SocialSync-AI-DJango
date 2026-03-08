@@ -499,12 +499,8 @@ class AdminAPISettingsView(APIView):
                 """, ['admin' if admin_managed else 'user', openai_key or None, gemini_key or None, user_id])
 
                 if openai_key:
-                    cursor.execute("SELECT id FROM ai_caption_userapisettings WHERE user_id = %s", [user_id])
-                    if cursor.fetchone():
-                        cursor.execute("UPDATE ai_caption_userapisettings SET openai_api_key = %s WHERE user_id = %s", [openai_key, user_id])
-                    else:
-                        cursor.execute("INSERT INTO ai_caption_userapisettings (user_id, openai_api_key, default_model, total_tokens_used, total_generations) VALUES (%s, %s, 'gpt-4o', 0, 0)", [user_id, openai_key])
-
+                    # Caption/text AI now uses Claude (global admin key) — skip caption sync.
+                    # Only sync to messenger bot (for embeddings) and image/voice services.
                     cursor.execute("""
                         UPDATE ai_configurations ac
                         JOIN messenger_connections mc ON ac.connection_id = mc.id

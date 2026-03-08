@@ -7,7 +7,7 @@ from accounts.permissions import IsCreatorOrAbove, IsWorkspaceAdmin, IsViewerOrA
 
 from posts.models import Post, PostHashtag, HashtagGroup, BannedHashtag
 from brands.models import Brand
-from accounts.api_keys import get_openai_key
+from accounts.api_keys import get_claude_key
 from accounts.services.notification_service import notify_daily_limit_warning
 from posts.services.hashtag_service import generate_hashtags
 from .serializers import (
@@ -62,13 +62,12 @@ class GenerateHashtagsView(APIView):
                     status=status.HTTP_429_TOO_MANY_REQUESTS,
                 )
 
-        # Get API key and call the real hashtag service
-        api_key = get_openai_key(request.user)
+        # Generate using Claude (primary) via user config
         override_prompt = request.data.get('override_prompt', '')
         created, used_prompt = generate_hashtags(
             post=post,
             platform=platform,
-            api_key=api_key,
+            user=request.user,
             count=count,
             topic=topic,
             override_prompt=override_prompt or None,

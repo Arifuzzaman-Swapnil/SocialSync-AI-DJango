@@ -17,12 +17,12 @@ from .forms import (
     CaptionTemplateForm, SaveCaptionForm, VariationsForm
 )
 from .openai_service import CaptionGeneratorService
-from accounts.api_keys import get_openai_key
+from accounts.api_keys import get_claude_key
 
 
 def get_user_api_key(user):
-    """Get user's OpenAI API key - checks all sources via centralized lookup"""
-    return get_openai_key(user)
+    """Check if AI service is available (Claude key configured)"""
+    return get_claude_key(user)
 
 
 def get_or_create_api_settings(user):
@@ -65,21 +65,20 @@ def api_settings(request):
             messages.success(request, 'API key deleted successfully!')
         
         elif action == 'test_key':
-            # Test the API key
-            api_key = api_settings.get_openai_api_key()
-            if api_key:
-                service = CaptionGeneratorService(api_key=api_key)
+            # Test AI service (Claude primary)
+            try:
+                service = CaptionGeneratorService(user=request.user)
                 result = service.generate_from_text(
                     topic="Test",
                     tone="friendly",
                     length="short"
                 )
                 if result['success']:
-                    messages.success(request, 'API key is working! ✓')
+                    messages.success(request, 'AI service is working! ✓')
                 else:
-                    messages.error(request, f'API key test failed: {result.get("error", "Unknown error")}')
-            else:
-                messages.error(request, 'No API key set')
+                    messages.error(request, f'AI test failed: {result.get("error", "Unknown error")}')
+            except Exception as e:
+                messages.error(request, f'AI service not configured: {e}')
         
         return redirect('ai_caption:api_settings')
     
@@ -119,17 +118,16 @@ def api_settings_ajax(request):
         return JsonResponse({'success': True, 'message': 'API key deleted'})
     
     elif action == 'test_key':
-        api_key = api_settings.get_openai_api_key()
-        if not api_key:
-            return JsonResponse({'success': False, 'error': 'No API key set'})
-        
-        service = CaptionGeneratorService(api_key=api_key)
-        result = service.generate_from_text(topic="Hello", tone="friendly", length="short")
-        
-        if result['success']:
-            return JsonResponse({'success': True, 'message': 'API key is valid!'})
-        else:
-            return JsonResponse({'success': False, 'error': result.get('error', 'Test failed')})
+        try:
+            service = CaptionGeneratorService(user=request.user)
+            result = service.generate_from_text(topic="Hello", tone="friendly", length="short")
+
+            if result['success']:
+                return JsonResponse({'success': True, 'message': 'AI service is working!'})
+            else:
+                return JsonResponse({'success': False, 'error': result.get('error', 'Test failed')})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': f'AI service not configured: {e}'})
     
     return JsonResponse({'success': False, 'error': 'Invalid action'})
 
@@ -144,7 +142,7 @@ def caption_generator(request):
 
     if request.method == 'POST':
         if not has_api_key:
-            messages.error(request, 'Please set your OpenAI API key first.')
+            messages.error(request, 'AI service not configured. Contact admin.')
             return redirect('ai_caption:api_settings')
         
         form = CaptionGenerationForm(request.POST, request.FILES)
@@ -166,9 +164,8 @@ def caption_generator(request):
             
             caption_gen.save()
             
-            # Generate caption using user's API key
-            user_api_key = get_user_api_key(request.user)
-            service = CaptionGeneratorService(api_key=user_api_key)
+            # Generate caption using Claude (primary) via user's config
+            service = CaptionGeneratorService(user=request.user)
             
             try:
                 if caption_gen.media_type == 'image':
@@ -297,7 +294,7 @@ def generate_ajax(request):
         if not get_user_api_key(request.user):
             return JsonResponse({
                 'success': False,
-                'error': 'Please set your OpenAI API key in settings first.',
+                'error': 'AI service not configured. Contact admin.',
                 'redirect': '/ai-caption/settings/'
             })
         
@@ -342,9 +339,8 @@ def generate_ajax(request):
                 caption_gen.media_type = 'video'
             caption_gen.save()
         
-        # Generate using user's API key
-        user_api_key = get_user_api_key(request.user)
-        service = CaptionGeneratorService(api_key=user_api_key)
+        # Generate using Claude (primary) via user's config
+        service = CaptionGeneratorService(user=request.user)
         
         if caption_gen.media_type == 'image':
             result = service.generate_from_image(
@@ -695,7 +691,7 @@ def use_template(request, pk):
     if not get_user_api_key(request.user):
         return JsonResponse({
             'success': False,
-            'error': 'Please set your OpenAI API key first.',
+            'error': 'AI service not configured. Contact admin.',
             'redirect': '/ai-caption/settings/'
         })
 
@@ -719,9 +715,8 @@ def use_template(request, pk):
     for key, value in variables.items():
         filled_text = filled_text.replace(f'{{{key}}}', value)
     
-    # Generate using filled template with user's API key
-    user_api_key = get_user_api_key(request.user)
-    service = CaptionGeneratorService(api_key=user_api_key)
+    # Generate using filled template via Claude (primary)
+    service = CaptionGeneratorService(user=request.user)
     
     result = service.generate_from_text(
         topic=filled_text,

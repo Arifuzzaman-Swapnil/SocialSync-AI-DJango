@@ -5,23 +5,18 @@ from django.conf import settings as django_settings
 
 
 def sync_openai_key(user, raw_key):
-    """Save OpenAI API key to ALL features that use it"""
+    """Save OpenAI API key to features that use it (image, voice only).
+    Caption/text AI now uses Claude (global admin key), not OpenAI."""
     if not raw_key:
         return
 
-    # 1. AI Caption (base64 encoded)
-    from ai_caption.models import UserAPISettings
-    caption_settings, _ = UserAPISettings.objects.get_or_create(user=user)
-    caption_settings.set_openai_api_key(raw_key)
-    caption_settings.save()
-
-    # 2. AI Voice (plain text)
+    # 1. AI Voice (plain text)
     from ai_voice.models import UserVoiceSettings
     voice_settings, _ = UserVoiceSettings.objects.get_or_create(user=user)
     voice_settings.openai_api_key = raw_key
     voice_settings.save()
 
-    # 3. AI Image (base64 encoded)
+    # 2. AI Image (base64 encoded)
     from ai_image.models import UserImageSettings
     image_settings, _ = UserImageSettings.objects.get_or_create(user=user)
     image_settings.set_openai_api_key(raw_key)
@@ -48,17 +43,10 @@ def sync_gemini_key(user, raw_key):
 
 def get_openai_key(user):
     """Get OpenAI API key from any available source.
-    Checks all feature settings, returns first non-null key found."""
+    Used for image generation, voice (TTS/Whisper), and embeddings only.
+    Text AI uses Claude — see get_claude_key()."""
 
-    # 1. AI Caption (base64)
-    try:
-        key = user.api_settings.get_openai_api_key()
-        if key:
-            return key
-    except Exception:
-        pass
-
-    # 2. AI Voice (plain text)
+    # 1. AI Voice (plain text)
     try:
         key = user.voice_settings.openai_api_key
         if key:
@@ -66,7 +54,7 @@ def get_openai_key(user):
     except Exception:
         pass
 
-    # 3. AI Image (base64)
+    # 2. AI Image (base64)
     try:
         key = user.image_settings.get_openai_api_key()
         if key:
@@ -74,7 +62,7 @@ def get_openai_key(user):
     except Exception:
         pass
 
-    # 4. Messenger Bot AIConfiguration
+    # 3. Messenger Bot AIConfiguration
     try:
         from messenger_bot.models import AIConfiguration
         ai_config = AIConfiguration.objects.filter(
@@ -85,7 +73,7 @@ def get_openai_key(user):
     except Exception:
         pass
 
-    # 5. Fallback to Django settings
+    # 4. Fallback to Django settings
     fallback = getattr(django_settings, 'OPENAI_API_KEY', '')
     return fallback if fallback else None
 

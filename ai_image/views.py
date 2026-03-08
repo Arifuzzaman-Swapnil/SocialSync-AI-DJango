@@ -117,7 +117,7 @@ def api_settings(request):
             img_settings.default_provider = request.POST.get('default_provider', 'openai')
             img_settings.default_style = request.POST.get('default_style', 'realistic')
             img_settings.default_size = request.POST.get('default_size', '1024x1024')
-            img_settings.openai_model = request.POST.get('openai_model', 'dall-e-3')
+            img_settings.openai_model = request.POST.get('openai_model', 'gpt-image-1.5')
             img_settings.openai_quality = request.POST.get('openai_quality', 'standard')
             img_settings.save()
             messages.success(request, 'Default settings updated!')

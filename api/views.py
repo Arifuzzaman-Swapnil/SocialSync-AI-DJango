@@ -167,7 +167,7 @@ class RegisterWithBrandView(APIView):
                         page_data = _fetch_page_content(brand.website_url)
 
                     if page_data.get('success'):
-                        service = UnifiedLLMService(openai_key=server_key)
+                        service = UnifiedLLMService(openai_key=server_key, claude_key=get_claude_key())
                         existing_dna = json.dumps(brand.brand_dna, indent=2)
                         prompt = f"""<task>
 Enhance the existing Brand DNA using website content. Keep ALL existing values but fill gaps and enrich thin descriptions with evidence from the website.
@@ -577,12 +577,11 @@ def generate_caption(request):
         from ai_caption.openai_service import CaptionGeneratorService
         from ai_caption.models import CaptionGeneration as CaptionGen, UserAPISettings as CaptionAPISettings
 
-        # Get user's API key (centralized lookup)
-        user_api_key = get_openai_key(request.user)
-
-        if not user_api_key:
+        # Check if AI service is available (Claude key from env)
+        claude_key = get_claude_key()
+        if not claude_key:
             return Response(
-                {'error': 'OpenAI API key not configured. Please add your API key in Settings.'},
+                {'error': 'AI service not configured. Contact admin.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -636,8 +635,8 @@ def generate_caption(request):
         # Get or create user API settings for usage tracking
         api_settings, _ = CaptionAPISettings.objects.get_or_create(user=request.user)
 
-        # Initialize service with the user's API key
-        service = CaptionGeneratorService(api_key=user_api_key)
+        # Initialize service with Claude as primary provider
+        service = CaptionGeneratorService(user=request.user)
 
         # Generate based on media type (same logic as Django template view)
         if media_type == 'image':
@@ -741,7 +740,7 @@ def regenerate_caption(request, pk):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        service = CaptionGeneratorService(request.user)
+        service = CaptionGeneratorService(user=request.user)
 
         result = service.regenerate_with_feedback(
             original_caption=caption_gen.generated_caption,
@@ -3562,7 +3561,7 @@ class SupportChatView(APIView):
         # Get LLM service: admin site config key first, then user's configured provider
         site_key = SiteConfiguration.get('support_chat_api_key', '')
         if site_key:
-            service = UnifiedLLMService(openai_key=site_key)
+            service = UnifiedLLMService(openai_key=site_key, claude_key=get_claude_key())
         else:
             service = get_llm_service(request.user)
 

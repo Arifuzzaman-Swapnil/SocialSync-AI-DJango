@@ -1,9 +1,9 @@
 # ai_image/openai_service.py
 
 """
-OpenAI DALL-E API Service for AI Image Generation
+OpenAI Image Generation API Service
+Supports gpt-image-1.5 (primary) and DALL-E models (legacy)
 Uses requests library - NO SDK needed
-Install: pip install requests Pillow
 """
 
 import io
@@ -16,8 +16,8 @@ from django.conf import settings
 
 class OpenAIImageService:
     """
-    AI Image Generator using OpenAI DALL-E API (REST)
-    Supports DALL-E 2 and DALL-E 3
+    AI Image Generator using OpenAI Image API (REST)
+    Supports gpt-image-1.5 (primary), DALL-E 3 and DALL-E 2 (legacy)
     """
     
     def __init__(self, api_key=None):
@@ -90,28 +90,39 @@ Additional quality guidance: Ensure the image has a clear focal point, professio
 
         return enhanced
     
-    def _get_valid_size(self, size, model='dall-e-3'):
-        """Get valid size for DALL-E model"""
+    def _get_valid_size(self, size, model='gpt-image-1.5'):
+        """Get valid size for image model"""
+        # gpt-image-1.5 supported sizes
+        gpt_image_sizes = ['1024x1024', '1536x1024', '1024x1536', 'auto']
         # DALL-E 3 supported sizes
         dalle3_sizes = ['1024x1024', '1792x1024', '1024x1792']
         # DALL-E 2 supported sizes
         dalle2_sizes = ['256x256', '512x512', '1024x1024']
-        
-        if model == 'dall-e-3':
-            if size in dalle3_sizes:
+
+        if model == 'gpt-image-1.5':
+            if size in gpt_image_sizes:
                 return size
             # Map to closest supported size
             width, height = map(int, size.split('x'))
             if width > height:
-                return '1792x1024'  # Landscape
+                return '1536x1024'  # Landscape
             elif height > width:
-                return '1024x1792'  # Portrait
+                return '1024x1536'  # Portrait
             else:
                 return '1024x1024'  # Square
+        elif model == 'dall-e-3':
+            if size in dalle3_sizes:
+                return size
+            width, height = map(int, size.split('x'))
+            if width > height:
+                return '1792x1024'
+            elif height > width:
+                return '1024x1792'
+            else:
+                return '1024x1024'
         else:  # dall-e-2
             if size in dalle2_sizes:
                 return size
-            # Map to closest supported size
             width, height = map(int, size.split('x'))
             total = width * height
             if total <= 256*256:
@@ -123,7 +134,7 @@ Additional quality guidance: Ensure the image has a clear focal point, professio
     
     def generate_image(self, prompt, style='realistic', size='1024x1024', quality='standard',
                        negative_prompt=None, lighting=None, camera_angle=None,
-                       enhance=True, seed=None, model='dall-e-3'):
+                       enhance=True, seed=None, model='gpt-image-1.5'):
         """
         Generate image using OpenAI DALL-E API
         """
@@ -149,33 +160,45 @@ Additional quality guidance: Ensure the image has a clear focal point, professio
             # Get valid size for model
             valid_size = self._get_valid_size(size, model)
             
-            # Map quality
-            api_quality = 'hd' if quality in ['high', 'hd', 'ultra'] else 'standard'
-            
             # Prepare API request
             url = f"{self.base_url}/images/generations"
-            
+
             headers = {
                 'Content-Type': 'application/json',
                 'Authorization': f'Bearer {self.api_key}'
             }
-            
-            payload = {
-                'model': model,
-                'prompt': final_prompt,
-                'n': 1,
-                'size': valid_size,
-                'response_format': 'b64_json'
-            }
-            
-            # DALL-E 3 specific options
-            if model == 'dall-e-3':
-                payload['quality'] = api_quality
-                # Style: 'vivid' or 'natural'
-                if style in ['vivid', 'neon', 'cinematic', 'fantasy']:
-                    payload['style'] = 'vivid'
-                else:
-                    payload['style'] = 'natural'
+
+            # gpt-image-1.5 has different API params than DALL-E models
+            if model == 'gpt-image-1.5':
+                # Quality: low/medium/high (NOT standard/hd)
+                quality_map = {'standard': 'medium', 'high': 'high', 'hd': 'high', 'ultra': 'high', 'low': 'low'}
+                api_quality = quality_map.get(quality, 'medium')
+
+                payload = {
+                    'model': model,
+                    'prompt': final_prompt,
+                    'size': valid_size,
+                    'quality': api_quality,
+                    'output_format': 'png',
+                }
+            else:
+                # DALL-E 2/3 params
+                api_quality = 'hd' if quality in ['high', 'hd', 'ultra'] else 'standard'
+
+                payload = {
+                    'model': model,
+                    'prompt': final_prompt,
+                    'n': 1,
+                    'size': valid_size,
+                    'response_format': 'b64_json'
+                }
+
+                if model == 'dall-e-3':
+                    payload['quality'] = api_quality
+                    if style in ['vivid', 'neon', 'cinematic', 'fantasy']:
+                        payload['style'] = 'vivid'
+                    else:
+                        payload['style'] = 'natural'
             
             # Make request
             response = requests.post(
@@ -350,14 +373,21 @@ Additional quality guidance: Ensure the image has a clear focal point, professio
             return {'success': False, 'error': str(e)}
     
     def list_available_models(self):
-        """List available DALL-E models"""
+        """List available OpenAI image models"""
         return {
             'success': True,
             'models': [
                 {
+                    'id': 'gpt-image-1.5',
+                    'name': 'GPT Image 1.5',
+                    'description': 'Latest and most capable image model',
+                    'sizes': ['1024x1024', '1536x1024', '1024x1536', 'auto'],
+                    'features': ['HD quality', 'Best prompt understanding', 'Text rendering']
+                },
+                {
                     'id': 'dall-e-3',
                     'name': 'DALL-E 3',
-                    'description': 'Most capable model with best quality',
+                    'description': 'High quality image generation',
                     'sizes': ['1024x1024', '1792x1024', '1024x1792'],
                     'features': ['HD quality', 'Vivid/Natural styles', 'Prompt revision']
                 },

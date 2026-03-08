@@ -614,7 +614,8 @@
                     <div class="form-group">
                         <label class="form-label">OpenAI Model</label>
                         <select name="openai_model" class="form-control" style="font-family:inherit;">
-                            <option value="dall-e-3" {% if img_settings.openai_model == 'dall-e-3' %}selected{% endif %}>DALL-E 3 (Best)</option>
+                            <option value="gpt-image-1.5" {% if img_settings.openai_model == 'gpt-image-1.5' %}selected{% endif %}>GPT Image 1.5 (Best)</option>
+                            <option value="dall-e-3" {% if img_settings.openai_model == 'dall-e-3' %}selected{% endif %}>DALL-E 3</option>
                             <option value="dall-e-2" {% if img_settings.openai_model == 'dall-e-2' %}selected{% endif %}>DALL-E 2 (Faster)</option>
                         </select>
                     </div>

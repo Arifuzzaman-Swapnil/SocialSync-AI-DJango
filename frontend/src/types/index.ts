@@ -445,7 +445,7 @@ export interface UserImageSettings {
   default_provider: 'gemini' | 'openai';
   default_style: ImageStyle;
   default_size: ImageSize;
-  openai_model: 'dall-e-3' | 'dall-e-2';
+  openai_model: 'gpt-image-1.5' | 'dall-e-3' | 'dall-e-2';
   openai_quality: 'standard' | 'hd';
   total_images_generated: number;
   total_api_calls: number;

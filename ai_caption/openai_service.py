@@ -17,26 +17,42 @@ from django.conf import settings
 class CaptionGeneratorService:
     """
     Comprehensive AI Caption Generator using the Unified LLM Service.
-    Routes through OpenAI or Gemini depending on user configuration.
+    Routes through Claude (primary) with OpenAI/Gemini as fallback.
     Supports:
     - Text-based caption generation
     - Image analysis and caption generation
     - Video frame extraction and analysis
     """
-    
-    def __init__(self, api_key=None, llm_service=None):
+
+    def __init__(self, api_key=None, llm_service=None, user=None):
         self.llm_service = llm_service
-        if not self.llm_service and api_key:
+        if not self.llm_service and user:
+            # Best path: build service from user with all keys (Claude primary)
+            from accounts.services.llm_service import get_llm_service
+            self.llm_service = get_llm_service(user)
+        elif not self.llm_service and api_key:
+            # Legacy path: also inject Claude key so it's preferred
             from accounts.services.llm_service import UnifiedLLMService
-            self.llm_service = UnifiedLLMService(openai_key=api_key)
+            from accounts.api_keys import get_claude_key
+            claude_key = get_claude_key()
+            self.llm_service = UnifiedLLMService(
+                openai_key=api_key,
+                claude_key=claude_key,
+            )
         elif not self.llm_service:
-            # Try settings as last resort for backward compat
-            fallback_key = getattr(settings, 'OPENAI_API_KEY', None)
-            if fallback_key:
-                from accounts.services.llm_service import UnifiedLLMService
-                self.llm_service = UnifiedLLMService(openai_key=fallback_key)
+            # No user, no api_key: use global Claude key
+            from accounts.services.llm_service import UnifiedLLMService
+            from accounts.api_keys import get_claude_key
+            claude_key = get_claude_key()
+            if claude_key:
+                self.llm_service = UnifiedLLMService(claude_key=claude_key)
             else:
-                raise ValueError("Either api_key or llm_service must be provided")
+                # Last resort: try OpenAI from settings
+                fallback_key = getattr(settings, 'OPENAI_API_KEY', None)
+                if fallback_key:
+                    self.llm_service = UnifiedLLMService(openai_key=fallback_key)
+                else:
+                    raise ValueError("No AI API key configured. Contact admin.")
     
     def _get_word_count(self, length):
         """Get word count range based on length setting"""
