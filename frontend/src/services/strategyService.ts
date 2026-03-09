@@ -169,6 +169,13 @@ export const strategyService = {
     });
     return res.data;
   },
+
+  // Prompt History
+  async getPromptHistory(brandId: number, feature?: string) {
+    const params = feature ? { feature } : {};
+    const res = await api.get(`/brands/${brandId}/prompt-history/`, { params });
+    return res.data;
+  },
 };
 
 export default strategyService;

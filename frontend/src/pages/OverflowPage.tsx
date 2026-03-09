@@ -34,6 +34,7 @@ import postService from '../services/postService';
 import api from '../services/api';
 import type { ContentIdea, TrendingTopic, PlatformType } from '../types';
 import { PromptInfoButton } from '../components/ui/PromptInfoButton';
+import { usePromptHistory } from '../hooks/usePromptHistory';
 import { CopyOverlayModal } from '../components/ai-image/CopyOverlayModal';
 
 // ─── Step indicator ────────────────────────────────────────
@@ -140,7 +141,7 @@ export function OverflowPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold gradient-text">Get Started</h1>
-          <p className="text-sm text-text-secondary mt-1">Follow these steps to set up your content pipeline</p>
+          <p className="text-sm text-white mt-1">Follow these steps to set up your content pipeline</p>
         </div>
         <button onClick={handleSkip} className="text-sm text-text-muted hover:text-text-primary transition-colors">
           Skip & Go to Dashboard →
@@ -293,6 +294,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
   const [newFieldType, setNewFieldType] = useState<'text' | 'list'>('text');
   const [dnaUsedPrompt, setDnaUsedPrompt] = useState('');
   const [dnaRegenerating, setDnaRegenerating] = useState(false);
+  const dnaHistory = usePromptHistory(brandId, 'brand_dna');
 
   const BUILTIN_KEYS = new Set([
     'brand_name', 'tagline', 'industry', 'description', 'products_services',
@@ -404,9 +406,9 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
           <BeakerIcon className="w-5 h-5 text-primary-400" />
           Brand DNA Generator
-          <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" onRegenerate={handleDNARegenerate} regenerating={dnaRegenerating} regenerateLabel="Regenerate DNA" />
+          <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" onRegenerate={handleDNARegenerate} regenerating={dnaRegenerating} regenerateLabel="Regenerate DNA" promptHistory={dnaHistory.history} onLoadHistory={dnaHistory.load} historyLoading={dnaHistory.loading} />
         </h3>
-        <p className="text-sm text-text-secondary mb-4">
+        <p className="text-sm text-white mb-4">
           Enter your website URL and we'll analyze it to extract your brand's identity, tone, products, values, and more.
         </p>
         <div className="flex gap-3">
@@ -574,7 +576,7 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
           {/* Edit Bar */}
           <div className="flex items-center justify-between bg-dark-700/50 border border-white/10 rounded-lg px-4 py-3">
-            <p className="text-sm text-text-secondary">Click the edit icon or button to modify your Brand DNA</p>
+            <p className="text-sm text-white">Click the edit icon or button to modify your Brand DNA</p>
             <button onClick={enterEditMode} className="btn-primary flex items-center gap-2 px-5 py-2">
               <PencilIcon className="w-4 h-4" /> Edit Brand DNA
             </button>
@@ -659,8 +661,8 @@ function DNASubStep({ brandId }: { brandId: number | null }) {
       {!dnaData && !loading && (
         <div className="card p-12 text-center">
           <BeakerIcon className="w-12 h-12 mx-auto text-text-secondary mb-3" />
-          <p className="text-text-secondary">Enter your website URL above and click "Generate DNA"</p>
-          <p className="text-xs text-text-secondary mt-1">AI will analyze your website and extract your brand's identity</p>
+          <p className="text-white">Enter your website URL above and click "Generate DNA"</p>
+          <p className="text-xs text-white mt-1">AI will analyze your website and extract your brand's identity</p>
         </div>
       )}
     </div>
@@ -684,6 +686,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
   const [showGenPanel, setShowGenPanel] = useState(false);
   const [pillarsUsedPrompt, setPillarsUsedPrompt] = useState('');
   const [pillarsRegenerating, setPillarsRegenerating] = useState(false);
+  const pillarsHistory = usePromptHistory(brandId, 'pillars');
 
   const handlePillarsRegenerate = async (editedPrompt: string) => {
     if (!brandId) return;
@@ -766,7 +769,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <div className="w-5 h-5 rounded bg-gradient-to-br from-indigo-500 to-purple-500" />
           Content Pillars
-          <PromptInfoButton prompt={pillarsUsedPrompt} label="Content Pillars Generation Prompt" onRegenerate={handlePillarsRegenerate} regenerating={pillarsRegenerating} regenerateLabel="Regenerate Pillars" />
+          <PromptInfoButton prompt={pillarsUsedPrompt} label="Content Pillars Generation Prompt" onRegenerate={handlePillarsRegenerate} regenerating={pillarsRegenerating} regenerateLabel="Regenerate Pillars" promptHistory={pillarsHistory.history} onLoadHistory={pillarsHistory.load} historyLoading={pillarsHistory.loading} />
         </h3>
         <div className="flex items-center gap-2">
           <button onClick={() => setShowGenPanel(!showGenPanel)} className="btn-primary text-sm flex items-center gap-1.5">
@@ -778,7 +781,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
           </button>
         </div>
       </div>
-      <p className="text-sm text-text-secondary">
+      <p className="text-sm text-white">
         AI-generate pillars from your brand DNA, competitors & trends — or add them manually. You can edit each pillar after generation.
       </p>
 
@@ -828,7 +831,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
       {loading ? (
         <div className="text-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500 mx-auto" /></div>
       ) : pillars.length === 0 ? (
-        <p className="text-sm text-text-secondary text-center py-6">No pillars yet. Use AI Generate or add manually.</p>
+        <p className="text-sm text-white text-center py-6">No pillars yet. Use AI Generate or add manually.</p>
       ) : (
         <div className="space-y-2">
           {pillars.map((p) => (
@@ -851,7 +854,7 @@ function PillarsSubStep({ brandId }: { brandId: number | null }) {
                 <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: p.color_code }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{p.name}</p>
-                  <p className="text-xs text-text-muted">{p.description || 'No description'} &middot; {p.target_percentage}%</p>
+                  <p className="text-xs text-white/70">{p.description || 'No description'} &middot; {p.target_percentage}%</p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button onClick={() => { setEditingId(p.id); setEditForm({ name: p.name, description: p.description || '', target_percentage: p.target_percentage, color_code: p.color_code }); }}
@@ -907,6 +910,9 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [competitorUsedPrompts, setCompetitorUsedPrompts] = useState<Record<string, string>>({});
   const [competitorRegenerating, setCompetitorRegenerating] = useState<Record<string, boolean>>({});
+  const [aiSuggestions, setAiSuggestions] = useState<Array<{ name: string; platform: string; handle_or_url: string; reason: string }>>([]);
+  const [findingByAi, setFindingByAi] = useState(false);
+  const competitorHistory = usePromptHistory(brandId, 'competitors');
 
   const scoreColor = (score: number) => {
     if (score >= 8) return 'text-green-400 bg-green-400/10';
@@ -930,6 +936,19 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
   }, [brandId]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleFindByAi = async () => {
+    if (!brandId) return;
+    setFindingByAi(true);
+    setAnalysisError(null);
+    try {
+      const result = await strategyService.suggestCompetitors(brandId, 5);
+      setAiSuggestions(result.suggestions || []);
+    } catch (err: any) {
+      setAnalysisError(err?.response?.data?.error || 'AI competitor search failed');
+    }
+    setFindingByAi(false);
+  };
 
   const handleAdd = async () => {
     if (!form.handle_or_url.trim()) return;
@@ -1009,16 +1028,53 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
                 {analyzingAll ? 'Analyzing...' : 'Analyze All'}
               </button>
             )}
+            <button onClick={handleFindByAi} disabled={findingByAi} className="btn-secondary text-sm flex items-center gap-1.5">
+              {findingByAi ? <div className="animate-spin h-3.5 w-3.5 border-b-2 border-primary-400 rounded-full" /> : <SparklesIcon className="w-4 h-4" />}
+              {findingByAi ? 'Finding...' : 'Find by AI'}
+            </button>
             <button onClick={() => setShowForm(true)} className="btn-secondary text-sm flex items-center gap-1.5">
               <PlusIcon className="w-4 h-4" /> Add Competitor
             </button>
           </div>
         </div>
-        <p className="text-sm text-text-secondary">Add competitor profiles and get AI-powered strategic insights.</p>
+        <p className="text-sm text-white">Add competitor profiles and get AI-powered strategic insights.</p>
       </div>
 
       {analysisError && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">{analysisError}</div>
+      )}
+
+      {/* AI-Suggested Competitors */}
+      {aiSuggestions.length > 0 && (
+        <div className="card p-4 border-primary-500/20">
+          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <SparklesIcon className="w-4 h-4 text-primary-400" />
+            AI-Suggested Competitors
+          </h4>
+          <div className="grid gap-2">
+            {aiSuggestions.map((s, i) => (
+              <div key={i} className="flex items-center justify-between bg-dark-800/50 rounded-lg p-3">
+                <div className="min-w-0 flex-1 mr-3">
+                  <span className="text-sm font-medium">{s.name}</span>
+                  <span className="text-xs text-text-muted ml-2">({s.platform})</span>
+                  <p className="text-xs text-text-secondary mt-0.5 truncate">{s.reason}</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await strategyService.addCompetitor({ brand: brandId!, platform: s.platform, handle_or_url: s.handle_or_url });
+                      setAiSuggestions(prev => prev.filter((_, j) => j !== i));
+                      load();
+                    } catch { /* ignore */ }
+                  }}
+                  className="btn-primary text-xs px-3 py-1 shrink-0"
+                >
+                  Add
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {loading ? (
@@ -1026,8 +1082,8 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
       ) : competitors.length === 0 ? (
         <div className="card p-12 text-center">
           <GlobeAltIcon className="w-12 h-12 mx-auto text-text-secondary mb-3" />
-          <p className="text-text-secondary">No competitors added yet</p>
-          <p className="text-xs text-text-secondary mt-1">Add competitor profiles to get AI-powered strategic insights</p>
+          <p className="text-white">No competitors added yet</p>
+          <p className="text-xs text-white mt-1">Add competitor profiles to get AI-powered strategic insights</p>
         </div>
       ) : (
         /* Full competitor cards with insights — like Strategy Hub */
@@ -1071,7 +1127,7 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
                     <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                       <LightBulbIcon className="w-4 h-4 text-yellow-400" />
                       Strategic Insights
-                      <PromptInfoButton prompt={competitorUsedPrompts[comp.handle_or_url] || ''} label={`Competitor Analysis Prompt — ${comp.handle_or_url}`} onRegenerate={(ep) => handleCompetitorRegenerate(comp.handle_or_url, comp.id, ep)} regenerating={competitorRegenerating[comp.handle_or_url] || false} regenerateLabel="Re-analyze" />
+                      <PromptInfoButton prompt={competitorUsedPrompts[comp.handle_or_url] || ''} label={`Competitor Analysis Prompt — ${comp.handle_or_url}`} onRegenerate={(ep) => handleCompetitorRegenerate(comp.handle_or_url, comp.id, ep)} regenerating={competitorRegenerating[comp.handle_or_url] || false} regenerateLabel="Re-analyze" promptHistory={competitorHistory.history} onLoadHistory={competitorHistory.load} historyLoading={competitorHistory.loading} />
                     </h4>
                     <div className="space-y-3">
                       {compInsights.map((insight) => (
@@ -1079,8 +1135,8 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1">
                               <p className="text-sm font-medium">{insight.hook_text}</p>
-                              {insight.angle && <p className="text-xs text-text-secondary mt-1">Angle: {insight.angle}</p>}
-                              {insight.based_on && <p className="text-xs text-text-secondary mt-1 italic">Based on: {insight.based_on}</p>}
+                              {insight.angle && <p className="text-xs text-white mt-1">Angle: {insight.angle}</p>}
+                              {insight.based_on && <p className="text-xs text-white mt-1 italic">Based on: {insight.based_on}</p>}
                               {insight.recommendation && <p className="text-xs text-primary-400 mt-1">Action: {insight.recommendation}</p>}
                               {(insight.source_url || insight.competitor) && (
                                 <a href={insight.source_url || insight.competitor} target="_blank" rel="noopener noreferrer"
@@ -1105,7 +1161,7 @@ function CompetitorsSubStep({ brandId }: { brandId: number | null }) {
 
                 {compInsights.length === 0 && (
                   <div className="p-6 text-center">
-                    <p className="text-sm text-text-secondary">No insights yet. Click "Analyze" to get AI-powered insights.</p>
+                    <p className="text-sm text-white">No insights yet. Click "Analyze" to get AI-powered insights.</p>
                   </div>
                 )}
               </div>
@@ -1156,6 +1212,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
   const [addingCustom, setAddingCustom] = useState(false);
   const trendingUsedPrompt = useOverflowStore((s) => s.trendingUsedPrompt);
   const [trendingRegenerating, setTrendingRegenerating] = useState(false);
+  const trendingHistory = usePromptHistory(brandId, 'trending');
 
   const handleTrendingRegenerate = async (editedPrompt: string) => {
     if (!brandId) return;
@@ -1270,14 +1327,14 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
         <h3 className="text-lg font-semibold flex items-center gap-2">
           <FireIcon className="w-5 h-5 text-orange-400" />
           Trending Topics
-          <PromptInfoButton prompt={trendingUsedPrompt} label="Trending Topics Generation Prompt" onRegenerate={handleTrendingRegenerate} regenerating={trendingRegenerating} regenerateLabel="Regenerate Topics" />
+          <PromptInfoButton prompt={trendingUsedPrompt} label="Trending Topics Generation Prompt" onRegenerate={handleTrendingRegenerate} regenerating={trendingRegenerating} regenerateLabel="Regenerate Topics" promptHistory={trendingHistory.history} onLoadHistory={trendingHistory.load} historyLoading={trendingHistory.loading} />
         </h3>
         <button onClick={handleGenerate} disabled={loading} className="btn-primary text-sm flex items-center gap-2">
           {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowPathIcon className="w-4 h-4" />}
           {loading ? 'Analyzing...' : topics.length > 0 ? 'Refresh' : 'Generate'}
         </button>
       </div>
-      <p className="text-sm text-text-secondary">
+      <p className="text-sm text-white">
         Discover trending topics relevant to your brand. Like/dislike topics to teach AI your preferences — disliked topics won't appear in future generations. Add your own custom topics too.
       </p>
       {error && (
@@ -1357,7 +1414,7 @@ function TrendingSubStep({ brandId }: { brandId: number | null }) {
                           )}
                         </div>
                       </div>
-                      {t.relevance_explanation && <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">{t.relevance_explanation}</p>}
+                      {t.relevance_explanation && <p className="text-xs text-white mt-1.5 leading-relaxed">{t.relevance_explanation}</p>}
                       {t.volume_score != null && (
                         <div className="mt-2"><div className="h-1 bg-dark-600 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all ${t.volume_score >= 80 ? 'bg-red-500' : t.volume_score >= 50 ? 'bg-orange-500' : 'bg-yellow-500'}`} style={{ width: `${Math.min(t.volume_score, 100)}%` }} /></div></div>
                       )}
@@ -1430,6 +1487,7 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
   const [error, setError] = useState<string | null>(null);
   const ideasUsedPrompt = overflow.ideasUsedPrompt;
   const [ideasRegenerating, setIdeasRegenerating] = useState(false);
+  const ideasHistory = usePromptHistory(brandId, 'ideas');
 
   const handleIdeasRegenerate = async (editedPrompt: string) => {
     if (!brandId) return;
@@ -1506,14 +1564,14 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <LightBulbIcon className="w-5 h-5 text-yellow-400" />
             Content Ideas
-            <PromptInfoButton prompt={ideasUsedPrompt} label="Content Ideas Generation Prompt" onRegenerate={handleIdeasRegenerate} regenerating={ideasRegenerating} regenerateLabel="Regenerate Ideas" />
+            <PromptInfoButton prompt={ideasUsedPrompt} label="Content Ideas Generation Prompt" onRegenerate={handleIdeasRegenerate} regenerating={ideasRegenerating} regenerateLabel="Regenerate Ideas" promptHistory={ideasHistory.history} onLoadHistory={ideasHistory.load} historyLoading={ideasHistory.loading} />
           </h3>
           <button onClick={doGenerate} disabled={loading} className="btn-secondary text-sm flex items-center gap-2">
             {loading ? <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full" /> : <ArrowPathIcon className="w-4 h-4" />}
             {loading ? 'Generating...' : 'Regenerate'}
           </button>
         </div>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-white">
           1 idea per trending topic — auto-generated from your Brand DNA & market analysis.
         </p>
         {error && <p className="text-sm text-red-400 mt-2">{error}</p>}
@@ -1543,8 +1601,8 @@ function IdeasStep({ brandId }: { brandId: number | null }) {
                 {/* Idea summary */}
                 <div className="p-4">
                   <h4 className="font-semibold text-sm">{idea.title}</h4>
-                  <p className="text-xs text-text-secondary mt-1">{idea.hook}</p>
-                  {idea.angle && <p className="text-xs text-text-muted mt-0.5 italic">Angle: {idea.angle}</p>}
+                  <p className="text-xs text-white mt-1">{idea.hook}</p>
+                  {idea.angle && <p className="text-xs text-white/70 mt-0.5 italic">Angle: {idea.angle}</p>}
                   <div className="flex flex-wrap items-center gap-2 mt-2">
                     <span className="badge badge-primary text-[10px] capitalize">{idea.platform}</span>
                     <span className="text-[10px] text-text-muted bg-white/5 px-2 py-0.5 rounded">{idea.content_format}</span>
@@ -1748,7 +1806,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
     return (
       <div className="card p-12 text-center">
         <PencilSquareIcon className="w-12 h-12 mx-auto text-text-secondary mb-3" />
-        <p className="text-text-secondary">No ideas found</p>
+        <p className="text-white">No ideas found</p>
         <p className="text-xs text-text-muted mt-1">Go back to Step 2 to generate ideas first.</p>
       </div>
     );
@@ -1764,7 +1822,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
           <PencilSquareIcon className="w-5 h-5 text-purple-400" />
           AI Captions
         </h3>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-white">
           {isAllDone
             ? 'All captions generated! Select the ones you want to use, then click Next.'
             : 'Auto-generating 3 ready-to-post captions for each idea...'}
@@ -1814,7 +1872,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
                     <h4 className="text-sm font-semibold">{idea?.title || 'Content Idea'}</h4>
                     <PromptInfoButton prompt={captionUsedPrompts[String(ideaId)] || ''} label="Caption Generation Prompt" onRegenerate={(ep) => handleCaptionRegenerate(String(ideaId), ep)} regenerating={captionRegenerating[String(ideaId)] || false} regenerateLabel="Regenerate Captions" />
                   </div>
-                  {idea?.hook && <p className="text-xs text-text-secondary mt-1 ml-6">{idea.hook}</p>}
+                  {idea?.hook && <p className="text-xs text-white mt-1 ml-6">{idea.hook}</p>}
                   {idea?.angle && <p className="text-xs text-text-muted mt-0.5 ml-6 italic">{idea.angle}</p>}
                 </div>
                 {idea?.platform && (
@@ -1859,7 +1917,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
                           <span className="text-[9px] font-bold text-primary-400 bg-primary-500/20 px-1.5 py-0.5 rounded">SELECTED</span>
                         )}
                       </div>
-                      <p className="text-text-secondary whitespace-pre-wrap leading-relaxed mt-0.5">{caption.text}</p>
+                      <p className="text-white whitespace-pre-wrap leading-relaxed mt-0.5">{caption.text}</p>
                     </div>
                   </div>
                 </div>
@@ -1903,7 +1961,7 @@ Output the caption ONLY — no labels, no preamble, no explanation.${customInstr
               <PencilSquareIcon className="w-5 h-5 text-yellow-400" />
               Custom Caption Instructions
             </h3>
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs text-white">
               Tell the AI how you want the captions — tone, style, specific words, CTA, etc. This will be sent as a custom prompt.
             </p>
             <textarea
@@ -2205,7 +2263,7 @@ function MediaStep() {
     return (
       <div className="card p-12 text-center">
         <PhotoIcon className="w-12 h-12 mx-auto text-text-muted mb-3" />
-        <p className="text-sm text-text-secondary">No captions selected. Go back to the Captions step and select at least one.</p>
+        <p className="text-sm text-white">No captions selected. Go back to the Captions step and select at least one.</p>
       </div>
     );
   }
@@ -2217,7 +2275,7 @@ function MediaStep() {
           <PhotoIcon className="w-5 h-5 text-pink-400" />
           Media
         </h3>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-white">
           Generate or upload an image for each of your <span className="text-primary-400 font-medium">{captions.length}</span> selected caption{captions.length > 1 ? 's' : ''}.
           <span className="ml-2 text-green-400">{doneCount}/{captions.length} done</span>
         </p>
@@ -2266,7 +2324,7 @@ function MediaStep() {
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400">Needs media</span>
                   )}
                 </div>
-                <p className="text-xs text-text-secondary mt-0.5 truncate">{cap.text.substring(0, 80)}...</p>
+                <p className="text-xs text-white mt-0.5 truncate">{cap.text.substring(0, 80)}...</p>
               </div>
 
               <ChevronDownIcon className={`w-4 h-4 text-text-muted transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -2278,7 +2336,7 @@ function MediaStep() {
                 {/* Caption preview */}
                 <div className="bg-white/5 rounded-lg p-3">
                   <p className="text-[10px] text-text-muted mb-1 font-medium uppercase">Caption</p>
-                  <p className="text-xs text-text-secondary line-clamp-4">{cap.text}</p>
+                  <p className="text-xs text-white line-clamp-4">{cap.text}</p>
                 </div>
 
                 {/* Mode toggle */}
@@ -2752,7 +2810,7 @@ function CreatePostStep({ brandId }: { brandId: number | null }) {
       <div className="card p-12 text-center">
         <CheckCircleIcon className="w-16 h-16 mx-auto text-green-400 mb-4" />
         <h3 className="text-xl font-bold text-green-400">{captions.length} Post{captions.length > 1 ? 's' : ''} Created!</h3>
-        <p className="text-sm text-text-secondary mt-2">All posts have been scheduled. Continue to see them on the Calendar.</p>
+        <p className="text-sm text-white mt-2">All posts have been scheduled. Continue to see them on the Calendar.</p>
       </div>
     );
   }
@@ -2764,7 +2822,7 @@ function CreatePostStep({ brandId }: { brandId: number | null }) {
           <SparklesIcon className="w-5 h-5 text-primary-400" />
           Create Posts
         </h3>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-white">
           Review and schedule <span className="text-primary-400 font-medium">{captions.length}</span> post{captions.length > 1 ? 's' : ''}.
           <span className="ml-2 text-green-400">{createdCount}/{captions.length} created</span>
         </p>
@@ -2849,7 +2907,7 @@ function CreatePostStep({ brandId }: { brandId: number | null }) {
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400">Pending</span>
                   )}
                 </div>
-                <p className="text-xs text-text-secondary mt-0.5 truncate">{(postCaptions[cap.id] || cap.text).substring(0, 80)}...</p>
+                <p className="text-xs text-white mt-0.5 truncate">{(postCaptions[cap.id] || cap.text).substring(0, 80)}...</p>
               </div>
               <ChevronDownIcon className={`w-4 h-4 text-text-muted transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
             </button>
@@ -2939,7 +2997,7 @@ function CalendarStep() {
           <CalendarDaysIcon className="w-5 h-5 text-blue-400" />
           Content Calendar
         </h3>
-        <p className="text-sm text-text-secondary">Your post has been scheduled. You can view it on the full calendar.</p>
+        <p className="text-sm text-white">Your post has been scheduled. You can view it on the full calendar.</p>
       </div>
 
       <div className="card p-12 text-center">
@@ -2947,7 +3005,7 @@ function CalendarStep() {
           <>
             <CheckCircleIcon className="w-16 h-16 mx-auto text-green-400 mb-4" />
             <h3 className="text-xl font-bold mb-2">All Set!</h3>
-            <p className="text-sm text-text-secondary mb-6">Your content pipeline is ready. You've set up your strategy, generated ideas, written captions, and scheduled your first post.</p>
+            <p className="text-sm text-white mb-6">Your content pipeline is ready. You've set up your strategy, generated ideas, written captions, and scheduled your first post.</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => navigate('/calendar')} className="btn-secondary">
                 View Calendar

@@ -1,0 +1,396 @@
+[2026-03-10 01:06:03.248783] ==================================================
+[2026-03-10 01:06:03.248783] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:03.248783] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083157277,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083156002,
+          "message": {
+            "mid": "m_7OumQzd8Avv19an1khkgaj6emKAEKP43EIZtbCjJ16gNEOy8uEae8UKs0LSoWYi6NvXJTHjBDvCw0OMN6xhQYA",
+            "attachments": [
+              {
+    
+[2026-03-10 01:06:03.289315] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:03.291376] Processing 1 entries...
+[2026-03-10 01:06:03.459989] MessageHandler imported successfully
+[2026-03-10 01:06:03.469380] MessageHandler initialized OK
+[2026-03-10 01:06:03.476590] Message from 33046372111644819: '' (attachments: 1)
+[2026-03-10 01:06:23.842125] ==================================================
+[2026-03-10 01:06:23.843033] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:23.843033] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083177786,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083171929,
+          "message": {
+            "mid": "m_oPiHFbx8CVlFoI1YJPgj1D6emKAEKP43EIZtbCjJ16ik_A2y0XuUno4uqVmByuVdWJmsP2Z7ZPyVvPpmtrtACg",
+            "text": "Hi"
+          }
+        }
+  
+[2026-03-10 01:06:23.861208] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:23.861845] Processing 1 entries...
+[2026-03-10 01:06:23.862880] MessageHandler imported successfully
+[2026-03-10 01:06:23.869273] ==================================================
+[2026-03-10 01:06:23.873141] MessageHandler initialized OK
+[2026-03-10 01:06:23.873141] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:23.873141] Message from 33046372111644819: 'Hi' (attachments: 0)
+[2026-03-10 01:06:23.875990] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083177860,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083156002,
+          "message": {
+            "mid": "m_7OumQzd8Avv19an1khkgaj6emKAEKP43EIZtbCjJ16gNEOy8uEae8UKs0LSoWYi6NvXJTHjBDvCw0OMN6xhQYA",
+            "attachments": [
+              {
+    
+[2026-03-10 01:06:23.891572] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:23.892785] Processing 1 entries...
+[2026-03-10 01:06:23.894368] MessageHandler imported successfully
+[2026-03-10 01:06:23.905049] MessageHandler initialized OK
+[2026-03-10 01:06:23.905788] Message from 33046372111644819: '' (attachments: 1)
+[2026-03-10 01:06:34.561357] process_message result: True
+[2026-03-10 01:06:34.563376] Webhook handled OK, returning 200
+[2026-03-10 01:06:34.699601] ==================================================
+[2026-03-10 01:06:34.699601] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:34.701615] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083188940,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083188754,
+          "delivery": {
+            "mids": [
+              "m_15Jwc1jrORai75ZdnkbxYD6emKAEKP43EIZtbCjJ16gye8djV_r9CiN7DDmj7ciFYavWfgpaE3oiOHYsRIJpIg"
+            ],
+            "wate
+[2026-03-10 01:06:34.711863] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:34.711863] Processing 1 entries...
+[2026-03-10 01:06:34.713889] MessageHandler imported successfully
+[2026-03-10 01:06:34.718391] MessageHandler initialized OK
+[2026-03-10 01:06:34.720155] Webhook handled OK, returning 200
+[2026-03-10 01:06:36.111774] ==================================================
+[2026-03-10 01:06:36.112427] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:36.112427] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083190218,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083189643,
+          "delivery": {
+            "mids": [
+              "m_15Jwc1jrORai75ZdnkbxYD6emKAEKP43EIZtbCjJ16gye8djV_r9CiN7DDmj7ciFYavWfgpaE3oiOHYsRIJpIg"
+            ],
+            "wate
+[2026-03-10 01:06:36.127863] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:36.128649] Processing 1 entries...
+[2026-03-10 01:06:36.129375] MessageHandler imported successfully
+[2026-03-10 01:06:36.133360] MessageHandler initialized OK
+[2026-03-10 01:06:36.135584] Webhook handled OK, returning 200
+[2026-03-10 01:06:37.034120] ==================================================
+[2026-03-10 01:06:37.035712] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:37.035712] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083191198,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083190121,
+          "read": {
+            "watermark": 1773083188242
+          }
+        }
+      ]
+    }
+  ]
+}
+[2026-03-10 01:06:37.069707] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:37.073926] Processing 1 entries...
+[2026-03-10 01:06:37.073926] MessageHandler imported successfully
+[2026-03-10 01:06:37.077765] MessageHandler initialized OK
+[2026-03-10 01:06:37.077765] Webhook handled OK, returning 200
+[2026-03-10 01:06:37.126564] process_message result: True
+[2026-03-10 01:06:37.130890] Webhook handled OK, returning 200
+[2026-03-10 01:06:37.342277] ==================================================
+[2026-03-10 01:06:37.342277] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:37.344340] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083191564,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083191450,
+          "delivery": {
+            "mids": [
+              "m_dP_sL0Fm9HZSkD9YyndCkT6emKAEKP43EIZtbCjJ16ifYjWenh_5Hib7rq4tLIpcbLFA6B_eev4WhTCxHrbEug"
+            ],
+            "wate
+[2026-03-10 01:06:37.378277] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:37.378277] Processing 1 entries...
+[2026-03-10 01:06:37.378277] MessageHandler imported successfully
+[2026-03-10 01:06:37.384963] MessageHandler initialized OK
+[2026-03-10 01:06:37.386731] Webhook handled OK, returning 200
+[2026-03-10 01:06:38.161056] ==================================================
+[2026-03-10 01:06:38.162267] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:38.163996] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083192394,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083191560,
+          "read": {
+            "watermark": 1773083190828
+          }
+        }
+      ]
+    }
+  ]
+}
+[2026-03-10 01:06:38.189116] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:38.190523] Processing 1 entries...
+[2026-03-10 01:06:38.190523] MessageHandler imported successfully
+[2026-03-10 01:06:38.198714] MessageHandler initialized OK
+[2026-03-10 01:06:38.198714] Webhook handled OK, returning 200
+[2026-03-10 01:06:38.366255] ==================================================
+[2026-03-10 01:06:38.367554] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:06:38.367554] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083192610,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083192442,
+          "delivery": {
+            "mids": [
+              "m_dP_sL0Fm9HZSkD9YyndCkT6emKAEKP43EIZtbCjJ16ifYjWenh_5Hib7rq4tLIpcbLFA6B_eev4WhTCxHrbEug"
+            ],
+            "wate
+[2026-03-10 01:06:38.398468] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:06:38.400922] Processing 1 entries...
+[2026-03-10 01:06:38.403965] MessageHandler imported successfully
+[2026-03-10 01:06:38.408427] MessageHandler initialized OK
+[2026-03-10 01:06:38.408427] Webhook handled OK, returning 200
+[2026-03-10 01:09:43.271937] ==================================================
+[2026-03-10 01:09:43.271937] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:09:43.271937] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083377460,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083156002,
+          "message": {
+            "mid": "m_7OumQzd8Avv19an1khkgaj6emKAEKP43EIZtbCjJ16gNEOy8uEae8UKs0LSoWYi6NvXJTHjBDvCw0OMN6xhQYA",
+            "attachments": [
+              {
+    
+[2026-03-10 01:09:43.315465] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:09:43.315465] Processing 1 entries...
+[2026-03-10 01:09:43.326549] MessageHandler imported successfully
+[2026-03-10 01:09:43.340899] MessageHandler initialized OK
+[2026-03-10 01:09:43.341453] Message from 33046372111644819: '' (attachments: 1)
+[2026-03-10 01:10:06.705125] process_message result: True
+[2026-03-10 01:10:06.705125] Webhook handled OK, returning 200
+[2026-03-10 01:10:07.332075] ==================================================
+[2026-03-10 01:10:07.333167] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:10:07.333167] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083401662,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083401503,
+          "delivery": {
+            "mids": [
+              "m_c2t1a6nwtBwsPw1VbNTNRD6emKAEKP43EIZtbCjJ16icDvVTVKLIfcqcidHchNGXeUCgxnSNQ9p-0GZ2SP5vXA"
+            ],
+            "wate
+[2026-03-10 01:10:07.347348] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:10:07.348244] Processing 1 entries...
+[2026-03-10 01:10:07.348244] MessageHandler imported successfully
+[2026-03-10 01:10:07.354422] MessageHandler initialized OK
+[2026-03-10 01:10:07.354422] Webhook handled OK, returning 200
+[2026-03-10 01:10:10.363082] ==================================================
+[2026-03-10 01:10:10.363622] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:10:10.364159] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083404598,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083156002,
+          "message": {
+            "mid": "m_7OumQzd8Avv19an1khkgaj6emKAEKP43EIZtbCjJ16gNEOy8uEae8UKs0LSoWYi6NvXJTHjBDvCw0OMN6xhQYA",
+            "attachments": [
+              {
+    
+[2026-03-10 01:10:10.380792] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:10:10.381507] Processing 1 entries...
+[2026-03-10 01:10:10.382015] MessageHandler imported successfully
+[2026-03-10 01:10:10.385966] MessageHandler initialized OK
+[2026-03-10 01:10:10.385966] Message from 33046372111644819: '' (attachments: 1)
+[2026-03-10 01:10:26.067450] process_message result: True
+[2026-03-10 01:10:26.068151] Webhook handled OK, returning 200
+[2026-03-10 01:10:26.489375] ==================================================
+[2026-03-10 01:10:26.490374] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:10:26.490936] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083420813,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083420674,
+          "delivery": {
+            "mids": [
+              "m_7Ln_PYXpJmnOO435XbKy-D6emKAEKP43EIZtbCjJ16j82S1ywcFc-rprx7BKVKyLuttVT1VCZBr7u0hDtk6LEg"
+            ],
+            "wate
+[2026-03-10 01:10:26.504302] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:10:26.504302] Processing 1 entries...
+[2026-03-10 01:10:26.506621] MessageHandler imported successfully
+[2026-03-10 01:10:26.511683] MessageHandler initialized OK
+[2026-03-10 01:10:26.511683] Webhook handled OK, returning 200
+[2026-03-10 01:11:57.207746] ==================================================
+[2026-03-10 01:11:57.208280] WEBHOOK POST received for page: 877455748776936
+[2026-03-10 01:11:57.208280] Data: {
+  "object": "page",
+  "entry": [
+    {
+      "time": 1773083511111,
+      "id": "877455748776936",
+      "messaging": [
+        {
+          "sender": {
+            "id": "33046372111644819"
+          },
+          "recipient": {
+            "id": "877455748776936"
+          },
+          "timestamp": 1773083510563,
+          "read": {
+            "watermark": 1773083420013
+          }
+        }
+      ]
+    }
+  ]
+}
+[2026-03-10 01:11:57.216506] Connection found: customoo (auto_reply=True)
+[2026-03-10 01:11:57.217130] Processing 1 entries...
+[2026-03-10 01:11:57.217130] MessageHandler imported successfully
+[2026-03-10 01:11:57.217130] MessageHandler initialized OK
+[2026-03-10 01:11:57.221738] Webhook handled OK, returning 200

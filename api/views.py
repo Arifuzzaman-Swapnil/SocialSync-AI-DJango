@@ -3158,6 +3158,10 @@ Return ONLY a single JSON object with all 15 fields as keys.
                 is_active=True,
             )
 
+            # Save prompt to history
+            from brands.models import PromptHistory
+            PromptHistory.save_prompt(brand, 'brand_dna', prompt)
+
             return Response({
                 'success': True,
                 'brand_dna': dna_data,
@@ -3336,6 +3340,11 @@ Return ONLY a single JSON object with all 15 Brand DNA fields.
             source=source,
             is_active=True,
         )
+
+        # Save prompt to history
+        if used_prompt:
+            from brands.models import PromptHistory
+            PromptHistory.save_prompt(brand, 'brand_dna', used_prompt)
 
         return Response({
             'success': True,

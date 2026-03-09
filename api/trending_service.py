@@ -419,6 +419,9 @@ TOP QUERIES (most searched related to brand keywords):
                 'category': t.get('category', 'industry'),
             })
 
+        from brands.models import PromptHistory
+        PromptHistory.save_prompt(brand, 'trending', prompt)
+
         return {
             'success': True,
             'brand_id': brand.id,
@@ -426,6 +429,7 @@ TOP QUERIES (most searched related to brand keywords):
             'source': 'google_trends+llm' if all_trends else 'llm',
             'topics': created,
             'google_trends_count': len(all_trends),
+            'used_prompt': prompt,
         }
 
     except json.JSONDecodeError as e:
@@ -500,4 +504,5 @@ def _save_raw_trends(brand, trends, keywords, geo='global'):
         'count': len(created),
         'source': 'google_trends_raw' if trends else 'keywords',
         'topics': created,
+        'used_prompt': '',
     }

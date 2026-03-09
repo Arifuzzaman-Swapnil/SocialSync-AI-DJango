@@ -14,7 +14,8 @@ from accounts.permissions import IsWorkspaceAdmin, IsCreatorOrAbove, IsViewerOrA
 
 from brands.models import (
     Brand, Workspace, ContentPillar, CompetitorProfile, CompetitorInsight,
-    BrandTemplate, TrendingCache, ContentIdea, BrandDNAHistory, OverflowProgress
+    BrandTemplate, TrendingCache, ContentIdea, BrandDNAHistory, OverflowProgress,
+    PromptHistory,
 )
 from .serializers import (
     ContentPillarSerializer, CompetitorProfileSerializer,
@@ -531,6 +532,11 @@ Return ONLY valid JSON array — no markdown, no commentary."""},
                 profile.last_crawled_at = timezone.now()
                 profile.save(update_fields=['last_crawled_at'])
 
+            # Save prompts to history
+            from brands.models import PromptHistory
+            combined_prompt = '\n---\n'.join(all_used_prompts) if all_used_prompts else ''
+            PromptHistory.save_prompt(brand, 'competitors', combined_prompt)
+
             return Response({
                 'message': f'Analysis complete for {profiles.count()} competitor(s), crawled {pages_crawled_total} pages',
                 'brand_id': brand.id,
@@ -876,6 +882,10 @@ Return ONLY a JSON array of exactly {count} objects:
                 LearningSignal.objects.filter(
                     id__in=[s.id for s in learning_signals]
                 ).update(applied=True)
+
+            # Save prompt to history
+            from brands.models import PromptHistory
+            PromptHistory.save_prompt(brand, 'ideas', prompt)
 
             return Response({
                 'brand_id': brand.id,
@@ -1366,11 +1376,16 @@ IMPORTANT: Only suggest companies you are confident are real. If unsure about a 
             result = json.loads(llm_result.content)
             suggestions = result.get('competitors', [])
 
+            # Save prompt to history
+            from brands.models import PromptHistory
+            full_prompt = f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}"
+            PromptHistory.save_prompt(brand, 'suggest_competitors', full_prompt)
+
             return Response({
                 'brand_id': brand.id,
                 'count': len(suggestions),
                 'suggestions': suggestions,
-                'used_prompt': f"SYSTEM:\n{system_prompt}\n\nUSER:\n{prompt}",
+                'used_prompt': full_prompt,
             })
 
         except Exception as e:
@@ -1581,6 +1596,10 @@ Existing pillars (DO NOT duplicate): {', '.join(existing_pillars) if existing_pi
                 )
                 created_pillars.append(pillar)
 
+            # Save prompt to history
+            from brands.models import PromptHistory
+            PromptHistory.save_prompt(brand, 'pillars', prompt)
+
             serializer = ContentPillarSerializer(created_pillars, many=True)
             return Response({
                 'brand_id': brand.id,
@@ -1694,3 +1713,46 @@ class ManualTrendView(APIView):
             'relevance_explanation': trend.relevance_explanation,
             'expires_at': trend.expires_at.isoformat(),
         }, status=status.HTTP_201_CREATED)
+
+
+class PromptHistoryView(APIView):
+    """Get prompt history for a brand + feature"""
+    permission_classes = [IsAuthenticated, IsViewerOrAbove]
+
+    def get(self, request, brand_id):
+        try:
+            brand = Brand.objects.get(
+                Q(user=request.user) | Q(workspace__owner=request.user),
+                id=brand_id
+            )
+        except Brand.DoesNotExist:
+            return Response({'error': 'Brand not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        feature = request.query_params.get('feature', '')
+        valid_features = [c[0] for c in PromptHistory.FEATURE_CHOICES]
+
+        if feature and feature not in valid_features:
+            return Response(
+                {'error': f'Invalid feature. Choose from: {", ".join(valid_features)}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        qs = PromptHistory.objects.filter(brand=brand)
+        if feature:
+            qs = qs.filter(feature=feature)
+
+        entries = qs.order_by('-created_at')[:10]
+
+        return Response({
+            'brand_id': brand.id,
+            'feature': feature or 'all',
+            'history': [
+                {
+                    'id': e.id,
+                    'feature': e.feature,
+                    'prompt_text': e.prompt_text,
+                    'created_at': e.created_at.isoformat(),
+                }
+                for e in entries
+            ],
+        })

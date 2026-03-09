@@ -23,13 +23,13 @@ ALLOWED_HOSTS = [
     'localhost',
     'abedintechllc.com',
     'www.abedintechllc.com',
-    'idiomatic-davida-subacrid.ngrok-free.dev',
+    'lorilee-neediest-zina.ngrok-free.dev',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     'https://abedintechllc.com',
     'https://www.abedintechllc.com',
-    'https://idiomatic-davida-subacrid.ngrok-free.dev',
+    'https://lorilee-neediest-zina.ngrok-free.dev',
 ]
 
 # Application definition
@@ -224,7 +224,7 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:3000',
     'https://abedintechllc.com',
     'https://www.abedintechllc.com',
-    'https://idiomatic-davida-subacrid.ngrok-free.dev',
+    'https://lorilee-neediest-zina.ngrok-free.dev',
 ]
 
 CORS_ALLOW_CREDENTIALS = True

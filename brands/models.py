@@ -619,6 +619,48 @@ class BrandDNAHistory(models.Model):
         return f"DNA v{self.id} - {self.brand.brand_name} ({self.generated_at:%Y-%m-%d})"
 
 
+class PromptHistory(models.Model):
+    """Stores AI prompts used across all strategy features for history/reuse."""
+
+    FEATURE_CHOICES = [
+        ('brand_dna', 'Brand DNA'),
+        ('competitors', 'Competitor Analysis'),
+        ('pillars', 'Content Pillars'),
+        ('trending', 'Trending Topics'),
+        ('ideas', 'Content Ideas'),
+        ('suggest_competitors', 'Competitor Suggestions'),
+    ]
+
+    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='prompt_history')
+    feature = models.CharField(max_length=30, choices=FEATURE_CHOICES)
+    prompt_text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'prompt_history'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['brand', 'feature', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.feature} prompt for {self.brand.brand_name} ({self.created_at:%Y-%m-%d %H:%M})"
+
+    @classmethod
+    def save_prompt(cls, brand, feature, prompt_text):
+        """Save a prompt and enforce max 10 per brand+feature."""
+        if not prompt_text:
+            return None
+        obj = cls.objects.create(brand=brand, feature=feature, prompt_text=prompt_text)
+        ids_to_keep = list(
+            cls.objects.filter(brand=brand, feature=feature)
+            .order_by('-created_at')
+            .values_list('id', flat=True)[:10]
+        )
+        cls.objects.filter(brand=brand, feature=feature).exclude(id__in=ids_to_keep).delete()
+        return obj
+
+
 class OverflowProgress(models.Model):
     """Tracks user progress through the guided overflow flow"""
 

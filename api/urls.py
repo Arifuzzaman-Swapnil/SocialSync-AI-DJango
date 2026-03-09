@@ -198,6 +198,7 @@ urlpatterns = [
     path('brands/<int:brand_id>/pillars/generate/', strategy_views.GeneratePillarsView.as_view(), name='api-generate-pillars'),
     path('brands/<int:brand_id>/trending/feedback/', strategy_views.TrendFeedbackView.as_view(), name='api-trend-feedback'),
     path('brands/<int:brand_id>/trending/manual/', strategy_views.ManualTrendView.as_view(), name='api-manual-trend'),
+    path('brands/<int:brand_id>/prompt-history/', strategy_views.PromptHistoryView.as_view(), name='api-prompt-history'),
     path('schedule/compute-times/', scheduling_views.ComputeRecommendedTimesView.as_view(), name='api-compute-times'),
 
     # Draft Captions

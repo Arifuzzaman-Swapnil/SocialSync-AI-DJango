@@ -129,6 +129,13 @@ export interface OverflowStatus {
   current_step: number;
 }
 
+export interface PromptHistoryEntry {
+  id: number;
+  feature: string;
+  prompt_text: string;
+  created_at: string;
+}
+
 export interface User {
   id: number;
   username: string;
