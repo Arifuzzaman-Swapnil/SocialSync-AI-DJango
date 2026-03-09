@@ -147,7 +147,7 @@ export function StrategyHubPage() {
   const [suggestRegenerating, setSuggestRegenerating] = useState(false);
 
   // Prompt history hooks
-  const dnaHistory = usePromptHistory(brandId, 'brand_dna');
+  const dnaPromptHistory = usePromptHistory(brandId, 'brand_dna');
   const competitorHistory = usePromptHistory(brandId, 'competitors');
   const pillarsHistory = usePromptHistory(brandId, 'pillars');
   const trendingHistory = usePromptHistory(brandId, 'trending');
@@ -1462,7 +1462,7 @@ export function StrategyHubPage() {
                 <h3 className="text-lg font-semibold mb-4 flex items-center justify-between">
                   <span className="flex items-center gap-2">
                     Brand Identity
-                    {dnaUsedPrompt && <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" onRegenerate={handleDNARegenerate} regenerating={dnaRegenerating} regenerateLabel="Regenerate DNA" promptHistory={dnaHistory.history} onLoadHistory={dnaHistory.load} historyLoading={dnaHistory.loading} />}
+                    {dnaUsedPrompt && <PromptInfoButton prompt={dnaUsedPrompt} label="Brand DNA Generation Prompt" onRegenerate={handleDNARegenerate} regenerating={dnaRegenerating} regenerateLabel="Regenerate DNA" promptHistory={dnaPromptHistory.history} onLoadHistory={dnaPromptHistory.load} historyLoading={dnaPromptHistory.loading} />}
                   </span>
                   <button onClick={handleEnterDnaEdit} className="p-1 rounded hover:bg-white/10 text-text-muted hover:text-primary-400 transition-colors"><PencilIcon className="w-4 h-4" /></button>
                 </h3>
