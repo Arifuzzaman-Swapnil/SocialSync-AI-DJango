@@ -148,8 +148,8 @@ Ensure professional quality with clear composition, consistent lighting, and a c
     def _generate_with_gemini_flash(self, prompt, width, height):
         """Generate using Gemini Flash with image output (tries latest first)"""
         models_to_try = [
+            'gemini-3.1-flash-image-preview',
             'gemini-2.5-flash-preview-image-generation',
-            'gemini-2.0-flash-exp-image-generation',
         ]
 
         last_error = 'No models available'

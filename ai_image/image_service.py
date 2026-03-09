@@ -100,7 +100,7 @@ class ImageService:
                 seed=seed
             )
             result['provider'] = 'gemini'
-            result['model_used'] = result.get('model_used', 'gemini-2.5-flash')
+            result['model_used'] = result.get('model_used', 'gemini-3.1-flash-image-preview')
         
         return result
     
@@ -176,16 +176,16 @@ class ImageService:
                 'name': 'Google Gemini',
                 'models': [
                     {
-                        'id': 'gemini-2.5-flash',
-                        'name': 'Gemini 2.5 Flash',
+                        'id': 'gemini-3.1-flash-image-preview',
+                        'name': 'Gemini 3.1 Flash',
                         'description': 'Latest image generation model',
                         'sizes': ['Any size'],
                         'default': True
                     },
                     {
-                        'id': 'gemini-2.0-flash-exp',
-                        'name': 'Gemini 2.0 Flash',
-                        'description': 'Experimental image generation (fallback)',
+                        'id': 'gemini-2.5-flash',
+                        'name': 'Gemini 2.5 Flash',
+                        'description': 'Previous generation (fallback)',
                         'sizes': ['Any size'],
                         'default': False
                     }

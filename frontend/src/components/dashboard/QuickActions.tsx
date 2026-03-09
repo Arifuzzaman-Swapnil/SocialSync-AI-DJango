@@ -9,6 +9,7 @@ import {
   VideoCameraIcon,
   SpeakerWaveIcon,
   ChatBubbleLeftRightIcon,
+  RocketLaunchIcon,
 } from '@heroicons/react/24/outline';
 
 interface QuickAction {
@@ -20,6 +21,13 @@ interface QuickAction {
 }
 
 const actions: QuickAction[] = [
+  {
+    name: 'Setup',
+    description: 'Brand & strategy',
+    href: '/overflow',
+    icon: RocketLaunchIcon,
+    color: 'from-warning to-accent',
+  },
   {
     name: 'Create Post',
     description: 'Schedule a new post',
