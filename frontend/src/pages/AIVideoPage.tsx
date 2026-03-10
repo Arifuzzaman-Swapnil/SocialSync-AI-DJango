@@ -41,6 +41,7 @@ import type {
 } from '../types';
 import { authFetch } from '../services/api';
 import { PromptInfoButton } from '../components/ui/PromptInfoButton';
+import { DiamondCostIndicator } from '../components/diamond';
 
 // Style options
 const styles: { id: VideoStyle; label: string }[] = [
@@ -848,7 +849,7 @@ export function AIVideoPage() {
               leftIcon={<SparklesIcon className="w-5 h-5" />}
               className="bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600"
             >
-              Generate Video
+              Generate Video <DiamondCostIndicator cost={500} className="ml-2" />
             </Button>
           </div>
 

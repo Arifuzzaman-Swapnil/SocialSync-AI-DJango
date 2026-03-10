@@ -36,6 +36,7 @@ import { Button, Card, Input, Textarea, Modal, Spinner, PlatformIcon } from '../
 import type { CaptionGeneration, CaptionTemplate, SavedCaption, CaptionTone, CaptionLength, CaptionPlatform, TemplateCategory, GenerationStatus } from '../types';
 import { authFetch } from '../services/api';
 import { PromptInfoButton } from '../components/ui/PromptInfoButton';
+import { DiamondCostIndicator } from '../components/diamond';
 
 // Tone options with icons
 const tones: { id: CaptionTone; label: string; Icon: typeof BriefcaseIcon; description: string }[] = [
@@ -654,7 +655,7 @@ export function AICaptionPage() {
               leftIcon={<SparklesIcon className="w-5 h-5" />}
               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
             >
-              Generate Caption
+              Generate Caption <DiamondCostIndicator cost={5} className="ml-2" />
             </Button>
           </div>
 

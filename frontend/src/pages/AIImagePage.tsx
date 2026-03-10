@@ -26,6 +26,7 @@ import {
 import { HeartIcon as HeartSolidIcon, StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { formatDistanceToNow } from 'date-fns';
 import { Button, Card, Input, Textarea, Modal, Spinner } from '../components/ui';
+import { DiamondCostIndicator } from '../components/diamond';
 import type {
   ImageGeneration,
   SavedImage,
@@ -979,7 +980,7 @@ export function AIImagePage() {
               leftIcon={<SparklesIcon className="w-5 h-5" />}
               className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
             >
-              Generate Image
+              Generate Image <DiamondCostIndicator cost={15} className="ml-2" />
             </Button>
           </div>
 

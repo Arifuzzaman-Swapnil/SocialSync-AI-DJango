@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { formatDistanceToNow } from 'date-fns';
 import { Button, Card, Input, Textarea, Spinner } from '../components/ui';
+import { DiamondCostIndicator } from '../components/diamond';
 import voiceService from '../services/voiceService';
 import type { VoiceGeneration, UserVoiceSettings } from '../services/voiceService';
 
@@ -444,7 +445,7 @@ export function AIVoicePage() {
                 leftIcon={<SparklesIcon className="w-5 h-5" />}
                 className="bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
               >
-                Generate Voice
+                Generate Voice <DiamondCostIndicator cost={5} className="ml-2" />
               </Button>
             </div>
           </div>
