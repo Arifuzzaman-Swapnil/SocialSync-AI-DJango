@@ -53,7 +53,7 @@ const themeOptions: { value: ThemeMode; label: string; icon: typeof MoonIcon }[]
 ];
 
 export function SettingsPage() {
-  const { logout, user } = useAuthStore();
+  const { logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [saved, setSaved] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);

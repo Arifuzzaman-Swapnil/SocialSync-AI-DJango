@@ -848,12 +848,6 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             profile.phone = data['phone']
         if 'company' in data:
             profile.company = data['company']
-        if 'api_mode' in data:
-            profile.api_mode = data['api_mode']
-        if 'openai_api_key' in data:
-            profile.admin_openai_key = data['openai_api_key']
-        if 'gemini_api_key' in data:
-            profile.admin_gemini_key = data['gemini_api_key']
         profile.save()
 
         return Response(UserDetailSerializer(user).data)
