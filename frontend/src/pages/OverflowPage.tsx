@@ -2523,7 +2523,7 @@ function MediaStep() {
         if (anyResult) { const gp = anyResult.enhanced_prompt || anyResult.revised_prompt || ''; if (gp) setImageUsedPrompts((p) => ({ ...p, [captionId]: gp })); }
       } else {
         const result = await imageService.generate(buildReq(provider));
-        const rawUrl = result.composited_image || result.generated_image || result.generated_image_with_logo || null;
+        const rawUrl = result.generated_image_with_logo || result.composited_image || result.generated_image || null;
         const imageUrl = toMediaUrl(rawUrl);
         overflow.setCaptionMedia(captionId, imageUrl, result.id || null);
         if (result.id) overflow.addMedia(result.id);
@@ -3022,7 +3022,7 @@ function MediaStep() {
                               <p className="text-[10px] text-red-400">Failed to generate</p>
                             </div>
                           );
-                          const provUrl = toMediaUrl(provResult.composited_image || provResult.generated_image || provResult.generated_image_with_logo || null);
+                          const provUrl = toMediaUrl(provResult.generated_image_with_logo || provResult.composited_image || provResult.generated_image || null);
                           const isSelected = media?.mediaId === (provResult.id || null);
                           return (
                             <div key={prov} className={`rounded-lg border p-2 space-y-2 ${isSelected ? 'border-green-500/50 bg-green-500/5' : 'border-white/10'}`}>
